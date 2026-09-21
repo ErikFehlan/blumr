@@ -181,7 +181,7 @@
     status.className = 'rf-auth-message ' + (error ? 'error' : 'success');
     status.textContent = error ? (error.message || 'Your password could not be updated.') : 'Password updated successfully.';
     if (!error) {
-      event.currentTarget.reset();
+      document.getElementById('resetPasswordForm').reset();
       window.setTimeout(function () { resetPasswordModal.hidden = true; }, 900);
     }
   });
@@ -311,7 +311,7 @@
       return;
     }
 
-    event.currentTarget.reset();
+    document.getElementById('passwordForm').reset();
     status.textContent = 'Password saved. Use it the next time you sign in.';
   });
 

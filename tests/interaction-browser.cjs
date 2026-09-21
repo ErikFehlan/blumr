@@ -58,6 +58,7 @@ async function open(t, options = {}) {
         signInWithPassword: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: { code: 'invalid_credentials', message: 'Invalid login credentials' } }; },
         signUp: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { data: { session: null }, error: null }; },
         resetPasswordForEmail: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: null }; },
+        updateUser: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); window.auditPasswordUpdates = (window.auditPasswordUpdates || 0) + 1; return { error: null }; },
         signOut: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: null }; }
       },
       from: () => ({ select: () => ({ limit: () => ({ maybeSingle: async () => ({ data: { workspace_id: 'synthetic-workspace', role: 'owner', workspaces: { name: 'Synthetic workspace' } }, error: null }) }) }) })
@@ -236,5 +237,24 @@ test('an expired session during loading reveals sign-in and ignores late workspa
   await page.waitForTimeout(100);
   assert.equal(await page.locator('#rf-app').isVisible(), false);
   assert.equal(await page.locator('body.rf-data-loading').count(), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('password settings and recovery finish cleanly after an asynchronous save', async t => {
+  const { page, errors } = await open(t);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.locator('#newPassword').fill('Synthetic-password-only');
+  await page.locator('#confirmPassword').fill('Synthetic-password-only');
+  await page.locator('#passwordSubmit').click();
+  await page.waitForFunction(() => document.getElementById('passwordMessage').textContent.includes('Password saved'));
+  assert.equal(await page.locator('#newPassword').inputValue(), '');
+  await page.evaluate(() => window.auditAuthCallback('PASSWORD_RECOVERY', null));
+  await page.locator('#resetPasswordModal').waitFor({ state: 'visible' });
+  await page.locator('#recoveryNewPassword').fill('Synthetic-password-only');
+  await page.locator('#recoveryConfirmPassword').fill('Synthetic-password-only');
+  await page.locator('#resetPasswordSubmit').click();
+  await page.locator('#resetPasswordModal').waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('#recoveryNewPassword').inputValue(), '');
+  assert.equal(await page.evaluate(() => window.auditPasswordUpdates), 2);
   assert.deepEqual(errors, []);
 });
