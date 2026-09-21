@@ -21,6 +21,13 @@
   let appliedAccessToken = null;
   let authMode = 'signin';
 
+  async function requestAuth(action) {
+    try { return await action(); }
+    catch {
+      return { data: null, error: { code: 'connection_failed', message: 'The request could not finish. Check your connection and try again.' } };
+    }
+  }
+
   function showMessage(text, type) {
     message.textContent = text;
     message.className = 'rf-auth-message' + (type ? ' ' + type : '');
@@ -146,7 +153,7 @@
     button.disabled = true;
     button.textContent = 'Sending…';
     const redirectTo = window.location.origin + window.location.pathname;
-    const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+    const { error } = await requestAuth(() => client.auth.resetPasswordForEmail(email, { redirectTo }));
     button.disabled = false;
     button.textContent = 'Send reset link';
     status.className = 'rf-auth-message ' + (error ? 'error' : 'success');
@@ -168,7 +175,7 @@
     }
     button.disabled = true;
     button.textContent = 'Saving…';
-    const { error } = await client.auth.updateUser({ password });
+    const { error } = await requestAuth(() => client.auth.updateUser({ password }));
     button.disabled = false;
     button.textContent = 'Save new password';
     status.className = 'rf-auth-message ' + (error ? 'error' : 'success');
@@ -231,11 +238,11 @@
       submitButton.textContent = 'Creating account…';
       showMessage('Creating your private workspace…');
       const redirectTo = window.location.origin + window.location.pathname;
-      const { data, error } = await client.auth.signUp({
+      const { data, error } = await requestAuth(() => client.auth.signUp({
         email,
         password,
         options: { data: { display_name: displayName }, emailRedirectTo: redirectTo }
-      });
+      }));
       submitButton.disabled = false;
       submitButton.textContent = 'Create account';
 
@@ -260,13 +267,15 @@
     submitButton.textContent = 'Signing in…';
     showMessage('Signing in securely…');
 
-    const { error } = await client.auth.signInWithPassword({ email, password });
+    const { error } = await requestAuth(() => client.auth.signInWithPassword({ email, password }));
 
     submitButton.disabled = false;
     submitButton.textContent = 'Sign in';
 
     if (error) {
-      showMessage('The email or password is incorrect.', 'error');
+      showMessage(error.code === 'invalid_credentials' || /invalid.*credentials/i.test(error.message || '')
+        ? 'The email or password is incorrect.'
+        : error.message || 'Sign-in could not finish. Please try again.', 'error');
       return;
     }
 
@@ -293,7 +302,7 @@
     button.disabled = true;
     button.textContent = 'Saving…';
     status.textContent = 'Updating your account…';
-    const { error } = await client.auth.updateUser({ password });
+    const { error } = await requestAuth(() => client.auth.updateUser({ password }));
     button.disabled = false;
     button.textContent = 'Set Password';
 
@@ -329,7 +338,7 @@
     window.setTimeout(function () { applySession(client, session); }, 0);
   });
 
-  client.auth.getSession().then(function ({ data, error }) {
+  requestAuth(() => client.auth.getSession()).then(function ({ data, error }) {
     if (error) {
       showGuest();
       showMessage(error.message || 'Your session could not be restored.', 'error');
