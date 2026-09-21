@@ -1,0 +1,99 @@
+// Real UI and backend, exclusively temporary accounts and synthetic documents.
+const {chromium}=require('playwright');
+const assert=require('node:assert/strict'),fs=require('node:fs/promises');
+const {setTimeout:delay}=require('node:timers/promises');
+const results=[],output='test-results/live';
+let browser,page,stage='setup';
+(async()=>{
+ const fixture=JSON.parse(await fs.readFile(process.env.LIVE_FIXTURE_FILE,'utf8'));
+ assert.equal(fixture.app,'https://blumr.io/');assert.equal(fixture.base,'https://zqiqjzxcpznhzjengfff.supabase.co');
+ assert.equal(fixture.users.length,2);assert.notEqual(fixture.users[0].workspace,fixture.users[1].workspace);
+ const [owner,other]=fixture.users;
+ for(const user of fixture.users)for(const key of ['password','access'])if(process.env.GITHUB_ACTIONS)console.log('::add-mask::'+user[key]);
+ await fs.mkdir(output,{recursive:true});
+ const api=async(user,path)=>{
+  const r=await fetch(fixture.base+'/rest/v1/'+path,{headers:{apikey:fixture.anon,Authorization:'Bearer '+user.access},signal:AbortSignal.timeout(20000)});
+  if(!r.ok)throw Error('Read-only verification failed: HTTP '+r.status);return r.json();
+ };
+ const poll=async(check,message,timeout=90000)=>{const end=Date.now()+timeout;while(Date.now()<end){const found=await check();if(found)return found;await delay(1000);}throw Error(message);};
+ const pass=message=>{results.push({check:message,status:'passed'});console.log('PASS: '+message);};
+ const errors=[];
+ browser=await chromium.launch({headless:true});
+ const context=await browser.newContext({viewport:{width:1440,height:1000}});
+ page=await context.newPage();page.setDefaultTimeout(20000);page.on('pageerror',()=>errors.push('Unhandled application error'));
+ const login=async(user)=>{
+  const response=await page.goto(fixture.app,{waitUntil:'domcontentloaded',timeout:45000});assert.equal(response.status(),200);
+  await page.locator('.an-header [data-auth-mode="signin"]').click();
+  await page.locator('#authEmail').fill(user.email);await page.locator('#authPassword').fill(user.password);await page.locator('#authSubmit').click();
+  await page.locator('#page-home.active').waitFor({timeout:60000});
+ };
+ const nav=async(name)=>{
+  if(await page.locator('#mobileNavToggle').isVisible()&&!await page.locator('.rf-nav').isVisible())await page.locator('#mobileNavToggle').click();
+  await page.locator(`.rf-nav [data-page="${name}"]`).click();await page.locator(`#page-${name}.active`).waitFor();
+ };
+ stage='login';await login(owner);pass('Live password login reaches Home');
+ stage='create-job';await page.locator('[data-home-action="new"]').click();
+ const jobTitle='Synthetic live QA '+fixture.run.slice(0,8);
+ await page.locator('#jobTitle').fill(jobTitle);
+ await page.locator('#jobDescription').fill('QA Analyst: own manual regression testing, create test plans, document defects, validate fixes, and use SQL to verify billing data. Collaborate with engineers and product managers.');
+ await page.locator('#jobCriteria').fill('Manual regression testing\nDefect documentation and remediation\nSQL data validation');
+ await page.locator('#jobForm button[type="submit"]').click();await page.locator('#page-candidates.active').waitFor();
+ const job=await poll(async()=> (await api(owner,'jobs?select=id,title&workspace_id=eq.'+owner.workspace)).find(j=>j.title===jobTitle),'Job was not saved');
+ pass('Create a job through the live UI and persist it');
+ stage='navigation';
+ for(const name of ['dashboard','candidates','pipeline','feedback','outcomes','criteria','rankings','compare','benchmarks','insights','learn','backend','jobs','home'])await nav(name);
+ pass('All standard workspace tabs respond');
+ const docs=[{name:'Synthetic-Alex.pdf',mimeType:'application/pdf',buffer:require('./fixtures/pdf-resume.cjs')()},
+  {name:'Synthetic-Jamie.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:await require('./fixtures/docx-resume.cjs')()}];
+ const candidateIds=[];
+ for(const doc of docs){
+  stage='upload-'+doc.name;await nav('candidates');await page.locator('#resumeUpload').setInputFiles(doc);
+  await page.locator('#page-detail.active').waitFor();
+  const id=await poll(()=>page.locator('#candidateWorkspace').getAttribute('data-workspace-candidate'),'Candidate was not opened');candidateIds.push(id);
+  const saved=await poll(async()=> (await api(owner,'candidate_documents?select=file_name,extracted_text,storage_path&candidate_id=eq.'+id)).find(d=>d.file_name===doc.name),'Uploaded document was not persisted');
+  assert.ok(saved.extracted_text?.length>80,'Resume text was not extracted');assert.ok(saved.storage_path.startsWith(owner.workspace+'/'));
+  const task=await poll(async()=>{const t=(await api(owner,'resume_intake_tasks?select=status,result&candidate_id=eq.'+id))[0];if(t?.status==='failed')throw Error('Live AI intake failed');return t?.status==='ready'?t:null;},'AI intake did not finish',240000);
+  assert.ok(task.result.resume_evidence?.length,'AI response has no resume evidence');
+  assert.ok(task.result.model,'AI response has no model provenance');
+  for(const item of task.result.resume_evidence)assert.ok(saved.extracted_text.includes(item.quote),'Resume quotation is not grounded in uploaded text');
+  const before=(await api(owner,'candidates?select=manager_score&id=eq.'+id))[0];
+  assert.ok(before.manager_score==null||Number(before.manager_score)===0,'Unapproved assessment changed the rating');
+  await page.locator('#workspaceIntake [data-intake-approve]').waitFor({timeout:60000});
+  await page.screenshot({path:`${output}/${doc.name.endsWith('pdf')?'pdf':'docx'}-assessment.png`,mask:[page.locator('input[type="password"]')]});
+  await page.locator('#workspaceIntake [data-intake-approve]').click();
+  await poll(async()=> (await api(owner,'resume_intake_tasks?select=status&candidate_id=eq.'+id))[0]?.status==='approved','Assessment approval was not saved');
+  const after=(await api(owner,'candidates?select=manager_score,resume_jd_score&id=eq.'+id))[0];
+  assert.equal(Number(after.manager_score),Number(task.result.manager_score));assert.equal(Number(after.resume_jd_score),Number(task.result.score));
+  pass(`${doc.name.endsWith('pdf')?'PDF':'DOCX'} upload, text extraction, real AI assessment, grounded evidence and explicit approval`);
+ }
+ stage='submittal';
+ await page.locator('#workspaceSubmission > summary').click();const draft='Synthetic submittal: manual regression testing and documented defect remediation.';
+ await page.locator('#submissionDraft').fill(draft);await page.locator('#saveSubmissionDraft').click();
+ const last=candidateIds.at(-1);
+ await poll(async()=> (await api(owner,'candidate_assessments?select=evidence&candidate_id=eq.'+last)).some(a=>a.evidence?.submission_draft?.text===draft),'Submittal draft was not persisted');
+ stage='feedback';await nav('feedback');await page.locator('#feedbackText').fill('Synthetic feedback: demonstrated ownership of regression coverage; clarify the SQL work they personally completed.');
+ await page.locator('#feedbackSubmitBtn').click();await page.locator('#feedbackList [data-accept-interpretation]').first().waitFor({timeout:180000});
+ const feedback=await api(owner,'manager_feedback?select=id,feedback_text&job_id=eq.'+job.id);assert.equal(feedback.length,1);assert.match(feedback[0].feedback_text,/Synthetic feedback/);
+ pass('Manager feedback is saved and receives an AI interpretation');
+ stage='reload';await page.locator('#syncStatus[data-state="saved"]').waitFor();await page.reload();await page.locator('#page-home.active').waitFor({timeout:60000});
+ await nav('jobs');await page.locator(`[data-activate-job="${job.id}"]`).click();await nav('candidates');await page.locator(`[data-candidate-id="${last}"]`).click();
+ await page.locator('#workspaceSubmission > summary').click();assert.equal(await page.locator('#submissionDraft').inputValue(),draft);
+ pass('Job, candidates and submittal survive a real page reload');
+ stage='mobile';await page.setViewportSize({width:390,height:844});
+ await page.locator('#mobileNavToggle').click();await page.locator('.rf-nav [data-page="pipeline"]').click();await page.locator('#page-pipeline.active').waitFor();
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Mobile page overflows');
+ await page.screenshot({path:output+'/mobile-pipeline.png'});pass('Mobile navigation and pipeline layout');
+ stage='isolation';
+ for(const table of ['jobs','candidates','manager_feedback','candidate_documents'])assert.deepEqual(await api(other,table+'?select=id&'+(table==='jobs'?'id':'job_id')+'=eq.'+job.id),[],'Cross-account '+table+' access');
+ await page.setViewportSize({width:1440,height:1000});await page.locator('#authSignOut').click();await page.locator('#authSubmit').waitFor({state:'visible'});
+ await context.clearCookies();await page.evaluate(()=>localStorage.clear());await login(other);
+ assert.ok(!(await page.locator('#workspaceHome').textContent()).includes(jobTitle));await nav('jobs');assert.equal(await page.locator('[data-activate-job]').count(),0);
+ pass('Separate account cannot see the test job, candidates, feedback or resumes');
+ await page.locator('#authSignOut').click();await page.locator('#authSubmit').waitFor({state:'visible'});pass('Sign-out restores the login form');
+ assert.deepEqual(errors,[],'Unhandled application errors during the live journey');
+ await fs.writeFile(output+'/results.json',JSON.stringify({url:fixture.app,status:'passed',checks:results},null,2));
+})().catch(async error=>{
+ console.error(`FAIL during ${stage}: ${error.message}`);process.exitCode=1;
+ if(page)await page.screenshot({path:output+'/failure.png',mask:[page.locator('input[type="password"]'),page.locator('#authEmail')]}).catch(()=>{});
+ await fs.mkdir(output,{recursive:true});await fs.writeFile(output+'/results.json',JSON.stringify({status:'failed',stage,checks:results},null,2));
+}).finally(async()=>{if(browser)await browser.close();});

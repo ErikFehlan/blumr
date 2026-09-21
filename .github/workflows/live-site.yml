@@ -2,15 +2,26 @@ name: Verify live blumr site
 on:
   push:
     branches: [test/live-site-ci]
+  workflow_run:
+    workflows: [Validate and deploy GitHub Pages]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
+  checks: read
+concurrency:
+  group: live-blumr-${{ github.event_name == 'push' && 'probe' || 'production' }}
+  cancel-in-progress: false
 jobs:
   public-browser:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -18,6 +29,8 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright@1.58.2
           npx playwright install --with-deps chromium
+      - name: Check fixture cleanup guards
+        run: node --test tests/live-test-safety.test.js
       - name: Open the real custom domain
         run: node tests/live-site-probe.cjs
       - name: Save public test results
@@ -28,3 +41,83 @@ jobs:
           path: test-results/live/
           retention-days: 7
           if-no-files-found: warn
+  release-browser:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 25
+    env:
+      LIVE_FIXTURE_FILE: ${{ runner.temp }}/blumr-live-fixtures.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Wait for the matching Cloudflare deployment
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: node scripts/live-site-release.mjs
+      - name: Install browser runtime
+        if: steps.release.outputs.ready == 'true'
+        run: |
+          npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.8.0
+          npx playwright install --with-deps chromium
+      - name: Test public HTTPS and startup
+        if: steps.release.outputs.ready == 'true'
+        run: node tests/live-site-probe.cjs
+      - name: Create temporary test accounts
+        id: fixtures
+        if: steps.release.outputs.ready == 'true'
+        timeout-minutes: 3
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: node scripts/live-site-fixtures.mjs create
+      - name: Test the real recruiter workflows
+        id: journey
+        if: steps.release.outputs.ready == 'true'
+        timeout-minutes: 12
+        run: node tests/live-site-browser.cjs
+      - name: Remove temporary accounts and documents
+        id: cleanup
+        if: always() && steps.fixtures.outcome != 'skipped' && steps.fixtures.outcome != ''
+        timeout-minutes: 4
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: node scripts/live-site-fixtures.mjs cleanup
+      - name: Save synthetic screenshots and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-blumr-results
+          path: test-results/live/
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Write the run summary
+        if: always()
+        env:
+          READY: ${{ steps.release.outputs.ready }}
+          JOURNEY: ${{ steps.journey.outcome }}
+          CLEANUP: ${{ steps.cleanup.outcome }}
+        run: |
+          node --input-type=module <<'JS'
+          import {appendFile,readFile} from 'node:fs/promises';
+          const passed=process.env.READY==='true'&&process.env.JOURNEY==='success'&&process.env.CLEANUP==='success';
+          let results;try{results=JSON.parse(await readFile('test-results/live/results.json','utf8'));}catch{}
+          const text=['## Live blumr.io checks',passed?'**Passed, including cleanup.**':'**Not verified.** See the failed or skipped steps.',
+            ...(results?.checks||[]).map(r=>'- '+r.check+': '+r.status),
+            '','Temporary account cleanup: '+(process.env.CLEANUP||'not started'),
+            'Screenshots and results are in the live-blumr-results artifact.','',
+            'Not covered: delivery of confirmation/password-reset emails, image-only PDF OCR, or every browser/device.'];
+          await appendFile(process.env.GITHUB_STEP_SUMMARY,text.join('\n')+'\n');
+          JS
