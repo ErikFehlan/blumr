@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
   pages: write
   id-token: write
 
@@ -119,6 +120,12 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: validate
     uses: ./.github/workflows/core-backend.yml
+    secrets: inherit
+
+  live-site:
+    if: github.ref == 'refs/heads/main'
+    needs: [validate, prepare-home, core-backend]
+    uses: ./.github/workflows/live-site.yml
     secrets: inherit
 
   deploy:

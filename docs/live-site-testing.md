@@ -1,6 +1,6 @@
 # Live blumr checks
 
-`Verify live blumr site` checks https://blumr.io after each successful main release. It waits for Cloudflare Pages to report success for that same commit and verifies the served HTML, JavaScript and CSS against the checked-out files. A superseded commit is explicitly skipped. A failed deployment, TLS failure, stale files, failed test, or failed cleanup does not count as a verified release.
+`Verify live blumr site` checks https://blumr.io after main's application checks and backend deployment succeed. The release workflow calls it alongside the legacy GitHub Pages publishing job, so that job cannot delay or prevent the live check. It waits for Cloudflare Pages to report success for that same commit and verifies the served HTML, JavaScript and CSS against the checked-out files. A superseded commit is explicitly skipped. A failed deployment, TLS failure, stale files, failed test, or failed cleanup does not count as a verified release.
 
 A manual run is available in GitHub Actions on main. The `test/live-site-ci` development branch runs only the public connectivity probe and cleanup guard tests, with no production credentials.
 
@@ -26,7 +26,7 @@ Email delivery and recovery-link completion, scanned PDF OCR, other browsers and
 
 ## Results and cleanup
 
-Open GitHub Actions → Verify live blumr site. The summary lists completed checks and cleanup status. Download `live-blumr-results` for screenshots and `results.json`; artifacts expire after seven days. Password fields are masked in screenshots. No network traces, browser storage state, request bodies or credential files are uploaded.
+For automatic runs, open the release workflow's `live-site / release-browser` job; for manual runs, open GitHub Actions → Verify live blumr site. The summary lists completed checks and cleanup status. Download `live-blumr-results` for screenshots and `results.json`; artifacts expire after seven days. Password fields are masked in screenshots. No network traces, browser storage state, request bodies or credential files are uploaded.
 
 Cleanup runs even after test failure. It verifies the generated email and run marker against the actual account, refuses workspaces containing other members, deletes only that workspace's resume objects, then removes the temporary account (which cascades its workspace and rows). It verifies account/workspace removal and deletes the temporary beta approval. An interrupted creation response can be recovered by the run marker. A cleanup failure fails the workflow and logs only the synthetic account identifier for follow-up. A forcibly terminated runner can still require manual cleanup; investigate any cancelled run that did not complete the cleanup step.
 

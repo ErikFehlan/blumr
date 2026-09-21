@@ -2,20 +2,17 @@ name: Verify live blumr site
 on:
   push:
     branches: [test/live-site-ci]
-  workflow_run:
-    workflows: [Validate and deploy GitHub Pages]
-    types: [completed]
-    branches: [main]
+  workflow_call:
   workflow_dispatch:
 permissions:
   contents: read
   checks: read
 concurrency:
-  group: live-blumr-${{ github.event_name == 'push' && 'probe' || 'production' }}
+  group: live-blumr-${{ github.ref == 'refs/heads/test/live-site-ci' && 'probe' || 'production' }}
   cancel-in-progress: false
 jobs:
   public-browser:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/test/live-site-ci'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -43,10 +40,8 @@ jobs:
           if-no-files-found: warn
   release-browser:
     if: >-
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: ubuntu-latest
     environment: criteria-backend
     timeout-minutes: 25
@@ -55,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -64,7 +59,7 @@ jobs:
         id: release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: node scripts/live-site-release.mjs
       - name: Install browser runtime
         if: steps.release.outputs.ready == 'true'

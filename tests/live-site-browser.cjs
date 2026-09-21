@@ -29,6 +29,8 @@ let browser,page,stage='setup';
  };
  const nav=async(name)=>{
   if(await page.locator('#mobileNavToggle').isVisible()&&!await page.locator('.rf-nav').isVisible())await page.locator('#mobileNavToggle').click();
+  const group=page.locator('.rf-nav details').filter({has:page.locator(`[data-page="${name}"]`)});
+  if(await group.count()&&await group.getAttribute('open')===null)await group.locator('summary').click();
   await page.locator(`.rf-nav [data-page="${name}"]`).click();await page.locator(`#page-${name}.active`).waitFor();
  };
  stage='login';await login(owner);pass('Live password login reaches Home');
@@ -41,7 +43,8 @@ let browser,page,stage='setup';
  const job=await poll(async()=> (await api(owner,'jobs?select=id,title&workspace_id=eq.'+owner.workspace)).find(j=>j.title===jobTitle),'Job was not saved');
  pass('Create a job through the live UI and persist it');
  stage='navigation';
- for(const name of ['dashboard','candidates','pipeline','feedback','outcomes','criteria','rankings','compare','benchmarks','insights','learn','backend','jobs','home'])await nav(name);
+ for(const name of ['dashboard','candidates','pipeline','feedback','outcomes','criteria','rankings','compare','benchmarks','insights','learn','jobs','home'])await nav(name);
+ await page.locator('.rf-globalbar [data-goto="backend"]').click();await page.locator('#page-backend.active').waitFor();
  pass('All standard workspace tabs respond');
  const docs=[{name:'Synthetic-Alex.pdf',mimeType:'application/pdf',buffer:require('./fixtures/pdf-resume.cjs')()},
   {name:'Synthetic-Jamie.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:await require('./fixtures/docx-resume.cjs')()}];
