@@ -63,7 +63,7 @@ async function open(t, options = {}) {
       from: () => ({ select: () => ({ limit: () => ({ maybeSingle: async () => ({ data: { workspace_id: 'synthetic-workspace', role: 'owner', workspaces: { name: 'Synthetic workspace' } }, error: null }) }) }) })
     }) };
     window.AncalagonData = { create: () => ({
-      load: async () => { window.auditLoads++; if (window.auditFailLoad) throw Error('Synthetic workspace failure'); return copy(state); },
+      load: async () => { window.auditLoads++; if (options.holdLoad) await new Promise(resolve => { window.auditReleaseLoad = resolve; }); if (window.auditFailLoad) throw Error('Synthetic workspace failure'); return copy(state); },
       loadSettings: async () => ({ ...defaults }), saveSettings: async settings => settings,
       loadHome: async () => null, visitHome: async () => {}, saveHome: async () => {}, loadHomeReviews: async () => [],
       loadTutorial: async () => ({ state: null, revision: 0 }), saveTutorial: async (_, revision) => ({ revision: revision + 1 }),
@@ -77,7 +77,7 @@ async function open(t, options = {}) {
     }) };
   }, { defaults, options });
   await page.goto(url);
-  if (!options.missing && !options.guest) {
+  if (!options.missing && !options.guest && !options.holdLoad) {
     await page.locator('body.rf-authenticated:not(.rf-data-loading)').waitFor();
     await page.locator('#page-home.active').waitFor();
   }
@@ -221,5 +221,20 @@ test('interrupted sign-out keeps the workspace usable and lets the user retry', 
   assert.match(await page.locator('#toastRegion').textContent(), /connection|try again/i);
   await navigate(page, 'jobs');
   assert.equal(await page.locator('#page-jobs').isVisible(), true);
+  assert.deepEqual(errors, []);
+});
+
+test('an expired session during loading reveals sign-in and ignores late workspace data', async t => {
+  const { page, errors } = await open(t, { holdLoad: true });
+  await page.locator('body.rf-data-loading').waitFor();
+  await page.waitForFunction(() => typeof window.auditReleaseLoad === 'function');
+  await page.evaluate(() => window.auditAuthCallback('SIGNED_OUT', null));
+  await page.locator('body.rf-auth-guest:not(.rf-data-loading)').waitFor();
+  assert.equal(await page.locator('#rf-app').isVisible(), false);
+  assert.equal(await page.locator('#authSubmit').isVisible(), true);
+  await page.evaluate(() => window.auditReleaseLoad());
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('#rf-app').isVisible(), false);
+  assert.equal(await page.locator('body.rf-data-loading').count(), 0);
   assert.deepEqual(errors, []);
 });

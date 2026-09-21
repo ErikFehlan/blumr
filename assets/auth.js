@@ -35,7 +35,7 @@
 
   function showGuest() {
     window.dispatchEvent(new CustomEvent('ancalagon:auth-cleared'));
-    body.classList.remove('rf-auth-pending', 'rf-authenticated');
+    body.classList.remove('rf-auth-pending', 'rf-authenticated', 'rf-data-loading');
     body.classList.add('rf-auth-guest');
     gate.removeAttribute('aria-hidden');
     document.getElementById('rf-app').setAttribute('aria-hidden', 'true');
