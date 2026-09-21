@@ -324,7 +324,16 @@
   signOutButton.addEventListener('click' , async function () {
     signOutButton.disabled = true;
     try { await window.ancalagonFlush?.(); } catch (error) { console.warn('Final workspace sync failed', error); signOutButton.disabled = false; return; }
-    await client.auth.signOut();
+    const { error } = await requestAuth(() => client.auth.signOut());
+    if (error) {
+      signOutButton.disabled = false;
+      const notice = document.createElement('div');
+      notice.className = 'rf-toast error';
+      notice.textContent = error.message || 'Sign-out could not finish. Please try again.';
+      document.getElementById('toastRegion').append(notice);
+      window.setTimeout(() => notice.remove(), 6000);
+      return;
+    }
     window.location.reload();
   });
 

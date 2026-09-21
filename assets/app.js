@@ -799,6 +799,7 @@ function renderJobs(){
       async function initializeWorkspace(auth){
         if(dataReady||workspaceLoading||!auth?.session||!auth?.workspace)return;
         workspaceLoading=true;
+        document.body.classList.add('rf-data-loading');
         const workspaceRequest=++workspaceGeneration;dataService=window.AncalagonData.create(auth);workspaceLoadError='';home?.dispose();home=window.AncalagonHome.create({state:stateSnapshot,load:()=>dataService.loadHome?.()||null,visit:()=>dataService.visitHome?.(),save:location=>dataService.saveHome?.(location),reviews:()=>dataService.loadHomeReviews?.()||[],changed:()=>{if(root.querySelector('#page-home').classList.contains('active'))renderHome();}});
         guidance?.dispose();const guidanceService=dataService;guidance=window.AncalagonGuidance.mount(root,{load:()=>guidanceService.loadGuidance?.()||null,save:(action,tip)=>guidanceService.saveGuidance(action,tip)});
         tutorial?.dispose();tutorial=window.AncalagonTutorialUI.mount(root.querySelector('#ancalagon-tutorial'),{

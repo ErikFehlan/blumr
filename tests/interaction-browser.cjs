@@ -56,7 +56,9 @@ async function open(t, options = {}) {
         getSession: async () => ({ data: { session: options.guest ? null : session }, error: null }),
         onAuthStateChange: callback => { window.auditAuthCallback = callback; return { data: { subscription: { unsubscribe() {} } } }; },
         signInWithPassword: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: { code: 'invalid_credentials', message: 'Invalid login credentials' } }; },
-        signOut: async () => ({ error: null })
+        signUp: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { data: { session: null }, error: null }; },
+        resetPasswordForEmail: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: null }; },
+        signOut: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: null }; }
       },
       from: () => ({ select: () => ({ limit: () => ({ maybeSingle: async () => ({ data: { workspace_id: 'synthetic-workspace', role: 'owner', workspaces: { name: 'Synthetic workspace' } }, error: null }) }) }) })
     }) };
@@ -106,7 +108,7 @@ test('every workspace tab responds across all ten themes; dropdowns, exports, ke
   }
   await navigate(page, 'candidates');
   await page.locator('#candidateSort').locator('..').locator('.rf-select-button').click();
-  await page.locator('#candidateSort').locator('..').getByRole('option', { name: 'Name A–Z', exact: true }).click();
+  await page.locator('#candidateSort').locator('..').locator('.rf-select-menu').getByRole('option', { name: 'Name A–Z', exact: true }).click();
   assert.equal(await page.locator('#candidateSort').inputValue(), 'name');
   await page.locator('[data-candidate-id="candidate-a"]').first().click();
   await page.locator('#page-detail.active').waitFor();
@@ -117,7 +119,7 @@ test('every workspace tab responds across all ten themes; dropdowns, exports, ke
   for (const [id, label] of [['compare1', 'Alex Example'], ['compare2', 'Jamie Example']]) {
     const wrapper = page.locator('#' + id).locator('..');
     await wrapper.locator('.rf-select-button').click();
-    await wrapper.getByRole('option', { name: new RegExp('^' + label + ' ·') }).click();
+    await wrapper.locator('.rf-select-menu').getByRole('option', { name: new RegExp('^' + label + ' ·') }).click();
   }
   await page.locator('#runCompare').click();
   assert.match(await page.locator('#compareResults').textContent(), /Alex Example/);
@@ -182,7 +184,7 @@ test('missing application scripts show a recovery control instead of an unrespon
   assert.equal(await page.locator('#page-jobs').isVisible(), true);
 });
 
-test('a thrown sign-in request restores the button and shows the connection problem', async t => {
+test('interrupted sign-in, signup and recovery restore their buttons and explain the problem', async t => {
   const { page, errors } = await open(t, { guest: true });
   await page.getByRole('link', { name: 'Log in', exact: true }).first().click();
   await page.locator('#authEmail').fill('synthetic@example.test');
@@ -194,5 +196,30 @@ test('a thrown sign-in request restores the button and shows the connection prob
   await page.evaluate(() => { window.auditAuthThrows = false; });
   await page.locator('#authSubmit').click();
   await page.waitForFunction(() => document.getElementById('authMessage').textContent.includes('incorrect'));
+  await page.evaluate(() => { window.auditAuthThrows = true; });
+  await page.locator('#forgotAccess').click();
+  await page.locator('#recoverySubmit').click();
+  await page.waitForFunction(() => !document.getElementById('recoverySubmit').disabled);
+  assert.match(await page.locator('#recoveryMessage').textContent(), /connection|try again/i);
+  await page.locator('#recoveryCancel').click();
+  await page.locator('#createAccountTab').click();
+  await page.locator('#authName').fill('Synthetic Recruiter');
+  await page.locator('#authEmail').fill('synthetic@example.test');
+  await page.locator('#authPassword').fill('Synthetic-password-only');
+  await page.locator('#authConfirmPassword').fill('Synthetic-password-only');
+  await page.locator('#authSubmit').click();
+  await page.waitForFunction(() => !document.getElementById('authSubmit').disabled);
+  assert.match(await page.locator('#authMessage').textContent(), /connection|try again/i);
+  assert.deepEqual(errors, []);
+});
+
+test('interrupted sign-out keeps the workspace usable and lets the user retry', async t => {
+  const { page, errors } = await open(t);
+  await page.evaluate(() => { window.auditAuthThrows = true; });
+  await page.locator('#authSignOut').click();
+  await page.waitForFunction(() => !document.getElementById('authSignOut').disabled);
+  assert.match(await page.locator('#toastRegion').textContent(), /connection|try again/i);
+  await navigate(page, 'jobs');
+  assert.equal(await page.locator('#page-jobs').isVisible(), true);
   assert.deepEqual(errors, []);
 });
