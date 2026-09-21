@@ -1,0 +1,30 @@
+name: Verify live blumr site
+on:
+  push:
+    branches: [test/live-site-ci]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install browser runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Open the real custom domain
+        run: node tests/live-site-probe.cjs
+      - name: Save public test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-site-public
+          path: test-results/live/
+          retention-days: 7
+          if-no-files-found: warn
