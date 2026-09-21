@@ -1,6 +1,21 @@
 import {handleAccountControls} from '../supabase/functions/account-controls/handler.ts';
 import {processAccountDeletions} from '../supabase/functions/account-controls/cleanup.ts';
 const assert=(value:unknown,message='Assertion failed')=>{if(!value)throw Error(message);};
+Deno.test('account controls allow both production hosts and reject lookalike origins',async()=>{
+ for(const origin of ['https://erikfehlan.github.io','https://blumr.pages.dev']){
+  const response=await handleAccountControls(new Request('https://account.invalid',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'authorization, content-type'}}));
+  assert(response.status===204);
+  assert(response.headers.get('Access-Control-Allow-Origin')===origin);
+  assert(response.headers.get('Vary')==='Origin');
+  assert(response.headers.get('Access-Control-Allow-Methods')?.includes('POST'));
+  assert(response.headers.get('Access-Control-Allow-Headers')?.includes('authorization'));
+ }
+ for(const origin of ['https://foreign.invalid','http://blumr.pages.dev','https://preview.blumr.pages.dev','https://blumr.pages.dev.foreign.invalid']){
+  const response=await handleAccountControls(new Request('https://account.invalid',{method:'OPTIONS',headers:{Origin:origin}}));
+  assert(response.status===403);
+  assert(!response.headers.has('Access-Control-Allow-Origin'));
+ }
+});
 Deno.test('account endpoint authenticates and rechecks password before queuing a verified user',async()=>{
  const originalFetch=globalThis.fetch,names=['SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY'],previous=names.map(n=>Deno.env.get(n));let queued:any=null,passwordOK=false;
  names.forEach((n,i)=>Deno.env.set(n,['https://account.invalid','public-test','private-test'][i]));

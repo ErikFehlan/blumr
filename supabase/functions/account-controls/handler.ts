@@ -1,5 +1,5 @@
 import {accountIO,processAccountDeletions} from './cleanup.ts';
-const origins=new Set(['https://erikfehlan.github.io']);
+const origins=new Set(['https://erikfehlan.github.io','https://blumr.pages.dev']);
 export async function handleAccountControls(request:Request){
  const origin=request.headers.get('origin')||'';
  const headers={'Content-Type':'application/json','Vary':'Origin',...(origins.has(origin)?{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'POST, OPTIONS'}:{})};
