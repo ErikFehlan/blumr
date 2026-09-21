@@ -46,6 +46,16 @@ if(mode==='create'){
   assert.equal(memberships.length,1);user.workspace=memberships[0].workspace_id;await save(state);
   assert.equal(await request('/rest/v1/rpc/is_app_admin',user.access,'POST',{}),false,'Test accounts must not be application admins');
  }
+ // Mint a recovery link only for the disposable second account. This does not
+ // send email and must never be reported as inbox-delivery verification.
+ const recovery=await request('/auth/v1/admin/generate_link',service,'POST',{
+  type:'recovery',email:state.users[1].email,options:{redirect_to:APP_URL}
+ });
+ const link=new URL(recovery.action_link);
+ assert.equal(link.origin,base);assert.equal(link.pathname,'/auth/v1/verify');
+ assert.equal(link.searchParams.get('type'),'recovery');assert.equal(link.searchParams.get('redirect_to'),APP_URL);
+ state.users[1].recovery_url=link.href;mask(link.href);mask(link.searchParams.get('token'));
+ await save(state);
  assert.notEqual(state.users[0].workspace,state.users[1].workspace);
  console.log('Created two temporary, non-admin accounts with separate workspaces.');
 }else{

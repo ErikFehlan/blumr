@@ -8,7 +8,7 @@ A manual run is available in GitHub Actions on main. The `test/live-site-ci` dev
 
 The existing `criteria-backend` environment supplies `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF`. No new user-managed passwords or Cloudflare API token are required. Administrative credentials are available only to fixture setup/cleanup. The browser step receives temporary non-admin account credentials through a private file in the runner's temporary directory. It never receives the Supabase management token or service-role key.
 
-Each run creates two synthetic accounts and separate workspaces. All document and candidate content is synthetic. Account creation uses the existing beta approval mechanism and sends no mail. No real recruiter or candidate records are used. Production limits and security settings remain in force. Real model calls consume normal AI usage (two resume assessments plus job/feedback processing).
+Each run creates two synthetic accounts and separate workspaces. All document and candidate content is synthetic. Account creation uses the existing beta approval mechanism and sends no mail. No real recruiter or candidate records are used. Production limits and security settings remain in force. Real model calls consume normal AI usage (three resume assessments plus job/feedback processing).
 
 ## Coverage
 
@@ -16,13 +16,21 @@ Each run creates two synthetic accounts and separate workspaces. All document an
 - Actual password login to the current Home screen.
 - UI job creation and persistence; all standard navigation tabs.
 - Text-based PDF and DOCX uploads, text extraction and private storage.
+- Two-page, image-only PDF OCR with mild scan tilt and JPEG compression. The browser independently confirms that both source pages have zero extractable text, then checks recognized phrases from both pages, saved source text, AI evidence and approval. The generator is `tests/fixtures/generate-scanned-resume.py`; the committed PDF needs no Python at runtime.
 - Real durable AI intake, grounded resume quotes and explicit approval before scores persist.
 - Manager feedback saving and AI interpretation.
 - Submittal editing, persistence and page reload.
 - Mobile navigation and basic overflow check.
 - Separate-account record isolation and sign-out.
+- A genuine recovery link for the disposable second account returns to blumr.io, opens the reset form, saves a new password, rejects the previous password and signs in with the new password. Setup generates this link with the Auth admin API; this deliberately does **not** send email or establish inbox delivery. The temporary link is masked and never uploaded in artifacts.
 
-Email delivery and recovery-link completion, scanned PDF OCR, other browsers and exhaustive mobile coverage are not yet tested.
+Inbox delivery, handwriting, heavily degraded or non-English scans, other browsers and exhaustive mobile coverage are not yet tested.
+
+## Email delivery follow-up
+
+Inspection on September 21, 2026 found custom SMTP disabled in Supabase Authentication > Emails > SMTP Settings. The default sender restricts delivery to project-team addresses and is unsuitable for ordinary beta-tester delivery. See [Supabase's SMTP documentation](https://supabase.com/docs/guides/auth/auth-smtp).
+
+To verify inbox delivery, choose an address controlled by the owner/tester and an authorized sending configuration. Send one recovery request through blumr's Forgot email or password flow. Confirm the message actually arrives (including the spam folder), record elapsed time and sender identity, and follow its link back to blumr. A successful API response alone is not delivery evidence. Completing a reset on a real account remains the account owner's action; use a disposable approved account for repeatable end-to-end testing. Confirmation-email testing similarly requires a new disposable address and inbox access. Never publish reset links, passwords, or email bodies containing tokens in CI logs.
 
 ## Results and cleanup
 

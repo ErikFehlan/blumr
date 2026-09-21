@@ -2,6 +2,7 @@
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs/promises');
 const {setTimeout:delay}=require('node:timers/promises');
+const {randomBytes}=require('node:crypto');
 const results=[],output='test-results/live';
 let browser,page,stage='setup';
 (async()=>{
@@ -9,7 +10,8 @@ let browser,page,stage='setup';
  assert.equal(fixture.app,'https://blumr.io/');assert.equal(fixture.base,'https://zqiqjzxcpznhzjengfff.supabase.co');
  assert.equal(fixture.users.length,2);assert.notEqual(fixture.users[0].workspace,fixture.users[1].workspace);
  const [owner,other]=fixture.users;
- for(const user of fixture.users)for(const key of ['password','access'])if(process.env.GITHUB_ACTIONS)console.log('::add-mask::'+user[key]);
+ for(const user of fixture.users)for(const key of ['password','access','recovery_url'])if(process.env.GITHUB_ACTIONS&&user[key])console.log('::add-mask::'+user[key]);
+ if(process.env.GITHUB_ACTIONS&&other.recovery_url)console.log('::add-mask::'+new URL(other.recovery_url).searchParams.get('token'));
  await fs.mkdir(output,{recursive:true});
  const api=async(user,path)=>{
   const r=await fetch(fixture.base+'/rest/v1/'+path,{headers:{apikey:fixture.anon,Authorization:'Bearer '+user.access},signal:AbortSignal.timeout(20000)});
@@ -46,15 +48,30 @@ let browser,page,stage='setup';
  for(const name of ['dashboard','candidates','pipeline','feedback','outcomes','criteria','rankings','compare','benchmarks','insights','learn','jobs','home'])await nav(name);
  await page.locator('.rf-globalbar [data-goto="backend"]').click();await page.locator('#page-backend.active').waitFor();
  pass('All standard workspace tabs respond');
- const docs=[{name:'Synthetic-Alex.pdf',mimeType:'application/pdf',buffer:require('./fixtures/pdf-resume.cjs')()},
-  {name:'Synthetic-Jamie.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:await require('./fixtures/docx-resume.cjs')()}];
+ const scanned=await fs.readFile(__dirname+'/fixtures/scanned-resume.pdf');
+ const scanPages=await page.evaluate(async bytes=>{
+  const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs/+esm');
+  pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+  const document=await pdfjs.getDocument({data:new Uint8Array(bytes)}).promise;
+  try{const lengths=[];for(let n=1;n<=document.numPages;n++)lengths.push((await (await document.getPage(n)).getTextContent()).items.map(x=>x.str||'').join('').trim().length);return lengths;}
+  finally{await document.destroy();}
+ },Array.from(scanned));
+ assert.deepEqual(scanPages,[0,0],'OCR fixture must contain two pages with no text layer');
+ const docs=[{label:'PDF',name:'Synthetic-Alex.pdf',mimeType:'application/pdf',buffer:require('./fixtures/pdf-resume.cjs')()},
+  {label:'DOCX',name:'Synthetic-Jamie.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:await require('./fixtures/docx-resume.cjs')()},
+  {label:'Scanned PDF OCR',name:'Synthetic-Morgan-Scanned.pdf',mimeType:'application/pdf',buffer:scanned,ocr:true}];
  const candidateIds=[];
  for(const doc of docs){
-  stage='upload-'+doc.name;await nav('candidates');await page.locator('#resumeUpload').setInputFiles(doc);
-  await page.locator('#page-detail.active').waitFor();
+  stage='upload-'+doc.name;await nav('candidates');await page.locator('#resumeUpload').setInputFiles({name:doc.name,mimeType:doc.mimeType,buffer:doc.buffer});
+  await page.locator('#page-detail.active').waitFor({timeout:doc.ocr?120000:20000});
   const id=await poll(()=>page.locator('#candidateWorkspace').getAttribute('data-workspace-candidate'),'Candidate was not opened');candidateIds.push(id);
   const saved=await poll(async()=> (await api(owner,'candidate_documents?select=file_name,extracted_text,storage_path&candidate_id=eq.'+id)).find(d=>d.file_name===doc.name),'Uploaded document was not persisted');
   assert.ok(saved.extracted_text?.length>80,'Resume text was not extracted');assert.ok(saved.storage_path.startsWith(owner.workspace+'/'));
+  if(doc.ocr){
+   const text=saved.extracted_text.replace(/\s+/g,' ').toLowerCase();
+   for(const phrase of ['morgan sample','manual regression testing','sql queries','release checklist','invoice correction workflows','information systems'])assert.ok(text.includes(phrase),'OCR missed expected text: '+phrase);
+   await fs.writeFile(output+'/ocr-extracted-text.txt',saved.extracted_text);
+  }
   const task=await poll(async()=>{const t=(await api(owner,'resume_intake_tasks?select=status,result&candidate_id=eq.'+id))[0];if(t?.status==='failed')throw Error('Live AI intake failed');return t?.status==='ready'?t:null;},'AI intake did not finish',240000);
   assert.ok(task.result.resume_evidence?.length,'AI response has no resume evidence');
   assert.ok(task.result.model,'AI response has no model provenance');
@@ -62,12 +79,12 @@ let browser,page,stage='setup';
   const before=(await api(owner,'candidates?select=manager_score&id=eq.'+id))[0];
   assert.ok(before.manager_score==null||Number(before.manager_score)===0,'Unapproved assessment changed the rating');
   await page.locator('#workspaceIntake [data-intake-approve]').waitFor({timeout:60000});
-  await page.screenshot({path:`${output}/${doc.name.endsWith('pdf')?'pdf':'docx'}-assessment.png`,mask:[page.locator('input[type="password"]')]});
+  await page.screenshot({path:`${output}/${doc.ocr?'scanned-pdf':doc.name.endsWith('pdf')?'pdf':'docx'}-assessment.png`,mask:[page.locator('input[type="password"]')]});
   await page.locator('#workspaceIntake [data-intake-approve]').click();
   await poll(async()=> (await api(owner,'resume_intake_tasks?select=status&candidate_id=eq.'+id))[0]?.status==='approved','Assessment approval was not saved');
   const after=(await api(owner,'candidates?select=manager_score,resume_jd_score&id=eq.'+id))[0];
   assert.equal(Number(after.manager_score),Number(task.result.manager_score));assert.equal(Number(after.resume_jd_score),Number(task.result.score));
-  pass(`${doc.name.endsWith('pdf')?'PDF':'DOCX'} upload, text extraction, real AI assessment, grounded evidence and explicit approval`);
+  pass(`${doc.label} upload, ${doc.ocr?'both image-only pages recognized':'text extraction'}, real AI assessment, grounded evidence and explicit approval`);
  }
  stage='submittal';
  await page.locator('#workspaceSubmission > summary').click();const draft='Synthetic submittal: manual regression testing and documented defect remediation.';
@@ -93,6 +110,20 @@ let browser,page,stage='setup';
  assert.ok(!(await page.locator('#workspaceHome').textContent()).includes(jobTitle));await nav('jobs');assert.equal(await page.locator('[data-activate-job]').count(),0);
  pass('Separate account cannot see the test job, candidates, feedback or resumes');
  await page.locator('#authSignOut').click();await page.locator('#authSubmit').waitFor({state:'visible'});pass('Sign-out restores the login form');
+ stage='password-recovery';
+ assert.ok(other.recovery_url,'Disposable-account recovery link missing');
+ await page.goto(other.recovery_url,{waitUntil:'domcontentloaded',timeout:45000});
+ await page.locator('#resetPasswordModal:not([hidden])').waitFor({timeout:60000});
+ assert.equal(new URL(page.url()).origin,new URL(fixture.app).origin,'Recovery left the live custom domain');
+ const newPassword=randomBytes(32).toString('base64url');if(process.env.GITHUB_ACTIONS)console.log('::add-mask::'+newPassword);
+ await page.locator('#recoveryNewPassword').fill(newPassword);await page.locator('#recoveryConfirmPassword').fill(newPassword);
+ await page.locator('#resetPasswordSubmit').click();await page.locator('#resetPasswordMessage.success').waitFor();
+ await page.locator('#resetPasswordModal').waitFor({state:'hidden'});await page.locator('#page-home.active').waitFor();
+ await page.locator('#authSignOut').click();await page.locator('#authSubmit').waitFor({state:'visible'});
+ const oldLogin=await fetch(fixture.base+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:fixture.anon,'Content-Type':'application/json'},body:JSON.stringify({email:other.email,password:other.password}),signal:AbortSignal.timeout(20000)});
+ assert.equal(oldLogin.status,400,'Previous password was not rejected');assert.equal((await oldLogin.json()).error_code,'invalid_credentials');
+ await login({...other,password:newPassword});await page.locator('#authSignOut').click();await page.locator('#authSubmit').waitFor({state:'visible'});
+ pass('Recovery link returns to blumr; disposable password changes, old password fails and new password signs in (email delivery not tested)');
  assert.deepEqual(errors,[],'Unhandled application errors during the live journey');
  await fs.writeFile(output+'/results.json',JSON.stringify({url:fixture.app,status:'passed',checks:results},null,2));
 })().catch(async error=>{

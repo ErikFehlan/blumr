@@ -113,6 +113,7 @@ jobs:
             ...(results?.checks||[]).map(r=>'- '+r.check+': '+r.status),
             '','Temporary account cleanup: '+(process.env.CLEANUP||'not started'),
             'Screenshots and results are in the live-blumr-results artifact.','',
-            'Not covered: delivery of confirmation/password-reset emails, image-only PDF OCR, or every browser/device.'];
+            'Not covered: inbox delivery of confirmation/password-reset emails, handwriting, heavily degraded scans, or every browser/device.',
+            'Recovery uses an admin-generated link for a disposable account; no email is sent by this test.'];
           await appendFile(process.env.GITHUB_STEP_SUMMARY,text.join('\n')+'\n');
           JS
