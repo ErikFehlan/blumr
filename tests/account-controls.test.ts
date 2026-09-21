@@ -1,8 +1,8 @@
 import {handleAccountControls} from '../supabase/functions/account-controls/handler.ts';
 import {processAccountDeletions} from '../supabase/functions/account-controls/cleanup.ts';
 const assert=(value:unknown,message='Assertion failed')=>{if(!value)throw Error(message);};
-Deno.test('account controls allow both production hosts and reject lookalike origins',async()=>{
- for(const origin of ['https://erikfehlan.github.io','https://blumr.pages.dev']){
+Deno.test('account controls allow production hosts and reject lookalike origins',async()=>{
+ for(const origin of ['https://erikfehlan.github.io','https://blumr.pages.dev','https://blumr.io']){
   const response=await handleAccountControls(new Request('https://account.invalid',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'authorization, content-type'}}));
   assert(response.status===204);
   assert(response.headers.get('Access-Control-Allow-Origin')===origin);
@@ -10,7 +10,7 @@ Deno.test('account controls allow both production hosts and reject lookalike ori
   assert(response.headers.get('Access-Control-Allow-Methods')?.includes('POST'));
   assert(response.headers.get('Access-Control-Allow-Headers')?.includes('authorization'));
  }
- for(const origin of ['https://foreign.invalid','http://blumr.pages.dev','https://preview.blumr.pages.dev','https://blumr.pages.dev.foreign.invalid']){
+ for(const origin of ['https://foreign.invalid','http://blumr.pages.dev','https://preview.blumr.pages.dev','https://blumr.pages.dev.foreign.invalid','http://blumr.io','https://blumr.io.foreign.invalid','https://preview.blumr.io']){
   const response=await handleAccountControls(new Request('https://account.invalid',{method:'OPTIONS',headers:{Origin:origin}}));
   assert(response.status===403);
   assert(!response.headers.has('Access-Control-Allow-Origin'));
