@@ -51,7 +51,7 @@ jobs:
     environment: criteria-backend
     timeout-minutes: 25
     env:
-      LIVE_FIXTURE_FILE: ${{ runner.temp }}/blumr-live-fixtures.json
+      LIVE_FIXTURE_FILE: /tmp/blumr-live-fixtures-${{ github.run_id }}-${{ github.run_attempt }}.json
     steps:
       - uses: actions/checkout@v4
         with:
