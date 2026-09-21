@@ -21,6 +21,13 @@
   let appliedAccessToken = null;
   let authMode = 'signin';
 
+  async function requestAuth(action) {
+    try { return await action(); }
+    catch {
+      return { data: null, error: { code: 'connection_failed', message: 'The request could not finish. Check your connection and try again.' } };
+    }
+  }
+
   function showMessage(text, type) {
     message.textContent = text;
     message.className = 'rf-auth-message' + (type ? ' ' + type : '');
@@ -28,7 +35,7 @@
 
   function showGuest() {
     window.dispatchEvent(new CustomEvent('ancalagon:auth-cleared'));
-    body.classList.remove('rf-auth-pending', 'rf-authenticated');
+    body.classList.remove('rf-auth-pending', 'rf-authenticated', 'rf-data-loading');
     body.classList.add('rf-auth-guest');
     gate.removeAttribute('aria-hidden');
     document.getElementById('rf-app').setAttribute('aria-hidden', 'true');
@@ -146,7 +153,7 @@
     button.disabled = true;
     button.textContent = 'Sending…';
     const redirectTo = window.location.origin + window.location.pathname;
-    const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+    const { error } = await requestAuth(() => client.auth.resetPasswordForEmail(email, { redirectTo }));
     button.disabled = false;
     button.textContent = 'Send reset link';
     status.className = 'rf-auth-message ' + (error ? 'error' : 'success');
@@ -168,13 +175,13 @@
     }
     button.disabled = true;
     button.textContent = 'Saving…';
-    const { error } = await client.auth.updateUser({ password });
+    const { error } = await requestAuth(() => client.auth.updateUser({ password }));
     button.disabled = false;
     button.textContent = 'Save new password';
     status.className = 'rf-auth-message ' + (error ? 'error' : 'success');
     status.textContent = error ? (error.message || 'Your password could not be updated.') : 'Password updated successfully.';
     if (!error) {
-      event.currentTarget.reset();
+      document.getElementById('resetPasswordForm').reset();
       window.setTimeout(function () { resetPasswordModal.hidden = true; }, 900);
     }
   });
@@ -231,11 +238,11 @@
       submitButton.textContent = 'Creating account…';
       showMessage('Creating your private workspace…');
       const redirectTo = window.location.origin + window.location.pathname;
-      const { data, error } = await client.auth.signUp({
+      const { data, error } = await requestAuth(() => client.auth.signUp({
         email,
         password,
         options: { data: { display_name: displayName }, emailRedirectTo: redirectTo }
-      });
+      }));
       submitButton.disabled = false;
       submitButton.textContent = 'Create account';
 
@@ -260,13 +267,15 @@
     submitButton.textContent = 'Signing in…';
     showMessage('Signing in securely…');
 
-    const { error } = await client.auth.signInWithPassword({ email, password });
+    const { error } = await requestAuth(() => client.auth.signInWithPassword({ email, password }));
 
     submitButton.disabled = false;
     submitButton.textContent = 'Sign in';
 
     if (error) {
-      showMessage('The email or password is incorrect.', 'error');
+      showMessage(error.code === 'invalid_credentials' || /invalid.*credentials/i.test(error.message || '')
+        ? 'The email or password is incorrect.'
+        : error.message || 'Sign-in could not finish. Please try again.', 'error');
       return;
     }
 
@@ -293,7 +302,7 @@
     button.disabled = true;
     button.textContent = 'Saving…';
     status.textContent = 'Updating your account…';
-    const { error } = await client.auth.updateUser({ password });
+    const { error } = await requestAuth(() => client.auth.updateUser({ password }));
     button.disabled = false;
     button.textContent = 'Set Password';
 
@@ -302,7 +311,7 @@
       return;
     }
 
-    event.currentTarget.reset();
+    document.getElementById('passwordForm').reset();
     status.textContent = 'Password saved. Use it the next time you sign in.';
   });
 
@@ -315,7 +324,16 @@
   signOutButton.addEventListener('click' , async function () {
     signOutButton.disabled = true;
     try { await window.ancalagonFlush?.(); } catch (error) { console.warn('Final workspace sync failed', error); signOutButton.disabled = false; return; }
-    await client.auth.signOut();
+    const { error } = await requestAuth(() => client.auth.signOut());
+    if (error) {
+      signOutButton.disabled = false;
+      const notice = document.createElement('div');
+      notice.className = 'rf-toast error';
+      notice.textContent = error.message || 'Sign-out could not finish. Please try again.';
+      document.getElementById('toastRegion').append(notice);
+      window.setTimeout(() => notice.remove(), 6000);
+      return;
+    }
     window.location.reload();
   });
 
@@ -329,7 +347,7 @@
     window.setTimeout(function () { applySession(client, session); }, 0);
   });
 
-  client.auth.getSession().then(function ({ data, error }) {
+  requestAuth(() => client.auth.getSession()).then(function ({ data, error }) {
     if (error) {
       showGuest();
       showMessage(error.message || 'Your session could not be restored.', 'error');

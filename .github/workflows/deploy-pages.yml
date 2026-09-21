@@ -28,6 +28,7 @@ jobs:
           node-version: 22
       - name: Validate JavaScript
         run: |
+          node --check assets/startup.js
           node --check assets/app.js
           node --check assets/search-flow.js
           node --check assets/guidance.js
@@ -65,6 +66,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Test recruiter browser journey
         run: |
+          node --test tests/interaction-browser.cjs
           CAPTURE_UI=test-results/presentation node tests/presentation-browser.cjs
           node tests/security-browser.cjs
           node tests/landing-browser.cjs
