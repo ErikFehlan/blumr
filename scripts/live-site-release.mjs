@@ -6,7 +6,7 @@ const sha=process.env.EXPECTED_SHA,repo=process.env.GITHUB_REPOSITORY,token=proc
 if(repo!=='ErikFehlan/blumr'||!/^[a-f0-9]{40}$/.test(sha||'')||!token)throw Error('Invalid trusted release context');
 const output=value=>appendFile(process.env.GITHUB_OUTPUT,`ready=${value}\n`);
 async function github(path){const r=await fetch(`https://api.github.com/repos/${repo}/${path}`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('Release lookup failed: '+r.status);return r.json();}
-const paths=['index.html','about.html',...(await readdir('assets')).filter(f=>/\.(js|css)$/.test(f)).map(f=>'assets/'+f)];
+const paths=['index.html','about.html','why-blumr-works.html',...(await readdir('assets')).filter(f=>/\.(js|css)$/.test(f)).map(f=>'assets/'+f)];
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 let ready=false;
 for(let attempt=0;attempt<12;attempt++){
