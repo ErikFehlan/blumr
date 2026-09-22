@@ -80,7 +80,7 @@ body:not(.rf-authenticated) .rf-welcome-dialog .rf-auth-message.success{color:#2
 .an-public-page{margin:0;padding:0;background:#bce0df}
 .an-public-page #authGate{display:flex;flex-direction:column}
 .an-public-page #an-main{flex:1}
-.an-why{display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:28px 64px;padding-block:76px 56px;border-bottom:1px solid var(--an-line)}
+.an-why{display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:28px 64px;padding-block:76px 80px}
 .an-why h1{font-size:clamp(38px,4.4vw,60px);font-weight:550;line-height:1.12;letter-spacing:-.045em;margin:0 0 24px}
 .an-why h1 span{display:block;color:var(--an-mint)}
 .an-why p{font-size:15px;line-height:1.85;color:var(--an-muted);margin:0 0 20px}
@@ -88,9 +88,12 @@ body:not(.rf-authenticated) .rf-welcome-dialog .rf-auth-message.success{color:#2
 .an-why-copy{padding-top:6px}.an-why-copy>p:last-child{margin-bottom:0}
 .an-why .an-why-outcome{grid-column:1/-1;margin:12px 0 0;padding-top:28px;border-top:1px solid var(--an-line);font-size:clamp(20px,2.2vw,28px);font-weight:550;line-height:1.5;letter-spacing:-.025em;color:var(--an-ink)}
 .an-why-outcome span{color:var(--an-mint)}
+.an-why .an-actions{grid-column:1/-1;margin-top:0}
 .an-about-page .an-about{padding-top:76px}
 .an-header .an-nav-links a[aria-current="page"]{color:var(--an-ink);text-decoration:underline;text-underline-offset:5px}
-.an-about-page .an-actions{align-items:center;gap:24px}
+.an-public-page .an-actions{align-items:center;gap:24px}
 @media(max-width:1180px){.an-why{column-gap:36px}}
+@media(max-width:1100px){.an-header{min-height:138px;padding-bottom:48px}.an-nav-links{position:absolute;bottom:0;left:0;right:0;justify-content:center;gap:32px}}
 @media(max-width:900px){.an-why{padding-block:52px 40px;column-gap:28px}.an-why p{font-size:14px}.an-why-intro>p{font-size:17px}.an-about-page .an-about{padding-top:52px}}
 @media(max-width:650px){.an-why{grid-template-columns:1fr;gap:24px;padding-block:36px}.an-why h1{font-size:42px;margin-bottom:22px}.an-why-copy{padding-top:0}.an-why .an-why-outcome{margin-top:0;padding-top:24px;font-size:22px}.an-about-page .an-about{padding-top:36px}}
+@media(max-width:650px){.an-header{min-height:174px;padding-bottom:92px}.an-nav-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.an-header .an-nav-links a{justify-content:center}}
