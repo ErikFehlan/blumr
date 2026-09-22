@@ -30,6 +30,17 @@
     const needle=quoteIndex(quote).value,at=needle?index.value.indexOf(needle):-1;
     return at<0?null:String(text).slice(index.starts[at],index.ends[at+needle.length-1]);
   }
+  const reviewKey=(kind,index)=>kind+'-'+index;
+  function pointReview(c,kind,index){return c?.resumeIntake?.evidenceReviews?.[reviewKey(kind,index)]||null;}
+  function evidenceForPoint(brief,kind,index){
+    if(kind!=='strength')return null;
+    const item=brief?.resume_evidence?.[index];
+    return item?.quote?item:null;
+  }
+  function pointText(brief,kind,index){
+    if(kind==='strength')return brief?.resume_evidence?.[index]?.claim||'';
+    return brief?.concerns?.[index]||'';
+  }
   function invalid(code){const e=new Error('The AI response could not be verified against this resume. Try the assessment again.');e.code=code;throw e;}
   function validate(a,text){
     const source=normalize(text);
@@ -170,7 +181,7 @@
         }
         const now=Date.now();c.resumeIntake.reviewedAt=now;
         Object.assign(c,{jdScore:brief.score,resumeJDScore:brief.score,originalManagerScore:brief.manager_score,managerScore:brief.manager_score,rec:api.recommendation(brief.manager_score),
-          aiReview:{source:'resume_intake',verdict:'Needs Adjustment',correctedScore:brief.manager_score,correctedJDScore:brief.score,notes:brief.manager_reason,createdAt:now,reasons:['Resume assessment reviewed']}});
+          aiReview:{source:'resume_intake',verdict:'Needs Adjustment',correctedScore:brief.manager_score,correctedJDScore:brief.score,notes:brief.manager_reason,createdAt:now,reasons:['Resume assessment reviewed'],evidenceReviews:c.resumeIntake.evidenceReviews||{}}});
         c.aiReview.contextSignature=api.signature(api.fullContext(c));await api.persist();
         approved=true;api.toast('Assessment approved and added to rankings.');
       }catch(e){Object.assign(c,before);delete c.resumeIntake.reviewedAt;api.toast(e.message||'Approval could not be saved. Try again.','error');}
@@ -183,6 +194,51 @@
       wrap.querySelector('[data-intake-next]')?.addEventListener('click',()=>void approve(c,{next:true}));
       wrap.querySelector('[data-intake-retry]')?.addEventListener('click',()=>void retry(c));
       wrap.querySelectorAll('[data-intake-existing]').forEach(b=>b.addEventListener('click',()=>{const existing=api.candidates().find(x=>x.id===b.dataset.intakeExisting&&x.jobId===c.jobId);if(existing)api.open(existing,true);}));
+      wrap.querySelector('[data-view-resume]')?.addEventListener('click',()=>void openResume(c));
+      wrap.querySelectorAll('[data-assessment-point]').forEach(b=>b.addEventListener('click',()=>void openResume(c,b.dataset.pointKind,Number(b.dataset.pointIndex))));
+    }
+    function closeResume(){
+      const panel=api.root?.querySelector('#resumeEvidencePanel'),backdrop=api.root?.querySelector('#resumeEvidenceBackdrop');
+      if(panel)panel.remove();if(backdrop)backdrop.remove();
+    }
+    function highlightedResume(text,quote){
+      if(!quote)return '<div class="rf-resume-copy">'+escape(text)+'</div>';
+      const actual=sourceQuote(text,quote),at=actual?text.indexOf(actual):-1;
+      if(at<0)return '<div class="rf-resume-copy">'+escape(text)+'</div>';
+      return '<div class="rf-resume-copy">'+escape(text.slice(0,at))+'<mark id="activeResumeEvidence" tabindex="-1">'+escape(actual)+'</mark>'+escape(text.slice(at+actual.length))+'</div>';
+    }
+    async function savePointReview(c,kind,index,status,correction=''){
+      const key=reviewKey(kind,index),previous=c.resumeIntake.evidenceReviews?{...c.resumeIntake.evidenceReviews}:undefined;
+      c.resumeIntake.evidenceReviews={...(c.resumeIntake.evidenceReviews||{}),[key]:{status,correction:correction.trim(),reviewedAt:Date.now()}};
+      try{await api.persist();api.toast(status==='approved'?'Interpretation approved.':status==='unsupported'?'Marked unsupported.':'Correction saved.');changed(c);closeResume();}
+      catch(error){if(previous)c.resumeIntake.evidenceReviews=previous;else delete c.resumeIntake.evidenceReviews;api.toast('This evidence review did not save. Try again.','error');}
+    }
+    async function openResume(c,kind=null,index=0){
+      closeResume();
+      const brief=c.resumeIntake?.brief,point=kind?pointText(brief,kind,index):'',evidence=kind?evidenceForPoint(brief,kind,index):null,review=kind?pointReview(c,kind,index):null;
+      const backdrop=document.createElement('button');backdrop.type='button';backdrop.id='resumeEvidenceBackdrop';backdrop.className='rf-resume-backdrop';backdrop.setAttribute('aria-label','Close resume');
+      const panel=document.createElement('aside');panel.id='resumeEvidencePanel';panel.className='rf-resume-panel';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','resumeEvidenceTitle');
+      panel.innerHTML='<div class="rf-resume-panel-head"><div><span class="rf-kicker">Source document</span><h3 id="resumeEvidenceTitle">'+escape(c.resumeIntake.fileName||'Candidate resume')+'</h3></div><button class="rf-resume-close" type="button" aria-label="Close resume">×</button></div><div class="rf-resume-panel-status">Loading resume…</div>';
+      api.root.append(backdrop,panel);backdrop.addEventListener('click',closeResume);panel.querySelector('.rf-resume-close').addEventListener('click',closeResume);
+      const onKey=e=>{if(e.key==='Escape'){closeResume();document.removeEventListener('keydown',onKey);}};document.addEventListener('keydown',onKey,{once:true});
+      try{
+        const text=await api.text(c);if(!panel.isConnected)return;
+        const hasEvidence=!!evidence?.quote;
+        const reviewHTML=kind?'<section class="rf-point-review"><span class="rf-kicker">'+(kind==='strength'?'Strength':'Concern')+'</span><h4>'+escape(review?.correction||point)+'</h4>'+(hasEvidence?'<p class="rf-supported-label">Supporting evidence found</p>':'<p class="rf-unsupported-label">No clear supporting resume evidence</p>')+'<div class="rf-point-actions"><button class="rf-btn'+(review?.status==='approved'?' selected':'')+'" type="button" data-point-decision="approved">Approve</button><button class="rf-btn'+(review?.status==='corrected'?' selected':'')+'" type="button" data-point-correct>Correct</button><button class="rf-btn'+(review?.status==='unsupported'?' selected':'')+'" type="button" data-point-decision="unsupported">Unsupported</button></div><form class="rf-point-correction" hidden><label for="pointCorrectionText">Correct interpretation</label><textarea id="pointCorrectionText" maxlength="800">'+escape(review?.correction||point)+'</textarea><div class="rf-actions"><button class="rf-btn primary" type="submit">Save correction</button><button class="rf-linkbtn" type="button" data-cancel-correction>Cancel</button></div></form></section>':'';
+        panel.innerHTML='<div class="rf-resume-panel-head"><div><span class="rf-kicker">Source document</span><h3 id="resumeEvidenceTitle">'+escape(c.resumeIntake.fileName||'Candidate resume')+'</h3></div><button class="rf-resume-close" type="button" aria-label="Close resume">×</button></div>'+reviewHTML+'<div class="rf-resume-document" aria-label="Resume text">'+highlightedResume(text,evidence?.quote)+'</div>';
+        panel.querySelector('.rf-resume-close').addEventListener('click',closeResume);
+        panel.querySelectorAll('[data-point-decision]').forEach(b=>b.addEventListener('click',()=>void savePointReview(c,kind,index,b.dataset.pointDecision)));
+        const form=panel.querySelector('.rf-point-correction'),correct=panel.querySelector('[data-point-correct]');
+        correct?.addEventListener('click',()=>{form.hidden=false;form.querySelector('textarea').focus();});
+        panel.querySelector('[data-cancel-correction]')?.addEventListener('click',()=>form.hidden=true);
+        form?.addEventListener('submit',e=>{e.preventDefault();const value=form.querySelector('textarea').value.trim();if(!value){api.toast('Add the corrected interpretation.','error');return;}void savePointReview(c,kind,index,'corrected',value);});
+        requestAnimationFrame(()=>panel.querySelector('#activeResumeEvidence')?.scrollIntoView({block:'center',behavior:'smooth'}));
+      }catch(error){if(panel.isConnected)panel.querySelector('.rf-resume-panel-status').textContent='The resume could not be opened. Try again.';}
+    }
+    function pointHTML(c,brief,kind,index){
+      const evidence=evidenceForPoint(brief,kind,index),review=pointReview(c,kind,index),original=pointText(brief,kind,index),label=review?.correction||original;
+      const state=review?.status==='approved'?'Approved':review?.status==='corrected'?'Corrected':review?.status==='unsupported'?'Unsupported':evidence?'Evidence linked':'No clear evidence';
+      return '<button class="rf-assessment-point" type="button" data-assessment-point data-point-kind="'+kind+'" data-point-index="'+index+'"><span>'+escape(global.AncalagonPresentation.brief(label,32))+'</span><small class="'+(evidence?'supported':'unsupported')+'">'+escape(state)+' <span aria-hidden="true">→</span></small></button>';
     }
     function renderCandidate(c,wrap){
       if(!wrap)return;const state=c?.resumeIntake;wrap.hidden=!state||(wrap.id==='workspaceIntake'&&!pending(c));if(wrap.hidden){wrap.innerHTML='';delete wrap.dataset.markup;return;}
@@ -193,9 +249,9 @@
       else if(state.phase==='error')html+='<h3>Resume intake needs attention</h3><p>'+escape(state.error)+'</p><button class="rf-btn" type="button" data-intake-retry>Try again</button>';
       else if(state.phase!=='ready')html+='<h3>Preparing your screening brief…</h3><p class="rf-sub">You can keep working. Once your resume is saved, processing continues even if you close this tab. Scores appear after review.</p>';
       else{
-        html+='<div class="rf-cardhead"><h3>'+(wrap.id==='workspaceIntake'?'Resume assessment':escape(c.short))+'</h3><span class="rf-pill '+(needsReview?'rf-amber':'rf-green')+'">'+(needsReview?'Ready for your review':'Reviewed')+'</span></div><p>'+escape(prose.brief(brief.primary_signal,35))+'</p>';
+        html+='<div class="rf-cardhead"><h3>'+(wrap.id==='workspaceIntake'?'Resume assessment':escape(c.short))+'</h3><div class="rf-actions"><button class="rf-btn" type="button" data-view-resume>View resume</button><span class="rf-pill '+(needsReview?'rf-amber':'rf-green')+'">'+(needsReview?'Ready for your review':'Reviewed')+'</span></div></div><p>'+escape(prose.brief(brief.primary_signal,35))+'</p>';
         if(needsReview)html+='<p><strong>Proposed JD Fit: '+brief.score.toFixed(1)+'/10 · Manager Fit: '+brief.manager_score.toFixed(1)+'/10</strong></p>';
-        html+='<p><strong>Worth asking about:</strong> '+escape(prose.brief(brief.concerns[0]||'Confirm the job requirements during screening.',25))+'</p><details><summary>Supporting resume evidence and score details</summary><p class="rf-sub">'+escape(prose.brief(brief.jd_reason,30))+'</p><p class="rf-sub">'+escape(prose.brief(brief.manager_reason,30))+'</p><ul>'+prose.evidenceHTML(brief.resume_evidence,3)+'</ul>'+(brief.resume_evidence.length?'':'<p>No supporting job-related evidence was confirmed. Verify the requirements during screening.</p>')+'<h4>Concerns to clarify</h4><ul>'+brief.concerns.slice(0,2).map(s=>'<li>'+escape(prose.brief(s,25))+'</li>').join('')+'</ul></details>';
+        html+='<div class="rf-point-groups"><section><h4>Strengths</h4><div class="rf-assessment-points">'+brief.resume_evidence.slice(0,3).map((_,i)=>pointHTML(c,brief,'strength',i)).join('')+(brief.resume_evidence.length?'':'<p class="rf-sub">No supporting job-related evidence was confirmed.</p>')+'</div></section><section><h4>Concerns to clarify</h4><div class="rf-assessment-points">'+brief.concerns.slice(0,2).map((_,i)=>pointHTML(c,brief,'concern',i)).join('')+(brief.concerns.length?'':'<p class="rf-sub">No concerns were identified from the resume.</p>')+'</div></section></div><details><summary>Score details</summary><p class="rf-sub">'+escape(prose.brief(brief.jd_reason,30))+'</p><p class="rf-sub">'+escape(prose.brief(brief.manager_reason,30))+'</p></details>';
         if(brief.name==='Candidate'||brief.role==='Role not stated')html+='<p class="rf-note">The resume did not clearly identify the name or professional role. Verify these details during screening.</p>';
         const matches=duplicates(c);
         if(matches.length)html+='<div class="rf-note">Possible duplicate: this name is already on this job. '+matches.map(x=>'<button class="rf-linkbtn" type="button" data-intake-existing="'+escape(x.id)+'">Open '+escape(x.short)+'</button>').join(' ')+' No records have been merged.</div>';
@@ -233,5 +289,5 @@
     function releaseFile(id){files.delete(id);}
     return {upload,retry,approve,resume,render,renderCandidate,hasUnsavedFile,releaseFile};
   }
-  const api={create,validate,identity,pending,normalize,sourceQuote};if(typeof module!=='undefined')module.exports=api;global.AncalagonIntake=api;
+  const api={create,validate,identity,pending,normalize,sourceQuote,evidenceForPoint,pointText};if(typeof module!=='undefined')module.exports=api;global.AncalagonIntake=api;
 })(typeof window==='undefined'?globalThis:window);
