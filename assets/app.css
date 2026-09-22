@@ -248,6 +248,7 @@
 .rf-brief-heading-actions{display:flex;align-items:flex-start;gap:18px}.rf-brief-heading-actions>.rf-btn{white-space:nowrap}.rf-brief-points{grid-column:1/-1;margin:4px 0 0;padding-top:18px;border-top:1px solid var(--ui-line)}.rf-brief-caution{grid-column:1/-1;margin:0}.rf-brief-points .rf-assessment-point{background:var(--ui-rail);border-color:var(--ui-line)}
 #rf-app[data-theme] .rf-resume-panel,#rf-app[data-theme] .rf-resume-panel-head{background:var(--ui-panel);color:var(--ui-text);border-color:var(--ui-line)}#rf-app[data-theme] .rf-resume-document{background:var(--ui-rail);border-color:var(--ui-line)}#rf-app[data-theme] .rf-point-review{background:var(--ui-rail);border-color:var(--ui-line)}
 @media(max-width:700px){.rf-point-groups{grid-template-columns:1fr}.rf-resume-panel{top:auto;bottom:0;width:100%;height:88vh;border-left:0;border-top:1px solid rgba(120,150,190,.32);border-radius:18px 18px 0 0}.rf-assessment-point{flex-direction:column}.rf-assessment-point small{white-space:normal}}
+@media(max-width:560px){.rf-brief-heading-actions{width:100%;flex-direction:column;gap:12px}.rf-brief-heading-actions>.rf-btn{width:100%;justify-content:center}.rf-brief-heading-actions .rf-brief-fit{width:100%;justify-content:space-between}}
 @media(max-width:560px){.rf-intake-status{flex-direction:column}.rf-resume-drop{padding:16px}}
 /* Keep the daily screening task visible; disclose submission and audit tools on demand. */
 #candidateWorkspace [hidden]{display:none!important}
