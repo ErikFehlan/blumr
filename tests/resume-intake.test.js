@@ -53,6 +53,14 @@ test('resume quotes and scores are validated, missing identity stays explicit',(
  assert.throws(()=>intake.validate({...result,screening_questions:['a','b','c','d']},text));
 });
 
+test('assessment points only link explicit resume evidence',()=>{
+ const brief={resume_evidence:[{claim:'Manual regression ownership',quote:'Owned manual regression testing'}],concerns:['Confirm automation scope.']};
+ assert.deepEqual(intake.evidenceForPoint(brief,'strength',0),brief.resume_evidence[0]);
+ assert.equal(intake.evidenceForPoint(brief,'concern',0),null,'a concern must not inherit an unrelated quote');
+ assert.equal(intake.pointText(brief,'strength',0),'Manual regression ownership');
+ assert.equal(intake.pointText(brief,'concern',0),'Confirm automation scope.');
+});
+
 
 test('Word bullets, nonbreaking hyphens, smart quotes and tabs resolve to original source passages',()=>{
  const source='Alex Carter\nQA Analyst\n• Worked on risk •documentation and business\u2011aligned controls.\nUsed “security controls” across\t teams.';
