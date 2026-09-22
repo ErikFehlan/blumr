@@ -287,7 +287,7 @@
     }
     function hasUnsavedFile(){for(const id of files.keys())if(!api.candidates().some(c=>c.id===id))files.delete(id);return extracting||files.size>0;}
     function releaseFile(id){files.delete(id);}
-    return {upload,retry,approve,resume,render,renderCandidate,hasUnsavedFile,releaseFile};
+    return {upload,retry,approve,resume,render,renderCandidate,openResume,hasUnsavedFile,releaseFile};
   }
   const api={create,validate,identity,pending,normalize,sourceQuote,evidenceForPoint,pointText};if(typeof module!=='undefined')module.exports=api;global.AncalagonIntake=api;
 })(typeof window==='undefined'?globalThis:window);

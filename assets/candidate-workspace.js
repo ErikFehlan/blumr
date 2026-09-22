@@ -13,6 +13,22 @@
   function evidenceFor(candidate){
     return prose.evidence(candidate.strengths?.[0]||candidate.signal||'No supporting evidence recorded yet.');
   }
+  function assessmentPointHTML(candidate,kind,index){
+    const brief=candidate.resumeIntake?.brief,evidence=global.AncalagonIntake?.evidenceForPoint(brief,kind,index);
+    const original=global.AncalagonIntake?.pointText(brief,kind,index)||'';
+    const review=candidate.resumeIntake?.evidenceReviews?.[kind+'-'+index],label=review?.correction||original;
+    const state=review?.status==='approved'?'Approved':review?.status==='corrected'?'Corrected':review?.status==='unsupported'?'Unsupported':evidence?'Evidence linked':'No clear evidence';
+    return `<button class="rf-assessment-point" type="button" data-workspace-point data-point-kind="${kind}" data-point-index="${index}"><span>${escape(prose.brief(label,32))}</span><small class="${evidence?'supported':'unsupported'}">${escape(state)} <span aria-hidden="true">→</span></small></button>`;
+  }
+  function assessmentPointsHTML(candidate){
+    const brief=candidate.resumeIntake?.brief;if(!brief)return '<p class="rf-sub">The full resume is available, but this assessment does not contain linked evidence points yet.</p>';
+    return `<section><h4>Strengths</h4><div class="rf-assessment-points">${brief.resume_evidence.slice(0,3).map((_,i)=>assessmentPointHTML(candidate,'strength',i)).join('')||'<p class="rf-sub">No supported strengths were identified.</p>'}</div></section><section><h4>Concerns to clarify</h4><div class="rf-assessment-points">${brief.concerns.slice(0,2).map((_,i)=>assessmentPointHTML(candidate,'concern',i)).join('')||'<p class="rf-sub">No concerns were identified from the resume.</p>'}</div></section>`;
+  }
+  function bindAssessmentPoints(wrap,candidate){
+    const view=wrap.querySelector('[data-workspace-view-resume]');
+    if(view&&!view.dataset.bound){view.dataset.bound='true';view.addEventListener('click',()=>void api.openResume?.(candidate));}
+    wrap.querySelectorAll('[data-workspace-point]').forEach(button=>button.addEventListener('click',()=>void api.openResume?.(candidate,button.dataset.pointKind,Number(button.dataset.pointIndex))));
+  }
   function fitHTML(candidate){
     return [['JD Fit',candidate.jdScore],['Manager Fit',candidate.managerScore]].map(([label,value])=>
       `<div class="rf-brief-score"><span>${label}</span><strong>${Number.isFinite(value)?value.toFixed(1):'—'}<small> / 10</small></strong></div>`).join('');
@@ -52,7 +68,7 @@
     const wrap=api.root.querySelector('#candidateWorkspace'),note=quickNotes.entry(candidate);
     wrap.dataset.workspaceCandidate=candidate.id;
     wrap.innerHTML=`<div class="rf-assessment-region"><div id="workspaceIntake" class="rf-card rf-intake-brief" hidden></div><div id="workspaceEvaluation" class="rf-card" aria-live="polite" hidden></div>
-      <section class="rf-card rf-workspace-overview" aria-labelledby="workspaceBriefTitle"><div class="rf-brief-heading"><div><span class="rf-kicker">Screening brief</span><h3 id="workspaceBriefTitle">${escape(readiness.label)}</h3><p class="rf-sub"></p></div><div id="workspaceFit" class="rf-brief-fit" aria-label="Assessment scores"></div></div><div class="rf-brief-evidence"><h4>Strongest evidence</h4><p id="workspaceEvidence"></p><details id="workspaceSource" class="rf-source-details" hidden><summary>View resume excerpt</summary><blockquote id="workspaceSourceQuote"></blockquote></details></div><div class="rf-brief-uncertainty"><h4>What to verify</h4><p id="workspaceUncertainty"></p><p class="rf-evidence-caution">Missing evidence is a question to verify, not proof of a missing skill.</p></div><details class="rf-review-explanation rf-brief-explanation"><summary>Why this assessment?</summary><div id="workspaceAssessmentReasons"></div></details></section></div>
+      <section class="rf-card rf-workspace-overview" aria-labelledby="workspaceBriefTitle"><div class="rf-brief-heading"><div><span class="rf-kicker">Screening brief</span><h3 id="workspaceBriefTitle">${escape(readiness.label)}</h3><p class="rf-sub"></p></div><div class="rf-brief-heading-actions"><button class="rf-btn" type="button" data-workspace-view-resume>View Resume</button><div id="workspaceFit" class="rf-brief-fit" aria-label="Assessment scores"></div></div></div><div id="workspaceAssessmentPoints" class="rf-point-groups rf-brief-points">${assessmentPointsHTML(candidate)}</div><p class="rf-evidence-caution rf-brief-caution">Select any strength or concern to review its source. Missing evidence is labeled instead of inferred.</p><details class="rf-review-explanation rf-brief-explanation"><summary>Why this assessment?</summary><div id="workspaceAssessmentReasons"></div></details></section></div>
       <div class="rf-card rf-screening-work"><div class="rf-workspace-columns"><form id="workspaceNoteForm" class="rf-form"><details class="rf-review-explanation"><summary>How do notes affect assessments?</summary><p>Your original words are saved first. Review the interpretation in Saved notes &amp; AI insights below. Accepting its wording leaves scores unchanged; assessment proposals have their own approval.</p></details><label for="workspaceNote">Screening notes</label><textarea id="workspaceNote" maxlength="10000" placeholder="What did you learn about their skills, ownership, or working style?">${escape(note.text)}</textarea><div class="rf-note-controls"><p id="workspaceNoteStatus" class="rf-sub" role="status"></p><button type="button" class="rf-linkbtn" id="newQuickNote">New note</button><button type="submit" class="rf-btn" id="retryQuickNote" hidden>Retry save</button></div></form><div class="rf-screen-questions"><h3>Ask in your screen</h3><ol id="workspaceQuestions">${questions.map(q=>`<li>${escape(q)}</li>`).join('')}</ol></div></div><details class="rf-feedback-history"><summary>Saved notes &amp; AI insights</summary><div id="workspaceFeedback" aria-live="polite"></div></details></div>
       <details id="workspaceSubmission" class="rf-card rf-workspace-details rf-submission-tools"><summary>Prepare a submittal</summary><div class="rf-submission-heading"><div><span class="rf-kicker">Candidate presentation</span><h3>Make the introduction.</h3><p class="rf-sub">Their strongest experience. Ready for your client.</p></div><span class="rf-submission-badge">Client submittal</span></div><div id="submissionGuidance" class="rf-guidance-slot" data-guidance-tip="submission"></div><div class="rf-submission-document"><div class="rf-submission-document-head"><label for="submissionDraft">Submittal draft</label><span id="submissionWordCount"></span></div><textarea id="submissionDraft" maxlength="12000" spellcheck="true" aria-describedby="submissionDraftHelp submissionWordCount" placeholder="Add a short introduction and 3–5 supported strengths for this role.">${escape(drafts.get(current)??candidate.submissionDraft?.text??summary(candidate,job))}</textarea><div class="rf-submission-document-foot"><span id="submissionDraftHelp">Click anywhere in the draft to make it yours.</span><span>Plain text · ready to paste</span></div></div><div class="rf-submission-footer"><div class="rf-actions"><button type="button" class="rf-btn primary" id="workspaceCopy">Copy submittal</button><button type="button" class="rf-btn" id="saveSubmissionDraft">Save</button><button type="button" class="rf-linkbtn" id="regenerateSubmission">Generate fresh draft</button></div><p class="rf-sub" id="submissionDraftStatus" role="status">${drafts.has(current)?'Unsaved edits':candidate.submissionDraft?'Saved draft':'Draft ready · review before sharing'}</p></div></details>`;
     const id=current,area=wrap.querySelector('#workspaceNote');
@@ -67,7 +83,7 @@
     draftObserver?.disconnect();
     if(global.ResizeObserver){let width=0;draftObserver=new ResizeObserver(entries=>{const next=entries[0].contentRect.width;if(next!==width){width=next;refreshDraft();}});draftObserver.observe(wrap.querySelector('#submissionDraft'));}
     wrap.querySelector('#workspaceSubmission').addEventListener('toggle',refreshDraft);
-    refreshFeedback();noteStatus(candidate);refreshDraft();
+    bindAssessmentPoints(wrap,candidate);refreshFeedback();noteStatus(candidate);refreshDraft();
   }
   function preserve(change){
     const region=api?.root.querySelector('.rf-assessment-region');
@@ -120,9 +136,7 @@
     api.intakeBrief?.(c,api.root.querySelector('#workspaceIntake'));
     const list=api.root.querySelector('#workspaceQuestions');if(list)list.innerHTML=questionsFor(c).map(q=>'<li>'+escape(q)+'</li>').join('');
     if(c.resumeIntake?.phase==='ready'&&!drafts.has(c.id)&&!c.submissionDraft){const draft=api.root.querySelector('#submissionDraft');if(draft){const text=summary(c,api.job());if(draft.value!==text){draft.value=text;refreshDraft();}}}
-    const proof=evidenceFor(c),evidence=api.root.querySelector('#workspaceEvidence');if(evidence)evidence.textContent=prose.brief(proof.claim,24);
-    const source=api.root.querySelector('#workspaceSource'),quote=api.root.querySelector('#workspaceSourceQuote');
-    if(source)source.hidden=!proof.quote;if(quote)quote.textContent=prose.excerpt(proof.quote,proof.claim);
+    const points=api.root.querySelector('#workspaceAssessmentPoints');if(points){points.innerHTML=assessmentPointsHTML(c);bindAssessmentPoints(api.root.querySelector('#candidateWorkspace'),c);}
     const ready=global.AncalagonIntake?.pending(c)?c.resumeIntake.phase==='ready':(api.reviewReady?.(c)||api.canReview(c));api.guidance?.(c,ready?'approval':'assessment');
     const reasons=api.root.querySelector('#workspaceAssessmentReasons');
     if(reasons){
@@ -130,8 +144,7 @@
       const items=latest?[['Latest review',latest]]:[['JD Fit',screen?.jd_reason||brief?.jd_reason],['Manager Fit',screen?.manager_reason||brief?.manager_reason]];
       reasons.innerHTML=items.filter(([,text])=>text).map(([label,text])=>'<p><strong>'+label+':</strong> '+escape(prose.brief(text,35))+'</p>').join('')||'<p>Scores reflect recorded job evidence and approved manager priorities.</p>';
     }
-    const readiness=api.readiness(c),uncertainty=api.root.querySelector('#workspaceUncertainty');
-    if(uncertainty)uncertainty.textContent=prose.brief(readiness.knockouts[0]?.requirement||readiness.mustGaps[0]?.requirement||c.concerns?.[0]||'Confirm personal ownership and the job requirements.',25);
+    const readiness=api.readiness(c);
     const overview=api.root.querySelector('.rf-workspace-overview > div');
     const fit=api.root.querySelector('#workspaceFit');if(fit)fit.innerHTML=global.AncalagonIntake?.pending(c)?'':fitHTML(c);
     const card=api.root.querySelector('.rf-workspace-overview');if(card)card.hidden=!api.root.querySelector('#workspaceIntake').hidden||!api.root.querySelector('#workspaceEvaluation').hidden;
@@ -139,7 +152,7 @@
       const failed=c.resumeIntake.phase==='error',ready=c.resumeIntake.phase==='ready';
       overview.querySelector('h3').textContent=failed?'Retry the resume assessment':ready?'Review the screening brief':'Preparing the resume assessment';
       overview.querySelector('p').textContent=failed?'Use Try again above to continue with this candidate. No assessment scores have been applied.':ready?'Check the evidence and proposed assessment, then use the questions below in your screen.':'You can keep working while the screening brief is prepared.';
-      if(evidence&&!ready)evidence.textContent=failed?'Assessment unavailable. Resume evidence has not been confirmed.':'Resume evidence is being checked.';
+      if(points&&!ready)points.innerHTML='<p class="rf-sub">'+(failed?'Assessment unavailable. Resume evidence has not been confirmed.':'Resume evidence is being checked.')+'</p>';
     }
   }
   function refreshEvaluation(){if(!api||!current)return;return preserve(()=>{const candidate=api.candidate(current);if(candidate){renderEvaluation(candidate);refreshIntake();}});}
@@ -153,4 +166,3 @@
   const methods={init:options=>{api=options;quickNotes=global.AncalagonQuickNotes.create({id:api.noteId,valid:api.validCandidate,save:api.saveNote,changed:noteStatus});},leave,beforeReview,flushNotes:()=>quickNotes?.flushAll(),hasPendingNotes:id=>quickNotes?.pending(id),render,refreshFeedback,refreshEvaluation,refreshIntake,hasDrafts:pending,copy,summary,displayName,evidenceFor};
   if(typeof module!=='undefined')module.exports=methods;global.AncalagonWorkspace=methods;
 })(typeof window!=='undefined'?window:globalThis);
-
