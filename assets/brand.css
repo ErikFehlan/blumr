@@ -29,10 +29,12 @@
    Render those same letter shapes in the theme's text color on light surfaces;
    the original green r and leaf stay visible to the right of that boundary. */
 #authGate.an-site .blumr-logo > img,
+#workspaceLoading .blumr-logo > img,
 #rf-app:is([data-theme="light"],[data-theme="paper"],[data-theme="sage"]) .rf-brand .blumr-logo > img {
   clip-path:inset(0 0 0 78%);
 }
 #authGate.an-site .blumr-logo::after,
+#workspaceLoading .blumr-logo::after,
 #rf-app:is([data-theme="light"],[data-theme="paper"],[data-theme="sage"]) .rf-brand .blumr-logo::after {
   content:"";
   position:absolute;
