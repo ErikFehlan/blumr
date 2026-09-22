@@ -15,6 +15,16 @@
   const workspace=document.getElementById('rf-app');
   if(workspace)colors.observe(workspace,{attributes:true,attributeFilter:['data-theme']});
   syncBrowserColors();
+  // Public pages can link directly to account creation in the existing form.
+  if(new URLSearchParams(window.location.search).get('auth')==='create'){
+    document.getElementById('createAccountTab')?.click();
+    window.addEventListener('pageshow',event=>{
+      if(event.persisted)return;
+      requestAnimationFrame(()=>{
+        if(document.body.classList.contains('rf-auth-guest'))document.getElementById('authName')?.focus({preventScroll:true});
+      });
+    });
+  }
   const tabs=Array.from(document.querySelectorAll('[data-demo]'));
   function select(tab){
     tabs.forEach(item=>{const active=item===tab;item.setAttribute('aria-selected',String(active));item.tabIndex=active?0:-1;document.getElementById(item.getAttribute('aria-controls')).hidden=!active;});
