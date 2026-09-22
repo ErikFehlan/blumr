@@ -17,7 +17,7 @@
     'assets/job-review.js?v=20260918-blumr',
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
-    'assets/candidate-workspace.js?v=20260922-resume-panel',
+    'assets/candidate-workspace.js?v=20260922-resume-panel-v2',
     'assets/criteria-automation.js?v=20260922-adaptive-polling',
     'assets/home.js?v=20260918-blumr',
     'assets/focus-ui.js?v=20260918-blumr',

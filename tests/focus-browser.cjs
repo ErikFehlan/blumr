@@ -34,11 +34,8 @@ const dir=path.resolve(__dirname,'..');
   assert.equal(await page.locator('.rf-nav [data-page="candidates"]').getAttribute('aria-current'),'page');
   assert.equal(await page.locator('#detailStage').locator('..').isVisible(),true,'stage control remains accessible without opening evidence');
   assert.equal(await page.locator('#workspaceSubmission').evaluate(e=>e.open),false);
-  assert.equal(await page.locator('#workspaceEvidence').textContent(),'Manual testing ownership');
-  assert.equal(await page.locator('#workspaceSource').evaluate(e=>e.open),false);
-  await page.locator('#workspaceSource > summary').click();
-  assert.equal(await page.locator('#workspaceSourceQuote').textContent(),'Built regression test suites for release validation and API coverage.');
-  await page.locator('#workspaceSource > summary').click();
+  assert.match(await page.locator('#workspaceAssessmentPoints').textContent(),/does not contain linked evidence points/i);
+  assert.equal(await page.locator('[data-workspace-view-resume]').count(),0,'legacy candidate without a stored resume has no dead resume control');
   await snap('candidate');
   // Background assessment content may grow, but the focused note and caret stay put.
   await page.locator('#workspaceNote').fill('Testing ownership to clarify');
