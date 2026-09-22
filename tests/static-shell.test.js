@@ -5,14 +5,16 @@ const test = require('node:test');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const workspaceLoader = fs.readFileSync(path.join(root, 'assets/workspace-loader.js'), 'utf8');
 
 test('production shell references modular application assets', () => {
   assert.match(html, /href="assets\/app\.css\?v=[^"]+"/);
   assert.match(html, /src="assets\/auth\.js\?v=[^"]+"/);
-  assert.match(html, /src="assets\/data\.js\?v=[^"]+"/);
-  assert.match(html, /src="assets\/select\.js\?v=[^"]+"/);
-  assert.match(html, /src="assets\/scoring\.js\?v=[^"]+"/);
-  assert.match(html, /src="assets\/app\.js\?v=[^"]+"/);
+  assert.match(html, /src="assets\/workspace-loader\.js\?v=[^"]+"/);
+  assert.match(workspaceLoader, /assets\/data\.js\?v=[^']+'/);
+  assert.match(workspaceLoader, /assets\/select\.js\?v=[^']+'/);
+  assert.match(workspaceLoader, /assets\/scoring\.js\?v=[^']+'/);
+  assert.match(workspaceLoader, /assets\/app\.js\?v=[^']+'/);
   assert.match(html, /id="managerPreferenceProfile"/);
   assert.match(html, /id="reevaluateCandidates"/);
   assert.match(html, /id="reevaluationResults"/);
@@ -25,8 +27,8 @@ test('production shell references modular application assets', () => {
   assert.match(html, /id="copySubmissionSummary"/);
   assert.match(html, /id="syncStatus"/);
   assert.match(html, /id="qualityLab"/);
-  assert.match(html, /src="assets\/quality\.js/);
-  assert.match(html, /src="assets\/quality-ui\.js/);
+  assert.match(workspaceLoader, /assets\/quality\.js/);
+  assert.match(workspaceLoader, /assets\/quality-ui\.js/);
   assert.doesNotMatch(html, /<style(?:\s|>)/i);
   assert.doesNotMatch(html, /<script>\s*[\s\S]+?<\/script>/i);
 });
