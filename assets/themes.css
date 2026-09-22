@@ -112,6 +112,11 @@
 #rf-app[data-theme] .rf-red {background:var(--ui-error-bg); color:var(--rf-red);}
 #rf-app[data-theme] :is(.rf-gray,.rf-job-choice-meta span) {background:var(--ui-soft); color:var(--ui-muted);}
 #rf-app[data-theme] .rf-value {background:none; color:var(--ui-text); -webkit-text-fill-color:var(--ui-text);}
+/* Keep candidate scores softly tinted on light surfaces. */
+#rf-app:is([data-theme="light"],[data-theme="paper"],[data-theme="sage"]) .rf-candidate-score {
+  background:color-mix(in srgb,var(--ui-soft) 25%,var(--ui-panel));
+  border-color:var(--ui-panel-line);
+}
 #rf-app[data-theme] .rf-score-ring:after {background:var(--ui-panel);}
 #rf-app[data-theme] :is(.rf-score-ring strong,.rf-score-breakdown .rf-score-total,.rf-screen-context strong,.rf-screen-evidence strong,.rf-score-change b,.rf-funnel-row,.rf-funnel-pct,.rf-legend-row,.rf-activity-copy,.rf-ai-summary) {color:var(--ui-text);}
 #rf-app[data-theme] :is(.rf-screen-context,.rf-screen-evidence,.rf-score-change,.rf-ai-summary,.rf-ai-evidence,.rf-weight-change,.rf-compare-field select,.rf-reason-chip) {background:var(--ui-rail); border-color:var(--ui-line);}
