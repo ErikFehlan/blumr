@@ -26,6 +26,8 @@
     }catch{if(api.job()?.id===job.id)render(job,'Automatic criteria processing is not available yet');}
     finally{busy=false;}
   }
-  function init(options){api=options;timer=setInterval(()=>{if(document.visibilityState==='visible')refresh(api.job());},2000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh(api.job(),true)});}
+  function pollingDelay(){const job=api?.job(),task=cache.get(job?.id);return matches(task,job)&&['ready','failed'].includes(task?.status)?30000:2000;}
+  function schedule(delay=pollingDelay()){if(typeof setTimeout!=='function')return;if(timer)clearTimeout(timer);timer=null;if(document.visibilityState!=='visible')return;timer=setTimeout(async()=>{await refresh(api.job());schedule();},delay);}
+  function init(options){api=options;schedule(300);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){refresh(api.job(),true).finally(()=>schedule());}else if(timer){clearTimeout(timer);timer=null;}});}
   const methods={init,refresh,label,questions,matches};if(typeof module!=='undefined')module.exports=methods;global.AncalagonCriteria=methods;
 })(typeof window!=='undefined'?window:globalThis);

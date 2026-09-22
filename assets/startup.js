@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  let ready = false, failed = false;
+  let ready = false, failed = false, workspaceLoading = false, timeout = null;
 
   function showFailure() {
     const panel = document.getElementById('startupProblem');
@@ -22,10 +22,21 @@
   }, true);
   window.addEventListener('blumr:ui-ready', function () {
     ready = true;
+    if (timeout) window.clearTimeout(timeout);
     if (failed) showFailure();
   }, { once: true });
+  window.addEventListener('blumr:workspace-loading', function () {
+    workspaceLoading = true;
+    timeout = window.setTimeout(function () {
+      if (!ready) showFailure();
+    }, 15000);
+  }, { once: true });
+  window.addEventListener('blumr:workspace-error', function () {
+    failed = true;
+    showFailure();
+  });
   document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('startupReload').addEventListener('click', function () { window.location.reload(); });
-    if (!ready || failed) showFailure();
+    if ((workspaceLoading && !ready) || failed) showFailure();
   }, { once: true });
 })();
