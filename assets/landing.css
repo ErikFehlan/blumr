@@ -1,6 +1,6 @@
 /* Public website only. Authenticated workspace styles and authentication stay separate. */
 #authGate.an-site{--an-bg:#bce0df;--an-surface:#f0f9f7;--an-soft:#d7eeea;--an-pressed:#acd3ce;--an-ink:#183c36;--an-muted:#355b53;--an-mint:#245e50;--an-on-accent:#fff;--an-hover:#1b4e42;--an-line:#83aca3;position:relative;inset:auto;display:block;min-height:100vh;padding:0;background:var(--an-bg);color:var(--an-ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6;overflow:clip;color-scheme:light}
-.rf-authenticated #authGate.an-site{display:none}
+.rf-authenticated:not(.rf-auth-opening) #authGate.an-site{display:none}
 .an-site *{box-sizing:border-box}.an-site a{color:inherit;text-decoration:none}.an-site button,.an-site input{font:inherit}.an-site [hidden]{display:none!important}
 .an-site :is(a,button,input,summary,[tabindex]):focus-visible{outline:3px solid var(--an-mint);outline-offset:5px}
 .an-site .an-container{width:min(1280px,calc(100% - 112px));margin-inline:auto}
@@ -46,7 +46,7 @@
 @media(prefers-reduced-motion:reduce){.an-site *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 
 /* Keep the surrounding canvas and guest account dialogs in Mint Light. */
-body:not(.rf-authenticated){background:#bce0df;color-scheme:light}
+body:not(.rf-authenticated),body.rf-auth-opening,body.rf-data-loading{background:#bce0df;color-scheme:light}
 body:not(.rf-authenticated) .rf-welcome-modal{background:rgba(24,60,54,.3);color-scheme:light}
 body:not(.rf-authenticated) .rf-welcome-dialog{background:#f0f9f7;color:#183c36;border-color:#83aca3;box-shadow:0 24px 64px #24483c26}
 body:not(.rf-authenticated) .rf-welcome-dialog :is(p,.rf-auth-form label,.rf-auth-message){color:#355b53}

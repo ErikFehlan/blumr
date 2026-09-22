@@ -20,6 +20,20 @@
   const welcomeMessage = document.getElementById('welcomeMessage');
   let appliedAccessToken = null;
   let authMode = 'signin';
+  let signingIn = false;
+  let sessionGeneration = 0;
+
+  function setSignInProgress(busy, label) {
+    signingIn = busy;
+    form.setAttribute('aria-busy', String(busy));
+    submitButton.setAttribute('aria-busy', String(busy));
+    submitButton.disabled = busy;
+    submitButton.textContent = label || (authMode === 'create' ? 'Create account' : 'Sign in');
+    document.getElementById('signInTab').disabled = busy;
+    document.getElementById('createAccountTab').disabled = busy;
+    emailInput.readOnly = busy;
+    passwordInput.readOnly = busy;
+  }
 
   async function requestAuth(action) {
     try { return await action(); }
@@ -34,19 +48,25 @@
   }
 
   function showGuest() {
+    sessionGeneration++;
     window.dispatchEvent(new CustomEvent('ancalagon:auth-cleared'));
-    body.classList.remove('rf-auth-pending', 'rf-authenticated', 'rf-data-loading');
+    setSignInProgress(false);
+    body.classList.remove('rf-auth-pending', 'rf-authenticated', 'rf-data-loading', 'rf-auth-opening');
     body.classList.add('rf-auth-guest');
     gate.removeAttribute('aria-hidden');
     document.getElementById('rf-app').setAttribute('aria-hidden', 'true');
+    document.getElementById('rf-app').removeAttribute('aria-busy');
   }
 
   function showApplication(session, workspace, needsWorkspaceLoad) {
+    const keepSignInVisible = needsWorkspaceLoad && signingIn && body.classList.contains('rf-auth-guest');
+    body.classList.toggle('rf-auth-opening', keepSignInVisible);
     body.classList.remove('rf-auth-pending', 'rf-auth-guest');
     body.classList.add('rf-authenticated');
     body.classList.toggle('rf-data-loading', Boolean(needsWorkspaceLoad));
-    gate.setAttribute('aria-hidden', 'true');
-    document.getElementById('rf-app').removeAttribute('aria-hidden');
+    if (keepSignInVisible) gate.removeAttribute('aria-hidden');
+    else gate.setAttribute('aria-hidden', 'true');
+    document.getElementById('rf-app').setAttribute('aria-hidden', String(Boolean(needsWorkspaceLoad)));
     userEmail.textContent = session.user.email || '';
     const displayName = session.user.user_metadata?.display_name?.trim();
     const resolvedWorkspaceName = workspace?.name || 'Private workspace';
@@ -54,6 +74,25 @@
       ? displayName + ' · ' + resolvedWorkspaceName
       : resolvedWorkspaceName;
   }
+
+  window.addEventListener('ancalagon:data-ready', function () {
+    if (!body.classList.contains('rf-authenticated')) return;
+    const enteringFromSignIn = body.classList.contains('rf-auth-opening');
+    body.classList.remove('rf-auth-opening');
+    setSignInProgress(false);
+    gate.setAttribute('aria-hidden', 'true');
+    const app = document.getElementById('rf-app');
+    app.removeAttribute('aria-hidden');
+    if (enteringFromSignIn) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      // The page remains mounted while Home refreshes its heading and job cards.
+      const page = app.querySelector('.rf-page.active');
+      if (page && !document.querySelector('.rf-welcome-modal:not([hidden])')) {
+        page.setAttribute('tabindex', '-1');
+        page.focus({ preventScroll: true });
+      }
+    }
+  });
 
   async function workspaceForUser(client) {
     const { data, error } = await client
@@ -91,8 +130,12 @@
     if ((previousUser && previousUser !== session.user.id) || (window.ancalagonPreviousUser && window.ancalagonPreviousUser !== session.user.id)) {window.location.reload();return;}
     window.ancalagonPreviousUser=session.user.id;
 
+    const generation = sessionGeneration;
     try {
       const workspace = await workspaceForUser(client);
+      if (generation !== sessionGeneration) return;
+      // getSession and the initial auth event can resolve the same session together.
+      if (session.access_token === appliedAccessToken && window.ancalagonAuth?.workspace) return;
       const workspaceChanged = window.ancalagonAuth?.workspace?.id !== workspace.id;
       appliedAccessToken = session.access_token;
       window.ancalagonAuth = { client, session, workspace };
@@ -101,6 +144,7 @@
         window.dispatchEvent(new CustomEvent('ancalagon:auth-ready', { detail: window.ancalagonAuth }));
       }
     } catch (error) {
+      if (generation !== sessionGeneration) return;
       showGuest();
       showMessage(error.message || 'Your workspace could not be loaded.', 'error');
     }
@@ -136,6 +180,7 @@
   const resetPasswordModal = document.getElementById('resetPasswordModal');
 
   document.getElementById('forgotAccess').addEventListener('click', function () {
+    if (signingIn) return;
     document.getElementById('recoveryEmail').value = emailInput.value.trim();
     document.getElementById('recoveryMessage').textContent = '';
     recoveryModal.hidden = false;
@@ -187,6 +232,7 @@
   });
 
   function setAuthMode(mode) {
+    if (signingIn) return;
     authMode = mode;
     const creating = mode === 'create';
     document.getElementById('signInTab').classList.toggle('active', !creating);
@@ -211,9 +257,11 @@
   document.querySelectorAll('[data-auth-mode]').forEach(function (link) {
     link.addEventListener('click', function (event) {
       event.preventDefault();
+      if (signingIn) return;
       const mode = link.dataset.authMode === 'create' ? 'create' : 'signin';
       if (authMode !== mode) setAuthMode(mode);
-      document.getElementById('authAccess').scrollIntoView({ block: 'start', behavior: 'instant' });
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById('authAccess').scrollIntoView({ block: 'start', behavior: reducedMotion ? 'instant' : 'smooth' });
       (mode === 'create' ? nameInput : emailInput).focus({ preventScroll: true });
     });
   });
@@ -221,6 +269,7 @@
 
   form.addEventListener('submit', async function (event) {
     event.preventDefault();
+    if (submitButton.disabled) return;
     const email = emailInput.value.trim().toLowerCase();
     const password = passwordInput.value;
     if (!email || !password) return;
@@ -263,16 +312,13 @@
       return;
     }
 
-    submitButton.disabled = true;
-    submitButton.textContent = 'Signing in…';
+    setSignInProgress(true, 'Signing in…');
     showMessage('Signing in securely…');
 
     const { error } = await requestAuth(() => client.auth.signInWithPassword({ email, password }));
 
-    submitButton.disabled = false;
-    submitButton.textContent = 'Sign in';
-
     if (error) {
+      setSignInProgress(false);
       showMessage(error.code === 'invalid_credentials' || /invalid.*credentials/i.test(error.message || '')
         ? 'The email or password is incorrect.'
         : error.message || 'Sign-in could not finish. Please try again.', 'error');
@@ -280,7 +326,10 @@
     }
 
     passwordInput.value = '';
-    showMessage('Signed in successfully.', 'success');
+    if (signingIn) {
+      setSignInProgress(true, 'Opening your workspace…');
+      showMessage('Getting your jobs and candidates ready…');
+    }
   });
 
   document.getElementById('passwordForm')?.addEventListener('submit', async function (event) {

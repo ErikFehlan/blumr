@@ -28,7 +28,7 @@ before(async () => {
   }).listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   url = 'http://127.0.0.1:' + server.address().port + '/';
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, executablePath: process.env.TEST_CHROME });
 });
 after(async () => { await browser?.close(); await new Promise(resolve => server.close(resolve)); });
 
@@ -49,19 +49,31 @@ async function open(t, options = {}) {
     const state = { jobs: options.empty ? [] : [job('job-a', 'Synthetic QA'), job('job-b', 'Synthetic second search')], candidates: options.empty ? [] : [candidate('candidate-a', 'Alex Example'), candidate('candidate-b', 'Jamie Example')], feedback: [], interviewOutcomes: [] };
     const session = { access_token: 'synthetic-token', user: { id: 'synthetic-user', email: 'qa@example.test', user_metadata: {} } };
     window.auditLoads = 0;
+    window.auditAuthCalls = 0;
     window.auditFailLoad = Boolean(options.failLoad);
     window.auditSaved = copy(state);
     window.supabase = { createClient: () => ({
       auth: {
         getSession: async () => ({ data: { session: options.guest ? null : session }, error: null }),
         onAuthStateChange: callback => { window.auditAuthCallback = callback; return { data: { subscription: { unsubscribe() {} } } }; },
-        signInWithPassword: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: { code: 'invalid_credentials', message: 'Invalid login credentials' } }; },
+        signInWithPassword: async () => {
+          window.auditAuthCalls++;
+          if (options.holdSignIn) await new Promise(resolve => { window.auditReleaseSignIn = resolve; });
+          if (window.auditAuthThrows) throw Error('Synthetic connection failure');
+          if (!options.signInSuccess) return { error: { code: 'invalid_credentials', message: 'Invalid login credentials' } };
+          window.auditAuthCallback('SIGNED_IN', session);
+          return { data: { session }, error: null };
+        },
         signUp: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { data: { session: null }, error: null }; },
         resetPasswordForEmail: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: null }; },
         updateUser: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); window.auditPasswordUpdates = (window.auditPasswordUpdates || 0) + 1; return { error: null }; },
         signOut: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: null }; }
       },
-      from: () => ({ select: () => ({ limit: () => ({ maybeSingle: async () => ({ data: { workspace_id: 'synthetic-workspace', role: 'owner', workspaces: { name: 'Synthetic workspace' } }, error: null }) }) }) })
+      from: () => ({ select: () => ({ limit: () => ({ maybeSingle: async () => {
+        if (options.holdMembership) await new Promise(resolve => { (window.auditReleaseMembership ||= []).push(resolve); });
+        if (options.failMembership) return { data: null, error: { message: 'Synthetic workspace access failure' } };
+        return { data: { workspace_id: 'synthetic-workspace', role: 'owner', workspaces: { name: 'Synthetic workspace' } }, error: null };
+      } }) }) })
     }) };
     window.AncalagonData = { create: () => ({
       load: async () => { window.auditLoads++; if (options.holdLoad) await new Promise(resolve => { window.auditReleaseLoad = resolve; }); if (window.auditFailLoad) throw Error('Synthetic workspace failure'); return copy(state); },
@@ -223,6 +235,93 @@ test('interrupted sign-out keeps the workspace usable and lets the user retry', 
   await navigate(page, 'jobs');
   assert.equal(await page.locator('#page-jobs').isVisible(), true);
   assert.deepEqual(errors, []);
+});
+
+test('sign-in stays on the form until workspace data is ready, without duplicate submits or a loading flash', async t => {
+  for (const width of [1440, 390]) {
+    const { page, errors } = await open(t, { guest: true, signInSuccess: true, holdSignIn: true, holdLoad: true });
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ reducedMotion: width === 390 ? 'reduce' : 'no-preference' });
+    await page.getByRole('link', { name: 'Log in', exact: true }).first().click();
+    await page.locator('#authEmail').fill('synthetic@example.test');
+    await page.locator('#authPassword').fill('Synthetic-password-only');
+    await page.locator('#authSubmit').click();
+    await page.waitForFunction(() => typeof window.auditReleaseSignIn === 'function');
+    assert.match(await page.locator('#authSubmit').textContent(), /Signing in/);
+    assert.equal(await page.locator('#authSubmit').isDisabled(), true);
+    await page.locator('#authForm').dispatchEvent('submit');
+    assert.equal(await page.evaluate(() => window.auditAuthCalls), 1, 'a second submit must not start another login');
+    await page.evaluate(() => window.auditReleaseSignIn());
+    await page.locator('body.rf-auth-opening').waitFor();
+    await page.waitForFunction(() => typeof window.auditReleaseLoad === 'function');
+    assert.equal(await page.locator('#authAccess').isVisible(), true);
+    assert.equal(await page.locator('#workspaceLoading').isVisible(), false, 'fresh sign-in must stay on its form');
+    assert.equal(await page.locator('#rf-app').isVisible(), false, 'private content stays hidden until ready');
+    assert.equal(await page.locator('#rf-app').getAttribute('aria-hidden'), 'true');
+    assert.equal(await page.locator('#authForm').getAttribute('aria-busy'), 'true');
+    assert.match(await page.locator('#authSubmit').textContent(), /Opening your workspace/);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(188, 224, 223)');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    if (process.env.CAPTURE_LOGIN) await page.screenshot({ path: process.env.CAPTURE_LOGIN + '-opening-' + width + '.png' });
+    await page.evaluate(() => window.auditAuthCallback('SIGNED_IN', window.ancalagonAuth.session));
+    await page.waitForTimeout(30);
+    assert.equal(await page.locator('#rf-app').isVisible(), false, 'repeated auth event must not reveal incomplete data');
+    await page.evaluate(() => window.auditReleaseLoad());
+    await page.locator('body.rf-authenticated:not(.rf-data-loading):not(.rf-auth-opening)').waitFor();
+    await page.locator('#page-home.active').waitFor();
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('rf-app')).opacity === '1');
+    assert.equal(await page.locator('#authGate').isVisible(), false);
+    assert.equal(await page.locator('#workspaceLoading').isVisible(), false);
+    assert.equal(await page.locator('#authPassword').inputValue(), '');
+    assert.equal(await page.evaluate(() => window.scrollY), 0);
+    assert.equal(await page.evaluate(() => Boolean(document.activeElement.closest('#page-home'))), true);
+    assert.equal(await page.locator('#rf-app').getAttribute('aria-busy'), null);
+    if (width === 390) assert.equal(await page.locator('#rf-app').evaluate(el => getComputedStyle(el).animationName), 'none');
+    if (process.env.CAPTURE_LOGIN) await page.screenshot({ path: process.env.CAPTURE_LOGIN + '-ready-' + width + '.png' });
+    assert.deepEqual(errors, []);
+  }
+});
+
+test('restoring a saved session uses the mint loading screen and reveals a usable error if loading fails', async t => {
+  const { page, errors } = await open(t, { holdLoad: true, failLoad: true });
+  await page.locator('#workspaceLoading').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#authGate').isVisible(), false);
+  assert.equal(await page.locator('#rf-app').isVisible(), false);
+  assert.equal(await page.locator('#workspaceLoading').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(188, 224, 223)');
+  assert.match(await page.locator('#workspaceLoading').textContent(), /Opening your workspace/);
+  if (process.env.CAPTURE_LOGIN) await page.screenshot({ path: process.env.CAPTURE_LOGIN + '-restore.png' });
+  await page.waitForFunction(() => typeof window.auditReleaseLoad === 'function');
+  await page.evaluate(() => window.auditReleaseLoad());
+  await page.locator('#workspaceLoading').waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('#page-home').isVisible(), true);
+  assert.equal(await page.locator('#retrySync').isEnabled(), true);
+  assert.equal(await page.locator('#syncStatus').getAttribute('data-state'), 'error');
+  assert.deepEqual(errors, []);
+});
+
+test('workspace access failure restores sign-in and an expired session cannot reopen it after a late access response', async t => {
+  const failed = await open(t, { guest: true, signInSuccess: true, failMembership: true });
+  await failed.page.locator('#authEmail').fill('synthetic@example.test');
+  await failed.page.locator('#authPassword').fill('Synthetic-password-only');
+  await failed.page.locator('#authSubmit').click();
+  await failed.page.waitForFunction(() => document.getElementById('authMessage').textContent.includes('access failure'));
+  assert.equal(await failed.page.locator('#authSubmit').isEnabled(), true);
+  assert.equal(await failed.page.locator('#rf-app').isVisible(), false);
+  assert.deepEqual(failed.errors, []);
+
+  const expired = await open(t, { guest: true, signInSuccess: true, holdMembership: true });
+  await expired.page.locator('#authEmail').fill('synthetic@example.test');
+  await expired.page.locator('#authPassword').fill('Synthetic-password-only');
+  await expired.page.locator('#authSubmit').click();
+  await expired.page.waitForFunction(() => window.auditReleaseMembership?.length);
+  await expired.page.evaluate(() => window.auditAuthCallback('SIGNED_OUT', null));
+  await expired.page.waitForFunction(() => !document.getElementById('authSubmit').disabled);
+  await expired.page.evaluate(() => window.auditReleaseMembership.forEach(resolve => resolve()));
+  await expired.page.waitForTimeout(50);
+  assert.equal(await expired.page.locator('body.rf-auth-guest').count(), 1);
+  assert.equal(await expired.page.locator('#rf-app').isVisible(), false);
+  assert.equal(await expired.page.evaluate(() => window.auditLoads), 0);
+  assert.deepEqual(expired.errors, []);
 });
 
 test('an expired session during loading reveals sign-in and ignores late workspace data', async t => {

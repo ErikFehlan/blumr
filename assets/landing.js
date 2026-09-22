@@ -2,7 +2,7 @@
   'use strict';
   // Browser chrome follows the visible surface without changing saved themes.
   function syncBrowserColors(){
-    const signedIn=document.body.classList.contains('rf-authenticated');
+    const signedIn=document.body.classList.contains('rf-authenticated')&&!document.body.classList.contains('rf-data-loading');
     const surface=document.getElementById(signedIn?'rf-app':'authGate');
     if(!surface)return;
     const styles=getComputedStyle(surface);
