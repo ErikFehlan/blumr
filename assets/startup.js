@@ -37,6 +37,6 @@
   });
   document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('startupReload').addEventListener('click', function () { window.location.reload(); });
-    if ((workspaceLoading && !ready) || failed) showFailure();
+    if (failed) showFailure();
   }, { once: true });
 })();
