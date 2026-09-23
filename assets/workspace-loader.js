@@ -2,19 +2,20 @@
   'use strict';
 
   const sources = [
-    'assets/data.js?v=20260917-security',
+    'assets/data.js?v=20260923-learning',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20260917-concise',
     'assets/evidence.js?v=20260911-quick-feedback',
-    'assets/context.js?v=20260915-core',
+    'assets/context.js?v=20260923-learning',
+    'assets/assessment-memory.js?v=20260923-learning',
     'assets/scoring.js?v=20260911-quick-feedback',
     'assets/quality.js?v=20260915-core',
     'assets/quality-ui.js?v=20260918-blumr',
     'assets/feedback.js?v=20260916-learning',
     'assets/pdf-text.js?v=20260915-intake',
-    'assets/resume-intake.js?v=20260922-resume-panel',
+    'assets/resume-intake.js?v=20260923-learning',
     'assets/resume-remote.js?v=20260917-security',
-    'assets/job-review.js?v=20260918-blumr',
+    'assets/job-review.js?v=20260923-learning',
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
     'assets/candidate-workspace.js?v=20260922-resume-panel-v2',
@@ -29,7 +30,7 @@
     'assets/settings-ui.js?v=20260918-blumr',
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
-    'assets/app.js?v=20260922-resume-panel'
+    'assets/app.js?v=20260923-learning'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;

@@ -1,5 +1,6 @@
 import '../../../assets/resume-intake.js';
 import '../../../assets/context.js';
+import {withDetails,validateDetails} from '../_shared/assessment-depth.mjs';
 const contextAPI=globalThis.AncalagonContext;
 export function prepare(input){
   if(!input?.job?.id||!input?.candidate?.id||input.candidate.jobId!==input.job.id)throw Error('invalid_scope');
@@ -7,11 +8,15 @@ export function prepare(input){
   const feedback=(input.feedback||[]).filter(f=>f.jobId===job.id&&(f.candidateId===candidate.id||(f.learningScope==='job'&&f.signalStatus==='approved')));
   const outcomes=(input.outcomes||[]).filter(o=>o.jobId===job.id&&o.candidateId===candidate.id);
   const context=contextAPI.build(job,candidate,feedback,outcomes);
+  const contextSignature=contextAPI.signature(context);
+  // Re-read the original resume, not just the strengths selected on the first pass.
+  if(typeof input.resume_text==='string'&&input.resume_text.trim())context.sources.push({id:'resume-full',kind:'resume quotation (candidate claim, not independently verified)',text:input.resume_text,scope:'candidate'});
   const payload={job:{title:job.title},candidate:{current_manager_score:Number(candidate.managerScore),current_jd_score:Number(candidate.jdScore)},evaluation_context:context};
   if(JSON.stringify(payload).length>180000)throw Error('input_too_large');
-  return {payload,contextSignature:contextAPI.signature(context),sourceIds:new Set(context.sources.map(s=>s.id)),sources:context.sources};
+  return {payload,contextSignature,sourceIds:new Set(context.sources.map(s=>s.id)),sources:context.sources,criteria:context.requirements};
 }
 export function validate(result,prepared){
+  validateDetails(result,prepared.sources,{suggestions:true,criteria:prepared.criteria||[]});
   if(!result||!['jd_score','manager_score'].every(k=>typeof result[k]==='number'&&Number.isFinite(result[k])&&result[k]>=0&&result[k]<=10)
     ||!['low','medium','high'].includes(result.confidence)
     ||!['summary','manager_reason','jd_reason'].every(k=>typeof result[k]==='string'&&result[k].trim()&&result[k].length<=4000)
@@ -30,8 +35,8 @@ export function validate(result,prepared){
   }
   return {...result,manager_score:Math.round(result.manager_score*10)/10,jd_score:Math.round(result.jd_score*10)/10,context_signature:prepared.contextSignature};
 }
-export const schema={type:'object',additionalProperties:false,required:['jd_score','manager_score','confidence','summary','manager_reason','jd_reason','evidence_ids','evidence_support','questions'],properties:{
+export const schema=withDetails({type:'object',additionalProperties:false,required:['jd_score','manager_score','confidence','summary','manager_reason','jd_reason','evidence_ids','evidence_support','questions'],properties:{
   jd_score:{type:'number',minimum:0,maximum:10},manager_score:{type:'number',minimum:0,maximum:10},confidence:{type:'string',enum:['low','medium','high']},
   evidence_support:{type:'array',minItems:1,maxItems:5,items:{type:'object',additionalProperties:false,required:['source_id','quote','claim'],properties:{source_id:{type:'string'},quote:{type:'string',minLength:12,maxLength:1000},claim:{type:'string',minLength:1,maxLength:800}}}},
   summary:{type:'string',maxLength:320},manager_reason:{type:'string',maxLength:320},jd_reason:{type:'string',maxLength:320},evidence_ids:{type:'array',items:{type:'string'}},questions:{type:'array',items:{type:'string',maxLength:220},maxItems:2}
-}};
+}},true);

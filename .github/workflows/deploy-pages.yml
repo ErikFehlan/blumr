@@ -47,6 +47,7 @@ jobs:
           node --check assets/scoring.js
           node --check assets/presentation.js
           node --check assets/evidence.js
+          node --check assets/assessment-memory.js
           node --check assets/context.js
           node --check assets/feedback.js
           node --check assets/job-review.js
@@ -74,6 +75,7 @@ jobs:
           node tests/settings-browser.cjs
           node tests/browser-journey.cjs
           node tests/job-review-browser.cjs
+          node tests/assessment-memory-browser.cjs
           node tests/resume-intake-browser.cjs
           node tests/streamline-browser.cjs
           node tests/home-browser.cjs
@@ -117,7 +119,6 @@ jobs:
         run: node scripts/workspace-home-backend.mjs
 
   core-backend:
-    if: github.ref == 'refs/heads/main'
     needs: validate
     uses: ./.github/workflows/core-backend.yml
     secrets: inherit

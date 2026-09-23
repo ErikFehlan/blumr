@@ -35,7 +35,7 @@ Deno.test('saved resumes start while job edits are still coalescing and retain t
    if(path.endsWith('/claim_resume_intakes'))return json([task]);
    if(path==='/v1/responses'){
     markStarted();
-    return json({output_text:JSON.stringify({name:'Synthetic QA Analyst',role:'QA Analyst',score:7,manager_score:7,primary_signal:'Testing ownership',jd_reason:'Testing evidence',manager_reason:'Ownership evidence',concerns:[],tags:['QA'],screening_questions:[],resume_evidence:[{claim:'Manual regression ownership',source_id:'resume-1'}]})});
+    return json({output_text:JSON.stringify({criteria_assessment:[],feedback_impact:{effect:'confirmation',summary:'No additional qualification evidence.',source_ids:[]},applied_lessons:[],name:'Synthetic QA Analyst',role:'QA Analyst',score:7,manager_score:7,primary_signal:'Testing ownership',jd_reason:'Testing evidence',manager_reason:'Ownership evidence',concerns:[],tags:['QA'],screening_questions:[],resume_evidence:[{claim:'Manual regression ownership',source_id:'resume-1'}]})});
    }
    if(path.endsWith('/finish_resume_intake')){const body=JSON.parse(String(init?.body));assert(body.p_lease==='lease-1'&&body.p_revision==='revision-1','Lease or revision changed');assert(body.p_error===null&&body.p_result.resume_evidence[0].quote===task.input.resume_text,'Grounded completion missing');finished=true;return json(true);}
    if(path.endsWith('/claim_job_reassessments')){jobClaimed=true;return json([]);}

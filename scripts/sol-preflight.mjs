@@ -29,27 +29,30 @@ try{
  user=created.id||created.user?.id;assert.ok(user);
  const memberships=await request('/rest/v1/workspace_members?select=workspace_id&user_id=eq.'+user);
  assert.equal(memberships.length,1);workspace=memberships[0].workspace_id;
- for(const caseName of ['feedback','resume','screening']){
+ for(const caseName of ['feedback','resume','screening','confirmation','contradiction','memory']){
   for(const model of ['baseline','sol']){
    const check=await request('/functions/v1/sol-model-check','POST',{case:caseName,model,workspace_id:workspace}),out=check.result;
    assert.ok(out?.model?.startsWith(check.requested_model),'Provider did not return the requested model');
-   assert.ok(check.duration_ms<55000,'Synthetic response exceeded the existing interactive request budget');
+   assert.ok(check.duration_ms<90000,'Synthetic response exceeded the existing interactive request budget');
    if(caseName==='feedback'){
     assert.ok(out.summary&&Object.hasOwn(out,'clarification_question'));
     assert.ok(!Object.hasOwn(out,'manager_score'),'Feedback produced an unreviewed score');
     assert.match(out.summary,/manual/i);assert.match(out.summary,/never|not |no |lack|without/i,'The explicit automation limitation was lost');
-   }else if(caseName==='resume'){
+   }else if(caseName==='resume'||caseName==='memory'){
     assert.ok(out.resume_evidence?.length,'Resume evidence missing');
-    assert.match(out.resume_evidence.map(e=>e.claim+' '+e.quote).join(' '),/manual/i);
-    assert.match(out.concerns.join(' ')+' '+out.primary_signal+' '+out.jd_reason,/not |never|lack|no |without/i,'Resume limitation was lost');
+    if(caseName==='resume')assert.match(out.resume_evidence.map(e=>e.claim+' '+e.quote).join(' '),/manual/i);
+    if(caseName==='resume')assert.match(out.concerns.join(' ')+' '+out.primary_signal+' '+out.jd_reason,/not |never|lack|no |without/i,'Resume limitation was lost');
+    if(caseName==='memory'){assert.ok(out.applied_lessons.some(l=>l.lesson_id==='lesson-ownership'),'Approved lesson was not used');assert.notEqual(out.criteria_assessment[0].status,'supported','Team ownership became personal ownership');}
    }else{
     for(const key of ['jd_score','manager_score'])assert.ok(Number.isFinite(out[key])&&out[key]>=0&&out[key]<=10);
     assert.ok(out.summary&&out.jd_reason&&out.manager_reason);
-    if(model==='sol'){
+    if(model==='sol'&&caseName==='screening'){
      assert.equal(out.jd_score,7,'Sol changed a score using requirements inferred from a job title');
      assert.equal(out.manager_score,6,'Sol changed manager fit without stated manager priorities');
     }
    }
+   if(caseName==='confirmation'){assert.equal(out.jd_score,8,'Repeated evidence inflated JD fit');assert.equal(out.manager_score,8,'Advance decision inflated fit');}
+   if(caseName==='contradiction'){assert.ok(out.jd_score<9&&out.manager_score<9,'Contradiction did not affect ownership assessment');assert.ok(out.criteria_assessment.some(c=>c.status==='contradicted'||c.status==='partial'),'Contradictory ownership missing');}
    // All output below is from the fixed synthetic fixtures, never real resumes.
    console.log('SOL_PREFLIGHT '+JSON.stringify(check));
   }

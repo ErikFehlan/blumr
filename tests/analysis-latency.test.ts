@@ -44,8 +44,8 @@ Deno.test('real screening still uses the full score schema', async () => {
     const body=JSON.parse(String(init?.body));
     assert(body.text.format.name==='screening_reassessment','screening routed to feedback');
     assert(body.text.format.schema.required.includes('manager_score'),'score schema removed');
-    assert(body.max_output_tokens===3200,'screening output cap missing');
-    return json({output_text:JSON.stringify({summary:'screen',manager_score:7,jd_score:7})});
+    assert(body.max_output_tokens===6000,'screening output cap missing');
+    return json({output_text:JSON.stringify({criteria_assessment:[],feedback_impact:{effect:'confirmation',summary:'No additional qualification evidence.',source_ids:[]},applied_lessons:[],summary:'screen',manager_score:7,jd_score:7})});
   };
   try {assert((await handleAnalysis(request({...payload,analysis_type:'screening',screening:{notes:'Specific technical example'}}))).ok,'screen failed');}
   finally{globalThis.fetch=oldFetch;Deno.env.delete('OPENAI_API_KEY');}

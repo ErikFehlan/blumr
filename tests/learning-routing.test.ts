@@ -19,7 +19,7 @@ Deno.test('learning models are workspace scoped, feedback only, server selected,
   models.push(body.model);
   if(modelFail&&body.model===model&&failureStatus!==200)return json({error:{type:"synthetic",code:"unavailable"}},failureStatus);
   if(modelFail&&body.model===model)return json({output_text:'{"summary":"missing question"}'});
-  return json({model:body.model,output_text:JSON.stringify({summary:'Documented ownership.',clarification_question:null})});
+  return json({model:body.model,output_text:JSON.stringify(body.text.format.name==='feedback_interpretation'?{summary:'Documented ownership.',clarification_question:null}:{criteria_assessment:[],feedback_impact:{effect:'confirmation',summary:'No additional qualification evidence.',source_ids:[]},applied_lessons:[],summary:'Documented ownership.',jd_score:7,manager_score:7})});
  };
  const request=(workspace='a',type='feedback')=>new Request('https://synthetic.invalid',{method:'POST',headers:{Authorization:'Bearer caller'},body:JSON.stringify({workspace_id:workspace,analysis_type:type,model:'ft:attacker',feedbackModel:'ft:attacker',job:{title:'QA'},feedback:{text:'Owned planning'},screening:{notes:'Owned planning'}})});
  try{

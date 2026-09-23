@@ -6,7 +6,15 @@
     function add(id,kind,text,date,scope){if(String(text||'').trim())sources.push({id,kind,text:String(text),recorded_at:date||null,scope});}
     add('job-description','requirement',job.description,null,'job');
     list(job.criteria).forEach((text,i)=>add(`criterion-${i+1}`,'requirement',text,null,'job'));
+    list(job.knockouts).forEach((text,i)=>add(`knockout-${i+1}`,'requirement',text,null,'job'));
     add('manager-calibration','manager context',job.managerFeedback,null,'job');
+    for(const lesson of list(job.assessmentLessons)){
+      if(!lesson.active||!['manager_priority','evaluation_method'].includes(lesson.kind))continue;
+      if(lesson.scope==='job'&&lesson.job_id!==job.id)continue;
+      if(lesson.scope==='role'&&(lesson.kind!=='evaluation_method'||lesson.role_key!==String(job.title||'').trim().replace(/\s+/g,' ').toLowerCase()))continue;
+      if(!['job','role'].includes(lesson.scope))continue;
+      add(`lesson-${lesson.id}`,'approved learning',`${lesson.kind}: ${lesson.text}`,lesson.updated_at,lesson.scope);
+    }
     for(const f of list(feedback).filter(f=>f.jobId===job.id)){
       const approved=f.learningScope==='job'&&f.signalStatus==='approved';
       if(approved)add(`preference-${f.id}`,'approved preference',`${f.signalDirection}: ${f.signalLabel}. Supporting observation: ${f.text}`,f.updatedAt||f.createdAt,'job');

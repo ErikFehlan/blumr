@@ -464,3 +464,12 @@
 .rf-search-flow li{display:flex;align-items:center;gap:8px;color:var(--ui-muted);font-size:12px}.rf-search-flow li span{display:grid;place-items:center;flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--ui-soft)}
 .rf-search-flow li[aria-current]{color:var(--ui-accent);font-weight:700}.rf-search-flow li[aria-current] span{background:var(--ui-accent);color:var(--ui-panel)}
 @media(max-width:760px){.rf-search-flow-top{align-items:flex-start;flex-direction:column}.rf-search-flow ol{grid-template-columns:repeat(2,minmax(0,1fr))}#rf-app .rf-search-flow{padding:16px}.rf-search-flow .rf-actions{flex-shrink:1}}
+/* Assessment details stay compact and inherit every existing green theme. */
+.rf-assessment-depth,.rf-learning-proposals{margin-block:16px}
+.rf-criteria-findings{padding-inline-start:20px;display:grid;gap:12px}
+.rf-criteria-findings p{margin:6px 0 0}
+.rf-learning-proposal,.rf-memory-item{padding-block:12px;border-bottom:1px solid var(--ui-line,#d8e4de)}
+.rf-learning-proposal label,.rf-memory-item label{display:grid;gap:6px;margin-block:10px}
+.rf-learning-proposal select,.rf-memory-item textarea{width:100%;max-width:100%;font:inherit;color:inherit;background:var(--ui-panel,#f4faf6);border:1px solid var(--ui-line,#d8e4de);border-radius:10px;padding:10px}
+.rf-memory-item textarea{min-height:86px;resize:vertical}
+#assessmentMemory{margin-top:18px}

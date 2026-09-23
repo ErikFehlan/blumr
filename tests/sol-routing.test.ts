@@ -7,7 +7,8 @@ Deno.test('Sol is used for assessments and feedback; inexpensive and pinned rout
  for(const task of ['feedback','resume','screening','reassessment'])assert(analysisModel(task,env)==='gpt-5.6-sol','old global setting overrode '+task);
  assert(analysisModel('patterns',env)==='gpt-4.1-mini','pattern workload changed');
  assert(analysisModel('feedback',key=>key==='FEEDBACK_MODEL'?'gpt-4.1-mini-2025-04-14':undefined)==='gpt-4.1-mini-2025-04-14','server rollback unavailable');
- assert(modelReasoning('gpt-5.6-sol').reasoning?.effort==='none','Sol inherited medium reasoning');
+ assert(modelReasoning('gpt-5.6-sol','feedback').reasoning?.effort==='none','Short feedback gained unnecessary reasoning');
+ for(const task of ['resume','screening','reassessment'])assert(modelReasoning('gpt-5.6-sol',task).reasoning?.effort==='medium','Assessment reasoning missing for '+task);
  for(const model of ['gpt-4.1-mini','ft:gpt-4.1-mini-2025-04-14:test:model'])assert(!Object.hasOwn(modelReasoning(model),'reasoning'),'Sol parameters leaked into legacy models');
 });
 Deno.test('public payload cannot select a model; Sol preserves the feedback contract and quota reservation',async()=>{

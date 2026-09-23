@@ -49,7 +49,7 @@ test('AI resume reviews remain estimates and do not masquerade as recruiter corr
 });
 test('reassessment quote verification preserves negation and rejects invented support',async()=>{
  const {prepare,validate}=await import('../supabase/functions/reassess-job/logic.mjs');const x=input();x.candidate.strengths=['Owned manual regression testing for billing systems'];
- const p=prepare(x),result={jd_score:8,manager_score:8,confidence:'medium',summary:'Manual testing supported',jd_reason:'Source supports testing',manager_reason:'Ownership supports priority',evidence_ids:['profile-strength-1'],evidence_support:[{source_id:'profile-strength-1',claim:'Manual testing',quote:'Owned manual regression testing for billing systems'}],questions:[]};
+ const p=prepare(x),result={criteria_assessment:(x.job.criteria||[]).map(criterion=>({criterion,status:'supported',reason:'Original evidence supports manual testing.',source_ids:['profile-strength-1']})),feedback_impact:{effect:'confirmation',summary:'Manual testing evidence confirmed.',source_ids:['profile-strength-1']},applied_lessons:[],learning_suggestions:[],jd_score:8,manager_score:8,confidence:'medium',summary:'Manual testing supported',jd_reason:'Source supports testing',manager_reason:'Ownership supports priority',evidence_ids:['profile-strength-1'],evidence_support:[{source_id:'profile-strength-1',claim:'Manual testing',quote:'Owned manual regression testing for billing systems'}],questions:[]};
  assert.equal(validate(result,p).evidence_support.length,1);
  assert.throws(()=>validate({...result,evidence_support:[{...result.evidence_support[0],quote:'Owned automated regression testing for billing systems'}]},p),/invalid_result/);
 });
