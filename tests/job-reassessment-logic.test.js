@@ -9,7 +9,7 @@ test('worker uses the same evidence model, includes shared approvals, and isolat
 });
 test('worker rejects invented source references, invalid scores, and unbounded questions',async()=>{
  const {prepare,validate}=await logic,p=prepare(input());
- const result={manager_score:8,jd_score:7,confidence:'medium',summary:'Evidence reviewed',manager_reason:'Ownership supports manual testing',jd_reason:'Baseline unchanged',evidence_ids:['feedback-own'],evidence_support:[{source_id:'feedback-own',claim:'Ownership described',quote:'Explained hands-on ownership.'}],questions:['Which releases did you own?']};
+ const result={criteria_assessment:[{criterion:'Must Have | manual testing',status:'supported',reason:'Candidate described hands-on ownership.',source_ids:['feedback-own']}],feedback_impact:{effect:'new_evidence',summary:'Ownership clarified.',source_ids:['feedback-own']},applied_lessons:[],learning_suggestions:[],manager_score:8,jd_score:7,confidence:'medium',summary:'Evidence reviewed',manager_reason:'Ownership supports manual testing',jd_reason:'Baseline unchanged',evidence_ids:['feedback-own'],evidence_support:[{source_id:'feedback-own',claim:'Ownership described',quote:'Explained hands-on ownership.'}],questions:['Which releases did you own?']};
  assert.equal(validate(result,p).context_signature,p.contextSignature);
  assert.throws(()=>validate({...result,evidence_ids:['invented']},p),/invalid_result/);
  assert.throws(()=>validate({...result,manager_score:11},p),/invalid_result/);

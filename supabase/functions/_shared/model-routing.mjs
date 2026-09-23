@@ -10,9 +10,8 @@ export function analysisModel(task, env = () => undefined) {
   return env('OPENAI_MODEL') || 'gpt-4.1-mini';
 }
 
-export function modelReasoning(model) {
-  // GPT-4.1 mini has no reasoning phase. Preserve that latency/output budget
-  // instead of inheriting Sol's medium reasoning default during migration.
+export function modelReasoning(model, task = 'feedback') {
+  // Spend reasoning on evidence evaluation; short note interpretation stays fast.
   return /^gpt-5\.6(?:-sol)?(?:-\d{4}-\d{2}-\d{2})?$/.test(model)
-    ? {reasoning: {effort: 'none'}} : {};
+    ? {reasoning: {effort: ['resume','screening','reassessment'].includes(task)?'medium':'none'}} : {};
 }

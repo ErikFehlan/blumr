@@ -332,6 +332,12 @@
       const {error}=await client.rpc('request_candidate_reassessment',{p_candidate:candidateId});
       if(error)throw error;
     }
+    async function loadAssessmentLessons(){
+      const {data,error}=await client.from('assessment_lessons').select('id,job_id,kind,scope,role_key,text,active,revision,updated_at').eq('workspace_id',workspaceId).order('updated_at',{ascending:false}).limit(500);
+      if(error)throw error;return data||[];
+    }
+    const saveAssessmentLesson=(candidate,revision,index,scope)=>settingsRPC('save_assessment_lesson',{p_candidate:candidate,p_revision:revision,p_index:index,p_scope:scope});
+    const updateAssessmentLesson=(id,revision,text,active)=>settingsRPC('update_assessment_lesson',{p_id:id,p_revision:revision,p_text:text,p_active:active});
     async function reviewJobReassessment(candidateId,revision,decision,state,rpcName='review_job_reassessment') {
       clearTimeout(timer);pendingWrites++;statusListener?.('saving');
       const operation=queued.then(async()=>{
@@ -493,7 +499,7 @@
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { loadBetaSecurity, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
+    return { loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };

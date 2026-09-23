@@ -49,6 +49,28 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!serviceKey) return json({ error: "Analysis service configuration incomplete" }, 503);
 
+  // Memory is resolved from reviewed server records, never trusted from the
+  // browser's claimed approval status. The caller JWT enforces workspace access.
+  const suppliedContext=payload.evaluation_context as {job_id?:string,sources?:Array<{id?:string,kind?:string}>}|undefined;
+  const memoryJob=suppliedContext?.job_id;
+  if(suppliedContext){
+    const cleanSources=(Array.isArray(suppliedContext.sources)?suppliedContext.sources:[]).filter(s=>s.kind!=='approved learning'&&!s.id?.startsWith('lesson-'));
+    payload.evaluation_context={...suppliedContext,sources:cleanSources};
+    if(typeof memoryJob==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(memoryJob)){
+      try{
+        // Ensure a supplied job belongs to this authenticated workspace, too.
+        const job=await fetch(`${supabaseUrl}/rest/v1/jobs?select=id&id=eq.${memoryJob}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,{headers,signal:AbortSignal.timeout(10000)});
+        const found=job.ok?await job.json():[];
+        if(!Array.isArray(found)||found.length!==1)return json({error:'Job unavailable'},403);
+        const response=await fetch(`${supabaseUrl}/rest/v1/rpc/get_assessment_lessons`,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({p_job:memoryJob}),signal:AbortSignal.timeout(10000)});
+        if(!response.ok)return json({error:'Learning memory temporarily unavailable. Try again.'},503);
+        const lessons=await response.json();
+        if(!Array.isArray(lessons))return json({error:'Learning memory temporarily unavailable. Try again.'},503);
+        payload.evaluation_context={...suppliedContext,sources:[...cleanSources,...lessons.map(l=>({id:`lesson-${l.id}`,kind:'approved learning',text:`${l.kind}: ${l.text}`,recorded_at:l.updated_at,scope:l.scope}))]};
+      }catch{return json({error:'Learning memory temporarily unavailable. Try again.'},503);}
+    }
+  }
+
   const operation = payload.analysis_type === "resume"
     ? "resume_analysis"
     : payload.analysis_type === "screening" || payload.analysis_type === "feedback"
