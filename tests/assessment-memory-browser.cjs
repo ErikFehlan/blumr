@@ -31,10 +31,10 @@ const dir=path.resolve(__dirname,'..');
   await assessment.locator('.rf-learning-proposal select').selectOption('role');await assessment.locator('[data-remember-lesson]').click();
   await page.waitForFunction(()=>window.calls.length===1&&window.lessons.length===1);assert.equal(await page.evaluate(()=>window.calls[0].scope),'role');
   assert.equal(await page.evaluate(()=>window.fixture.candidates[0].managerScore),7,'memory approval must not apply candidate scores');
-  await page.locator('.rf-nav [data-page="feedback"]').click();await page.locator('#assessmentMemory > summary').click();
+  await page.locator('#feedbackNav > summary').click();await page.locator('.rf-nav [data-page="feedback"]').click();await page.locator('#assessmentMemory > summary').click();
   await page.locator('.rf-memory-item > summary').click();await page.locator('.rf-memory-item textarea').fill('Verify whether the candidate owned forecasts or only supplied inputs.');
   await page.locator('[data-memory-edit]').click();await page.waitForFunction(()=>window.lessons[0].revision===2);
-  await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="feedback"]').click();await page.locator('#assessmentMemory > summary').click();
+  await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('#feedbackNav > summary').click();await page.locator('.rf-nav [data-page="feedback"]').click();await page.locator('#assessmentMemory > summary').click();
   await page.locator('.rf-memory-item > summary').filter({hasText:'Verify whether the candidate owned forecasts or only supplied inputs.'}).waitFor();
   await page.locator('.rf-memory-item > summary').click();
   for(const theme of ['mint','tech','violet','emerald','graphite']){
