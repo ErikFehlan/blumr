@@ -15,7 +15,7 @@
     'assets/pdf-text.js?v=20260915-intake',
     'assets/resume-intake.js?v=20260923-learning',
     'assets/resume-remote.js?v=20260917-security',
-    'assets/job-review.js?v=20260923-learning',
+    'assets/job-review.js?v=20260923-verification',
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
     'assets/candidate-workspace.js?v=20260922-resume-panel-v2',

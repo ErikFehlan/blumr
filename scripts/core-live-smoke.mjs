@@ -2,6 +2,7 @@
 // Credentials remain in this process; no request bodies, tokens or traces are logged.
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
+import {prepare as prepareReassessment} from '../supabase/functions/reassess-job/logic.mjs';
 const token=process.env.SUPABASE_ACCESS_TOKEN?.trim(),ref=process.env.SUPABASE_PROJECT_REF?.trim();
 if(!token||!/^[a-z0-9]{20}$/.test(ref||''))throw Error('Live checks require the existing deployment environment.');
 const base=`https://${ref}.supabase.co`,users=[];
@@ -106,6 +107,28 @@ try{
  const screening=await req('/functions/v1/analyze-patterns-v2',owner.access,'POST',{workspace_id:owner.workspace,analysis_type:'screening',job:{title:'Synthetic QA'},screening:{notes:'Confirmed manual regression ownership; automation ownership remains unverified.'}});
  assert.ok(screening.data.model?.startsWith('gpt-5.6-sol')&&Number.isFinite(screening.data.jd_score),'Live screening did not use Sol');
  console.log('PASS: deployed Sol model provenance for durable resume intake, manager feedback, and screening.');
+ // Exercise the durable reassessment worker, including unknown requirements.
+ // Screening and intake use different contracts and cannot cover this path.
+ const criteria=['-manual testing experience strongly required','-test automation authorship preferred','-cloud security experience preferred','-5+ years of QA testing experience'];
+ await req('/rest/v1/jobs?id=eq.'+job,owner.access,'PATCH',{criteria});
+ await req('/rest/v1/manager_feedback?id=eq.'+note,owner.access,'PATCH',{feedback_text:'The candidate confirmed personal ownership of manual regression testing, but did not write automated tests. No evidence about cloud security or years of experience was gathered.'});
+ let reassessment;
+ for(let i=0;i<480;i++){
+  reassessment=(await req('/rest/v1/job_reassessment_tasks?candidate_id=eq.'+candidate,owner.access)).data[0];
+  if(reassessment?.status==='ready')break;
+  if(reassessment?.status==='failed')throw Error('Live reassessment exhausted retries ('+reassessment.error_code+').');
+  await new Promise(resolve=>setTimeout(resolve,500));
+ }
+ assert.equal(reassessment?.status,'ready','Durable reassessment did not finish');
+ assert.ok(reassessment.result.model?.startsWith('gpt-5.6-sol'),'Reassessment did not use Sol');
+ for(const criterion of criteria)assert.ok(reassessment.result.criteria_assessment.some(row=>row.criterion===criterion),'A requirement was omitted or rewritten');
+ for(const criterion of criteria.slice(2))assert.equal(reassessment.result.criteria_assessment.find(row=>row.criterion===criterion).status,'unknown','Absent candidate evidence was not marked unknown');
+ const originalSources=prepareReassessment(reassessment.input).sources;
+ for(const support of reassessment.result.evidence_support)assert.ok(originalSources.find(source=>source.id===support.source_id)?.text.includes(support.quote),'Reassessment quotation was not exact');
+ const afterReassessment=(await req('/rest/v1/candidates?id=eq.'+candidate,owner.access)).data[0];
+ assert.equal(afterReassessment.manager_score,restored.data[0].manager_score,'Unapproved reassessment changed Manager Fit');
+ assert.equal(afterReassessment.jd_score,restored.data[0].jd_score,'Unapproved reassessment changed JD Fit');
+ console.log('PASS: durable reassessment, exact requirements, unknown evidence, source quotations, and unchanged scores before approval.');
  console.log('PASS: real password accounts, separate workspaces, record/document isolation, protected AI routes, background intake, grounded quotes, atomic approval and persistence.');
 }finally{
  for(const user of users){

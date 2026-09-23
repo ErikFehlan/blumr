@@ -1,6 +1,7 @@
 import '../../../assets/resume-intake.js';
 import '../../../assets/context.js';
 import {withDetails,validateDetails} from '../_shared/assessment-depth.mjs';
+import {resumeSources} from '../analyze-patterns-v2/resume-sources.mjs';
 const contextAPI=globalThis.AncalagonContext;
 export function prepare(input){
   if(!input?.job?.id||!input?.candidate?.id||input.candidate.jobId!==input.job.id)throw Error('invalid_scope');
@@ -11,32 +12,53 @@ export function prepare(input){
   const contextSignature=contextAPI.signature(context);
   // Re-read the original resume, not just the strengths selected on the first pass.
   if(typeof input.resume_text==='string'&&input.resume_text.trim())context.sources.push({id:'resume-full',kind:'resume quotation (candidate claim, not independently verified)',text:input.resume_text,scope:'candidate'});
-  const payload={job:{title:job.title},candidate:{current_manager_score:Number(candidate.managerScore),current_jd_score:Number(candidate.jdScore)},evaluation_context:context};
+  const passages=[];
+  const modelSources=context.sources.map(({text,...source})=>{
+    const parts=resumeSources(text).filter(part=>part.text.trim().length>=12).map(part=>{
+      const passage={id:'passage-'+(passages.length+1),source_id:source.id,text:part.text};passages.push(passage);
+      return {id:passage.id,text:passage.text};
+    });
+    return {...source,...(parts.length?{passages:parts}:{text})};
+  });
+  const payload={job:{title:job.title},candidate:{current_manager_score:Number(candidate.managerScore),current_jd_score:Number(candidate.jdScore)},evaluation_context:{...context,sources:modelSources}};
   if(JSON.stringify(payload).length>180000)throw Error('input_too_large');
-  return {payload,contextSignature,sourceIds:new Set(context.sources.map(s=>s.id)),sources:context.sources,criteria:context.requirements};
+  return {payload,contextSignature,sourceIds:new Set(context.sources.map(s=>s.id)),sources:context.sources,criteria:context.requirements,passages};
+}
+export function resolveEvidence(result,prepared){
+  const fail=()=>{throw Object.assign(new Error('invalid_result'),{validationIssue:'evidence_source'});};
+  if(!result||!Array.isArray(result.evidence_support)||!result.evidence_support.length||result.evidence_support.length>5||Object.hasOwn(result,'evidence_ids'))fail();
+  const evidence=result.evidence_support.map(item=>{
+    const passage=prepared.passages.find(p=>p.id===item?.passage_id);
+    if(!passage||Object.hasOwn(item,'quote')||Object.hasOwn(item,'source_id'))fail();
+    return {source_id:passage.source_id,quote:passage.text,claim:item.claim};
+  });
+  return {...result,evidence_support:evidence,evidence_ids:[...new Set(evidence.map(e=>e.source_id))]};
 }
 export function validate(result,prepared){
+  const fail=issue=>{throw Object.assign(new Error('invalid_result'),{validationIssue:issue});};
   validateDetails(result,prepared.sources,{suggestions:true,criteria:prepared.criteria||[]});
   if(!result||!['jd_score','manager_score'].every(k=>typeof result[k]==='number'&&Number.isFinite(result[k])&&result[k]>=0&&result[k]<=10)
     ||!['low','medium','high'].includes(result.confidence)
     ||!['summary','manager_reason','jd_reason'].every(k=>typeof result[k]==='string'&&result[k].trim()&&result[k].length<=4000)
     ||!Array.isArray(result.evidence_ids)||!result.evidence_ids.length||result.evidence_ids.some(id=>typeof id!=='string'||!prepared.sourceIds.has(id))
-    ||!Array.isArray(result.questions)||result.questions.length>3||result.questions.some(q=>typeof q!=='string'||q.length>600))throw Error('invalid_result');
+    ||!Array.isArray(result.questions)||result.questions.length>3||result.questions.some(q=>typeof q!=='string'||q.length>600))fail('result_fields');
   {
-    if(!Array.isArray(result.evidence_support)||!result.evidence_support.length||result.evidence_support.length>5)throw Error('invalid_result');
+    if(!Array.isArray(result.evidence_support)||!result.evidence_support.length||result.evidence_support.length>5)fail('evidence_count');
     result={...result,evidence_support:result.evidence_support.map(e=>{
       const source=prepared.sources.find(s=>s.id===e?.source_id);
       const quote=source&&typeof e.quote==='string'&&e.quote.length>=12&&e.quote.length<=1000?globalThis.AncalagonIntake.sourceQuote(source.text,e.quote):null;
-      if(!quote||typeof e.claim!=='string'||!e.claim.trim()||e.claim.length>800||!result.evidence_ids.includes(e.source_id))throw Error('invalid_result');
+      if(!source)fail('evidence_source');
+      if(!quote)fail('unmatched_quote');
+      if(typeof e.claim!=='string'||!e.claim.trim()||e.claim.length>800||!result.evidence_ids.includes(e.source_id))fail('evidence_claim');
       return {...e,quote};
     })};
     const supported=new Set(result.evidence_support.map(e=>e.source_id));
-    if(result.evidence_ids.some(id=>!supported.has(id)))throw Error('invalid_result');
+    if(result.evidence_ids.some(id=>!supported.has(id)))fail('missing_support');
   }
   return {...result,manager_score:Math.round(result.manager_score*10)/10,jd_score:Math.round(result.jd_score*10)/10,context_signature:prepared.contextSignature};
 }
-export const schema=withDetails({type:'object',additionalProperties:false,required:['jd_score','manager_score','confidence','summary','manager_reason','jd_reason','evidence_ids','evidence_support','questions'],properties:{
+export const schema=prepared=>withDetails({type:'object',additionalProperties:false,required:['jd_score','manager_score','confidence','summary','manager_reason','jd_reason','evidence_support','questions'],properties:{
   jd_score:{type:'number',minimum:0,maximum:10},manager_score:{type:'number',minimum:0,maximum:10},confidence:{type:'string',enum:['low','medium','high']},
-  evidence_support:{type:'array',minItems:1,maxItems:5,items:{type:'object',additionalProperties:false,required:['source_id','quote','claim'],properties:{source_id:{type:'string'},quote:{type:'string',minLength:12,maxLength:1000},claim:{type:'string',minLength:1,maxLength:800}}}},
-  summary:{type:'string',maxLength:320},manager_reason:{type:'string',maxLength:320},jd_reason:{type:'string',maxLength:320},evidence_ids:{type:'array',items:{type:'string'}},questions:{type:'array',items:{type:'string',maxLength:220},maxItems:2}
-}},true);
+  evidence_support:{type:'array',minItems:1,maxItems:5,items:{type:'object',additionalProperties:false,required:['passage_id','claim'],properties:{passage_id:{type:'string',enum:prepared.passages.map(p=>p.id)},claim:{type:'string',minLength:1,maxLength:800}}}},
+  summary:{type:'string',maxLength:320},manager_reason:{type:'string',maxLength:320},jd_reason:{type:'string',maxLength:320},questions:{type:'array',items:{type:'string',maxLength:220},maxItems:2}
+}},true,{sources:prepared.sources,criteria:prepared.criteria});
