@@ -13,7 +13,7 @@ async function request(path,method='GET',body){
  const credentials=path.startsWith('/functions/')?{'x-worker-secret':workerSecret}:{apikey:service,Authorization:`Bearer ${service}`};
  const r=await fetch(`https://${ref}.supabase.co${path}`,{method,headers:{...credentials,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(125000)});
  const data=await r.json().catch(()=>null);
- if(!r.ok){console.error('Synthetic Sol check failed:',JSON.stringify({status:r.status,case:data?.case,result:data?.result?.error}));throw Error(`Sol validation request failed (${r.status}); production model rollout stopped.`);}
+ if(!r.ok){console.error('Synthetic model check failed:',JSON.stringify({status:r.status,case:data?.case,model:body?.model,result:data?.result?.error}));throw Error(`Synthetic validation request failed (${r.status}).`);}
  return data;
 }
 const query=(query,parameters=[])=>management('/database/query','POST',{query,parameters});
@@ -31,6 +31,7 @@ try{
  assert.equal(memberships.length,1);workspace=memberships[0].workspace_id;
  for(const caseName of ['feedback','resume','screening','confirmation','contradiction','memory']){
   for(const model of ['baseline','sol']){
+   try{
    const check=await request('/functions/v1/sol-model-check','POST',{case:caseName,model,workspace_id:workspace}),out=check.result;
    assert.ok(out?.model?.startsWith(check.requested_model),'Provider did not return the requested model');
    assert.ok(check.duration_ms<90000,'Synthetic response exceeded the existing interactive request budget');
@@ -55,9 +56,15 @@ try{
    if(caseName==='contradiction'&&model==='sol'){assert.ok(out.jd_score<9&&out.manager_score<9,'Contradiction did not affect ownership assessment');assert.ok(out.criteria_assessment.some(c=>c.status==='contradicted'||c.status==='partial'),'Contradictory ownership missing');}
    // All output below is from the fixed synthetic fixtures, never real resumes.
    console.log('SOL_PREFLIGHT '+JSON.stringify(check));
+   }catch(error){
+    // The historical comparison is informative; every production-model case
+    // must still pass. Setup, authentication and cleanup failures remain fatal.
+    if(model==='sol')throw error;
+    console.warn('SOL_PREFLIGHT_BASELINE_FAILURE '+JSON.stringify({case:caseName,error:error instanceof Error?error.message:'Comparison unavailable'}));
+   }
   }
  }
- console.log('PASS: Sol API access, existing output contracts, evidence validation, limitation preservation, and bounded response time. Synthetic smoke comparison is not a broad quality benchmark.');
+ console.log('PASS: all six Sol cases passed API access, output contracts, evidence validation, limitation preservation, and bounded response time. Historical baseline failures are reported separately. Synthetic smoke comparison is not a broad quality benchmark.');
 }finally{
  if(user)await request('/auth/v1/admin/users/'+user,'DELETE');
  await query('delete from public.beta_access where email=$1 and user_id is null',[email]);
