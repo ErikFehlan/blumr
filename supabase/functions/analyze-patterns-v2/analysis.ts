@@ -208,7 +208,7 @@ ANALYSIS RULES
 
     const autoIntake=isResumeAnalysis && Boolean(evidence.auto_intake);
     const sources=isResumeAnalysis?resumeSources(evidence.resume_text):[];
-    const sourceEvidence=isScreeningAnalysis&&!isFeedback?{...evidence,screening_source:{id:'screening-notes',kind:'recruiter screening',text:evidence.screening.notes}}:evidence;
+    const sourceEvidence=isScreeningAnalysis&&!isFeedback?{...evidence,evaluation_context:{...evidence.evaluation_context,sources:[...(evidence.evaluation_context?.sources||[]).filter((s:{id:string})=>s.id!=='screening-notes'),{id:'screening-notes',kind:'recruiter screening',text:evidence.screening.notes}]}}:evidence;
     const modelInput=isResumeAnalysis?JSON.stringify({...sourceEvidence,resume_text:undefined,resume_sources:sources}):JSON.stringify(sourceEvidence);
     const model=options.modelOverride || (isFeedback && options.feedbackModel) || analysisModel(isFeedback?'feedback':isResumeAnalysis?'resume':isScreeningAnalysis?'screening':'patterns',name=>Deno.env.get(name));
     // Retry validation once inside this request; no extra click or duplicate intake.

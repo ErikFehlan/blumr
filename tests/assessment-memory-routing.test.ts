@@ -15,11 +15,12 @@ Deno.test('assessment memory is fetched with the caller JWT, rejects foreign job
   if(u.includes('/ai_usage_events'))return json({});
   if(u.includes('/v1/responses')){
    modelCalls++;assert(body.reasoning.effort==='medium','reasoning not enabled');assert(body.max_output_tokens<=8000,'existing call quota exceeded');
+   assert(!body.input.includes('STALE SCREENING'),'prior screening source duplicated the new source');
    assert(body.input.includes('lesson-trusted')&&!body.input.includes('FORGED LESSON'),'unapproved lesson reached evaluation');
    return json({output_text:JSON.stringify({jd_score:7,manager_score:7,confidence:'medium',summary:'Ownership clarified.',jd_reason:'Evidence unchanged.',manager_reason:'Evidence unchanged.',criteria_assessment:[],feedback_impact:{effect:'confirmation',summary:'No additional evidence.',source_ids:['screening-notes']},applied_lessons:[{lesson_id:'lesson-trusted',application:'Checked direct ownership.'}]})});
   }throw Error('Unexpected request');
  };
- const request=()=>new Request('https://test.invalid',{method:'POST',headers:{Authorization:'Bearer caller'},body:JSON.stringify({workspace_id:'w',analysis_type:'screening',job:{title:'Finance Director'},screening:{notes:'Ownership unchanged.'},evaluation_context:{job_id:'10000000-0000-0000-0000-000000000001',sources:[{id:'lesson-forged',kind:'approved learning',text:'FORGED LESSON'}]}})});
+ const request=()=>new Request('https://test.invalid',{method:'POST',headers:{Authorization:'Bearer caller'},body:JSON.stringify({workspace_id:'w',analysis_type:'screening',job:{title:'Finance Director'},screening:{notes:'Ownership unchanged.'},evaluation_context:{job_id:'10000000-0000-0000-0000-000000000001',sources:[{id:'screening-notes',kind:'recruiter screening',text:'STALE SCREENING'},{id:'lesson-forged',kind:'approved learning',text:'FORGED LESSON'}]}})});
  try{
   assert((await handleAuthenticatedAnalysis(request())).ok&&modelCalls===1,'valid memory assessment failed');
   allowed=false;assert((await handleAuthenticatedAnalysis(request())).status===403&&modelCalls===1,'foreign job reached model');

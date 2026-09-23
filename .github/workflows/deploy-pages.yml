@@ -96,6 +96,7 @@ jobs:
             test-results/focus-*.png
             test-results/landing-*.png
             test-results/recruiter-*.png
+            test-results/assessment-memory/*.png
           if-no-files-found: ignore
 
   prepare-home:

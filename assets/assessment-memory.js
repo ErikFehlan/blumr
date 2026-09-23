@@ -15,7 +15,7 @@
   return `<details class="rf-learning-proposals"><summary>Lessons to review (${task.result.learning_suggestions.length})</summary><p class="rf-sub">Approve a lesson only if it accurately reflects the feedback. Candidate facts stay with this candidate.</p>${task.result.learning_suggestions.map((l,i)=>`<div class="rf-learning-proposal"><p>${esc(l.text)}</p><label>Apply to<select><option value="job">This job only</option>${l.kind==='evaluation_method'?'<option value="role">Other jobs with the same title in this workspace</option>':''}</select></label><button type="button" class="rf-btn" data-remember-lesson="${i}" data-lesson-candidate="${esc(candidate.id)}" data-lesson-revision="${esc(task.revision)}">Approve lesson</button></div>`).join('')}</details>`;
  }
  function create(api){
-  let rows=[],loading=null,generation=0,loadedWorkspace=null,error='';const busy=new Set();
+  let rows=[],loading=null,generation=0,loadedWorkspace=null,error='';const busy=new Set(),rendered=new WeakMap();
   function sync(){for(const job of api.jobs())job.assessmentLessons=applicable(rows,job);api.changed?.();}
   async function refresh(){
    const workspace=api.workspace();if(!workspace||!api.ready())return;if(loading)return loading;const token=generation;
@@ -28,7 +28,10 @@
    const relevant=rows.filter(l=>job&&(l.job_id===job.id||l.scope==='role'&&l.role_key===role(job.title)));
    const list=wrap.querySelector('[data-memory-list]');if(!list||list.contains(global.document.activeElement))return;
    wrap.querySelector('[data-memory-count]').textContent=String(relevant.filter(l=>l.active).length);
+   const signature=JSON.stringify([job?.id,error,relevant]);if(rendered.get(list)===signature)return;rendered.set(list,signature);
+   const expanded=[...list.querySelectorAll('.rf-memory-item')].filter(d=>d.open).map(d=>d.querySelector('[data-memory-edit]')?.dataset.memoryEdit);
    list.innerHTML=error?`<p>${esc(error)}</p><button class="rf-btn" data-memory-retry>Try again</button>`:relevant.length?relevant.map(l=>`<details class="rf-memory-item"><summary>${esc(l.text)} ${l.active?'':'(inactive)'}</summary><p class="rf-sub">${l.kind==='manager_priority'?'Manager priority':'Evaluation lesson'} · ${l.scope==='job'?'This job only':'Jobs titled '+esc(l.role_key)} · ${l.active?'Approved':'Inactive'}</p><label>Lesson<textarea maxlength="300">${esc(l.text)}</textarea></label><div class="rf-actions"><button class="rf-btn" data-memory-edit="${esc(l.id)}">Save and approve</button>${l.active?`<button class="rf-btn" data-memory-disable="${esc(l.id)}">Stop using</button>`:''}</div></details>`).join(''):'<p class="rf-sub">No approved lessons yet. Review learning suggestions in an updated candidate assessment.</p>';
+   list.querySelectorAll('.rf-memory-item').forEach(d=>{d.open=expanded.includes(d.querySelector('[data-memory-edit]')?.dataset.memoryEdit);});
    list.querySelector('[data-memory-retry]')?.addEventListener('click',refresh);
    list.querySelectorAll('[data-memory-edit],[data-memory-disable]').forEach(button=>button.addEventListener('click',async()=>{
     const id=button.dataset.memoryEdit||button.dataset.memoryDisable,l=rows.find(r=>r.id===id);if(!l||busy.has(id))return;busy.add(id);button.disabled=true;

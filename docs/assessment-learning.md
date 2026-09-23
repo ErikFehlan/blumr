@@ -4,7 +4,7 @@ Candidate assessments now use medium reasoning on the existing Sol routes. Short
 
 The model produces concise findings for each supplied requirement, a classification and explanation of feedback impact, and references to any approved lessons it applied. Unknown evidence remains distinct from contradictory evidence. Existing scores are comparison points, not evidence; repeated facts and bare advance/reject decisions should not change scores. Scoring still requires the existing human approval. These findings are evidence summaries, not private chain-of-thought.
 
-Reassessment reads the original saved resume as well as feedback and approved context. Exact quotations are verified against the supplied source. Reviewed assessments retain their structured findings in assessment history; a recruiter correction retains the preceding assessment and scores.
+Reassessment reads the original saved resume as well as feedback and approved context. Exact quotations are verified against the supplied source. Reviewed assessments retain their structured findings in the saved assessment record; a recruiter correction retains the preceding assessment and scores.
 
 ## Memory lifecycle
 
