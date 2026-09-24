@@ -1,0 +1,17 @@
+# Suggested hiring priorities
+
+Saving a job queues up to five ordered priorities from its job description, even when manager notes and screening criteria are empty. These are provisional JD priorities, not confirmed manager preferences. Fewer than five, including none, are valid when the description is sparse. Explicit required and preferred wording is distinguished from inferred importance. Ranking never introduces numeric weights or knockout rules.
+
+The existing private `refine-job-criteria` worker generates priorities and polishes entered criteria in one bounded call. Priority grounding selects supplied JD passage IDs; the server attaches exact original text. Manager notes and candidate data are not supplied to priority generation. The original criteria remain canonical. The existing Sol assessment model, budget reservation, three-attempt queue, revision/lease protections and scheduler are reused.
+
+`job_criteria_tasks.priority_suggestions` retains the JD snapshot separately from transient queue results. `priority_review` records explicit recruiter acceptance or edits, and `priority_version` rejects stale edits. A new wording run cannot overwrite recruiter edits. Changes to the job title or description exclude stale priorities until a matching result is available. Existing jobs can request generation from Jobs or Evaluation criteria; deployment does not backfill every job.
+
+The job panels show the priority, why it matters, a screening question and an expandable original JD passage. Recruiters can accept, edit, remove individual priorities, or restore original suggestions. An accepted list is labeled recruiter reviewed, never manager confirmed. The Candidates page offers a compact list; candidate assessments show findings and focused questions for each saved priority. Existing themes and responsive layout are preserved.
+
+Intake, screening and durable reassessment use the same saved job priorities. Public analysis routes resolve them with the caller's JWT; browser claims cannot invent approved priorities. Findings require candidate-specific evidence for supported, partial or contradicted statuses. Unknown findings may have no sources and must include a verification question. Requirements and shared learning cannot serve as candidate evidence. Saved priorities are included in assessment context signatures and durable revisions. Updating priorities queues new proposals without applying scores; the recruiter still reviews assessment changes.
+
+Actual manager feedback remains separate, authoritative context for assessing candidates. It can refine evidence and Manager Fit, while an explicit recruiter edit updates shared priorities. Candidate-only feedback does not silently rewrite the job's shared priorities.
+
+Validation includes grounded generation and evidence-contract tests, authenticated worker tests, PostgreSQL tests for access, review conflicts, stale JD invalidation and unchanged scores, and browser coverage for acceptance/edit persistence, candidate findings, mint/dark themes and mobile layout. The production smoke gate also checks real JD generation and priority coverage through intake and reassessment on disposable synthetic data.
+
+Release through the normal backend-first workflow. The additive migration follows assessment memory in `scripts/core-backend.mjs`; it preserves existing data and applies the existing workspace RLS/read-only table permissions to the new columns. No model training or automatic hiring decisions are introduced.

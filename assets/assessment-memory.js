@@ -6,7 +6,7 @@
    .sort((a,b)=>(a.scope==='job'?0:1)-(b.scope==='job'?0:1)||String(b.updated_at).localeCompare(String(a.updated_at))||a.id.localeCompare(b.id)).slice(0,12).sort((a,b)=>a.scope.localeCompare(b.scope)||a.id.localeCompare(b.id));}
  function details(result){
   if(!result?.feedback_impact&&!result?.criteria_assessment)return '';
-  return `<div class="rf-assessment-depth">${result.feedback_impact?`<p><strong>${result.feedback_impact.effect==='initial'?'Assessment basis':'Feedback impact'}:</strong> ${esc(result.feedback_impact.summary)}</p>`:''}
+  return (global.BlumrHiringPriorities?.details(result)||'')+`<div class="rf-assessment-depth">${result.feedback_impact?`<p><strong>${result.feedback_impact.effect==='initial'?'Assessment basis':'Feedback impact'}:</strong> ${esc(result.feedback_impact.summary)}</p>`:''}
    ${result.applied_lessons?.length?`<p class="rf-sub"><strong>Applied approved learning:</strong> ${result.applied_lessons.map(l=>esc(l.application)).join(' ')}</p>`:''}
    ${result.criteria_assessment?.length?`<details><summary>Requirement-by-requirement assessment</summary><ul class="rf-criteria-findings">${result.criteria_assessment.map(c=>`<li><strong>${esc(c.criterion)}</strong> <span class="rf-pill rf-gray">${esc(c.status)}</span><p>${esc(c.reason)}</p></li>`).join('')}</ul></details>`:''}</div>`;
  }

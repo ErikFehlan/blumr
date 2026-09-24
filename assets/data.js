@@ -28,14 +28,15 @@
     }
 
     async function load() {
-      const [jobRows, candidateRows, feedbackRows, outcomeRows, benchmarkRows, screeningRows, reviewRows] = await Promise.all([
+      const [jobRows, candidateRows, feedbackRows, outcomeRows, benchmarkRows, screeningRows, reviewRows, priorityRows] = await Promise.all([
         query('jobs', 'id,title,client,description,manager_feedback,criteria,knockouts,weights,pattern_analysis,status,close_reason,closed_at,hired_candidate_id,created_at,updated_at'),
         query('candidates', 'id,job_id,name,role,stage,resume_jd_score,jd_score,original_manager_score,manager_score,confidence,recommendation,primary_signal,strengths,concerns,tags,screening_questions,created_at,updated_at'),
         query('manager_feedback', 'id,job_id,candidate_id,feedback_type,outcome,feedback_text,created_at,updated_at'),
         query('interview_outcomes', 'id,job_id,candidate_id,interview_stage,decision,positives,concerns,notes,previous_pipeline_stage,source_updated_at,created_at,updated_at'),
         query('candidate_benchmarks', 'job_id,candidate_id'),
         query('screening_insights', 'id,job_id,candidate_id,can_do_job,culture_working_style_fit,notes,resulting_jd_score,resulting_manager_score,assessment_summary,assessment_source,source_updated_at,created_at,previous_jd_score,previous_manager_score'),
-        query('candidate_assessments', 'id,job_id,candidate_id,assessment_type,evidence,created_at')
+        query('candidate_assessments', 'id,job_id,candidate_id,assessment_type,evidence,created_at'),
+        query('job_criteria_tasks','job_id,priority_suggestions,priority_review,priority_version')
       ]);
       const benchmarkIds = new Set(benchmarkRows.map(row => row.candidate_id));
       const screeningByCandidate = new Map(screeningRows.sort((a, b) => epoch(a.created_at) - epoch(b.created_at)).map(row => [row.candidate_id, row]));
@@ -44,6 +45,7 @@
       const loadedState = {
         jobs: jobRows.map(row => ({
           id: row.id, title: row.title, client: row.client || '', description: row.description || '',
+          hiringPriorities: window.BlumrHiringPriorities?.effective(priorityRows.find(t=>t.job_id===row.id),row)||null,
           managerFeedback: row.manager_feedback || '', criteria: row.criteria || [], knockouts: row.knockouts || [],
           weights: row.weights || [], patternAnalysis: row.pattern_analysis || null,
           status: row.status || 'active', closeReason: row.close_reason || '', closedAt: row.closed_at ? epoch(row.closed_at) : null,
@@ -374,9 +376,11 @@
       catch(error){pendingWrites--;statusListener?.('error');throw error;}
     }
     async function loadCriteriaTask(jobId) {
-      const { data, error } = await client.from('job_criteria_tasks').select('job_id,revision,input,status,result,display_original,error_code,updated_at').eq('workspace_id',workspaceId).eq('job_id',jobId);
+      const { data, error } = await client.from('job_criteria_tasks').select('job_id,revision,input,status,result,display_original,error_code,updated_at,priority_suggestions,priority_review,priority_version').eq('workspace_id',workspaceId).eq('job_id',jobId);
       if(error)throw error;return data?.[0]||null;
     }
+    const requestHiringPriorities=job=>settingsRPC('request_hiring_priorities',{p_job:job});
+    const reviewHiringPriorities=(job,version,decision,items)=>settingsRPC('review_job_hiring_priorities',{p_job:job,p_version:version,p_decision:decision,p_items:items});
     async function toggleCriteriaOriginal(jobId,revision,original) {
       const {data,error}=await client.rpc('use_original_job_criteria',{p_job:jobId,p_revision:revision,p_original:original});
       if(error)throw error;return data;
@@ -499,7 +503,7 @@
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
+    return { requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };

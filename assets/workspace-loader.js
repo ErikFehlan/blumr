@@ -2,12 +2,13 @@
   'use strict';
 
   const sources = [
-    'assets/data.js?v=20260923-learning',
+    'assets/hiring-priorities.js?v=20260924-priorities',
+    'assets/data.js?v=20260924-priorities',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20260917-concise',
     'assets/evidence.js?v=20260911-quick-feedback',
-    'assets/context.js?v=20260923-learning',
-    'assets/assessment-memory.js?v=20260923-learning',
+    'assets/context.js?v=20260924-priorities',
+    'assets/assessment-memory.js?v=20260924-priorities',
     'assets/scoring.js?v=20260911-quick-feedback',
     'assets/quality.js?v=20260915-core',
     'assets/quality-ui.js?v=20260918-blumr',
@@ -19,7 +20,7 @@
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
     'assets/candidate-workspace.js?v=20260922-resume-panel-v2',
-    'assets/criteria-automation.js?v=20260922-adaptive-polling',
+    'assets/criteria-automation.js?v=20260924-priorities',
     'assets/home.js?v=20260918-blumr',
     'assets/focus-ui.js?v=20260918-blumr',
     'assets/recruiter-workflow.js?v=20260915-phase2',
@@ -30,7 +31,7 @@
     'assets/settings-ui.js?v=20260918-blumr',
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
-    'assets/app.js?v=20260923-learning'
+    'assets/app.js?v=20260924-priorities'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
