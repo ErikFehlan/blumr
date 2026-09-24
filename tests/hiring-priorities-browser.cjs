@@ -38,9 +38,13 @@ const dir=path.resolve(__dirname,'..');
   await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('[data-candidate-id="candidate-a"]').first().click();
   const assessment=page.locator('#workspaceEvaluation .rf-priority-assessment');await assessment.getByText('Top hiring priorities',{exact:true}).waitFor();
   assert.equal(await assessment.getByText('Not established',{exact:true}).count(),4);await assessment.screenshot({path:'test-results/hiring-priorities/candidate-mint.png'});
-  await page.setViewportSize({width:390,height:844});await assessment.screenshot({path:'test-results/hiring-priorities/candidate-mobile.png'});
+  await page.setViewportSize({width:390,height:844});await page.waitForFunction(()=>document.querySelector('.rf-sidebar').getBoundingClientRect().right<=0);
+  await assessment.evaluate(el=>window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-155,behavior:'instant'}));
+  await page.screenshot({path:'test-results/hiring-priorities/candidate-mobile.png',animations:'disabled'});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'mobile overflow');
-  await page.evaluate(()=>document.querySelector('#rf-app').dataset.theme='emerald');await assessment.screenshot({path:'test-results/hiring-priorities/candidate-emerald.png'});
+  await page.evaluate(()=>document.querySelector('#rf-app').dataset.theme='emerald');await page.screenshot({path:'test-results/hiring-priorities/candidate-emerald.png',animations:'disabled'});
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('ancalagon:auth-cleared')));
+  assert.equal(await page.locator('[data-priority-panel] li').count(),0,'priorities survived sign-out');
   assert.deepEqual(errors,[]);console.log('PASS: five shared priorities, recruiter acceptance/edit persistence, stable editing, candidate evidence, mint/dark themes and mobile layout.');
  }finally{await browser?.close();server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

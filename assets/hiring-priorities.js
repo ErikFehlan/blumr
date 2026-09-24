@@ -16,7 +16,8 @@
    return `<li><div class="rf-priority-heading"><strong>${esc(item.title)}</strong><span class="rf-pill rf-gray">${esc(({supported:'Evidence found',partial:'Partial evidence',unknown:'Not established',contradicted:'Conflicting evidence'})[finding?.status]||'Not assessed')}</span></div><p>${esc(finding?.reason||'An updated assessment is needed.')}</p>${finding?.question?`<p><strong>Ask:</strong> ${esc(finding.question)}</p>`:''}<details><summary>Why this matters</summary><p>${esc(item.reason)}</p><p class="rf-sub">${esc(type(item))}</p><blockquote>${esc(item.source_quote)}</blockquote></details></li>`;
   }).join('')}</ol></section>`;
  }
- const rendered=new WeakMap();
+ let rendered=new WeakMap();
+ function clear(root){rendered=new WeakMap();root.querySelectorAll('[data-priority-panel]').forEach(wrap=>{wrap.replaceChildren();delete wrap.dataset.editing;delete wrap.dataset.job;});}
  function render(root,job,task,api){
   const priorities=effective(task,job);job.hiringPriorities=priorities;
   root.querySelectorAll('[data-priority-panel]').forEach(wrap=>{
@@ -44,5 +45,5 @@
   });
  }
  const active=job=>job?.hiringPriorities?.source_title===job.title&&job.hiringPriorities.source_description===(job.description||'')?job.hiringPriorities:null;
- const api={effective,active,basis,details,render};if(typeof module!=='undefined')module.exports=api;global.BlumrHiringPriorities=api;
+ const api={effective,active,basis,details,render,clear};if(typeof module!=='undefined')module.exports=api;global.BlumrHiringPriorities=api;
 })(typeof window==='undefined'?globalThis:window);

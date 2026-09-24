@@ -10,7 +10,7 @@ export async function handleCriteria(request:Request){
   if(request.method!=='POST')return response({error:'Method not allowed'},405);
   const base=Deno.env.get('SUPABASE_URL'),key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),apiKey=Deno.env.get('OPENAI_API_KEY');
   if(!base||!key||!apiKey)return response({error:'Worker configuration incomplete'},503);
-  const command=await request.json().catch(()=>({}));if(command.health===true)return response({status:'configured',immediate_criteria:true,hiring_priorities:true});
+  const command=await request.json().catch(()=>({}));if(!command||typeof command!=='object'||Array.isArray(command))return response({error:'Invalid request'},400);if(command.health===true)return response({status:'configured',immediate_criteria:true,hiring_priorities:true});
   async function rpc(name:string,body:unknown){const r=await fetch(`${base}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:key!,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error('database_unavailable');return r.json();}
   const jobId=command.job_id;
   if(jobId!==undefined&&(typeof jobId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)))return response({error:'Invalid job'},400);
