@@ -54,19 +54,20 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   const suppliedContext=payload.evaluation_context as {job_id?:string,sources?:Array<{id?:string,kind?:string}>}|undefined;
   const memoryJob=suppliedContext?.job_id;
   if(suppliedContext){
-    const cleanSources=(Array.isArray(suppliedContext.sources)?suppliedContext.sources:[]).filter(s=>s.kind!=='approved learning'&&!s.id?.startsWith('lesson-'));
-    payload.evaluation_context={...suppliedContext,sources:cleanSources};
+    const cleanSources=(Array.isArray(suppliedContext.sources)?suppliedContext.sources:[]).filter(s=>s.kind!=='approved learning'&&!s.id?.startsWith('lesson-')&&!s.id?.startsWith('priority-'));
+    payload.evaluation_context={...suppliedContext,hiring_priorities:null,sources:cleanSources};
     if(typeof memoryJob==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(memoryJob)){
       try{
         // Ensure a supplied job belongs to this authenticated workspace, too.
         const job=await fetch(`${supabaseUrl}/rest/v1/jobs?select=id&id=eq.${memoryJob}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,{headers,signal:AbortSignal.timeout(10000)});
         const found=job.ok?await job.json():[];
         if(!Array.isArray(found)||found.length!==1)return json({error:'Job unavailable'},403);
-        const response=await fetch(`${supabaseUrl}/rest/v1/rpc/get_assessment_lessons`,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({p_job:memoryJob}),signal:AbortSignal.timeout(10000)});
-        if(!response.ok)return json({error:'Learning memory temporarily unavailable. Try again.'},503);
+        const [response,priorityResponse]=await Promise.all(['get_assessment_lessons','get_job_hiring_priorities'].map(name=>fetch(`${supabaseUrl}/rest/v1/rpc/${name}`,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({p_job:memoryJob}),signal:AbortSignal.timeout(10000)})));
+        if(!response.ok||!priorityResponse.ok)return json({error:'Job context temporarily unavailable. Try again.'},503);
         const lessons=await response.json();
         if(!Array.isArray(lessons))return json({error:'Learning memory temporarily unavailable. Try again.'},503);
-        payload.evaluation_context={...suppliedContext,sources:[...cleanSources,...lessons.map(l=>({id:`lesson-${l.id}`,kind:'approved learning',text:`${l.kind}: ${l.text}`,recorded_at:l.updated_at,scope:l.scope}))]};
+        const saved=await priorityResponse.json(),priorities=saved?.items?.length?{basis:saved.basis,review_status:saved.review_status,items:saved.items}:null;
+        payload.evaluation_context={...suppliedContext,hiring_priorities:priorities,sources:[...cleanSources,...(priorities?.items||[]).map((p:{id:string,title:string,reason:string})=>({id:p.id,kind:'requirement',text:p.title+': '+p.reason,scope:'job'})),...lessons.map(l=>({id:`lesson-${l.id}`,kind:'approved learning',text:`${l.kind}: ${l.text}`,recorded_at:l.updated_at,scope:l.scope}))]};
       }catch{return json({error:'Learning memory temporarily unavailable. Try again.'},503);}
     }
   }

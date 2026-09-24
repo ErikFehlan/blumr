@@ -37,6 +37,21 @@ try{
  assert.notEqual(users[0].workspace,users[1].workspace,'Workspaces must be isolated');
  const owner=users[0],other=users[1],job=randomUUID(),candidate=randomUUID(),note=randomUUID();
  await req('/rest/v1/jobs',owner.access,'POST',{id:job,workspace_id:owner.workspace,title:'Synthetic core QA',description:'Manual regression testing and documented defect remediation.',criteria:['Must Have | manual regression testing'],created_by:owner.id});
+ // Wait for JD-only generation before adding evidence, then use the same
+ // reviewed priorities for intake and every subsequent reassessment.
+ let priorityTask;
+ for(let i=0;i<360;i++){
+  priorityTask=(await req('/rest/v1/job_criteria_tasks?job_id=eq.'+job,owner.access)).data[0];
+  if(priorityTask?.priority_suggestions)break;
+  if(priorityTask?.status==='failed')throw Error('Live hiring priorities exhausted retries ('+priorityTask.error_code+').');
+  await new Promise(resolve=>setTimeout(resolve,500));
+ }
+ const suggested=priorityTask?.priority_suggestions?.items;
+ assert.ok(suggested?.length>0&&suggested.length<=5,'Job priorities were not generated');
+ for(const item of suggested)assert.ok('Manual regression testing and documented defect remediation.'.includes(item.source_quote),'Priority source was not exact');
+ const reviewed=(await req('/rest/v1/rpc/review_job_hiring_priorities',owner.access,'POST',{p_job:job,p_version:priorityTask.priority_version,p_decision:'accept'})).data;
+ assert.equal(reviewed.review_status,'accepted');
+ console.log('PASS: saved job generates shared priorities with exact JD passages and explicit recruiter review.');
  await req('/rest/v1/candidates',owner.access,'POST',{id:candidate,workspace_id:owner.workspace,job_id:job,name:'Synthetic Candidate',role:'Resume awaiting analysis',created_by:owner.id});
  await req('/rest/v1/candidate_assessments',owner.access,'POST',{workspace_id:owner.workspace,job_id:job,candidate_id:candidate,assessment_type:'manual_correction',evidence:{resume_intake:{phase:'uploading',backend:'durable-v1'},submission_draft:{text:'Synthetic draft retained'}},created_by:owner.id});
  const text='Synthetic Candidate\nQA Analyst\nOwned manual regression testing for billing systems and documented defects through remediation.';
@@ -95,6 +110,7 @@ try{
  }
  assert.equal(task?.status,'ready','Intake did not finish without a browser');
  console.log('SYNTHETIC_INTAKE_METRIC '+JSON.stringify({document_to_ready_ms:Math.round(performance.now()-intakeStarted),attempts:task.attempts}));
+ assert.equal(task.result.priority_assessment?.length,suggested.length,'Intake omitted shared priorities');
  assert.ok(task.result.resume_evidence?.length,'Live AI did not return resume evidence');
  assert.ok(task.result.model?.startsWith('gpt-5.6-sol'),'Live intake did not use Sol');
  for(const evidence of task.result.resume_evidence)assert.ok(text.includes(evidence.quote),'Live quote not grounded');
@@ -120,6 +136,7 @@ try{
   await new Promise(resolve=>setTimeout(resolve,500));
  }
  assert.equal(reassessment?.status,'ready','Durable reassessment did not finish');
+ assert.equal(reassessment.result.priority_assessment?.length,suggested.length,'Reassessment omitted shared priorities');
  assert.ok(reassessment.result.model?.startsWith('gpt-5.6-sol'),'Reassessment did not use Sol');
  for(const criterion of criteria)assert.ok(reassessment.result.criteria_assessment.some(row=>row.criterion===criterion),'A requirement was omitted or rewritten');
  for(const criterion of criteria.slice(2))assert.equal(reassessment.result.criteria_assessment.find(row=>row.criterion===criterion).status,'unknown','Absent candidate evidence was not marked unknown');

@@ -76,6 +76,7 @@ jobs:
           node tests/browser-journey.cjs
           node tests/job-review-browser.cjs
           node tests/assessment-memory-browser.cjs
+          node tests/hiring-priorities-browser.cjs
           node tests/resume-intake-browser.cjs
           node tests/streamline-browser.cjs
           node tests/home-browser.cjs
@@ -97,6 +98,7 @@ jobs:
             test-results/landing-*.png
             test-results/recruiter-*.png
             test-results/assessment-memory/*.png
+            test-results/hiring-priorities/*.png
           if-no-files-found: ignore
 
   prepare-home:

@@ -1,5 +1,6 @@
 import '../../../assets/resume-intake.js';
 import '../../../assets/context.js';
+import {withPriorityAssessment,validatePriorityAssessment} from '../_shared/priority-assessment.mjs';
 import {withDetails,validateDetails} from '../_shared/assessment-depth.mjs';
 import {resumeSources} from '../analyze-patterns-v2/resume-sources.mjs';
 const contextAPI=globalThis.AncalagonContext;
@@ -22,7 +23,7 @@ export function prepare(input){
   });
   const payload={job:{title:job.title},candidate:{current_manager_score:Number(candidate.managerScore),current_jd_score:Number(candidate.jdScore)},evaluation_context:{...context,sources:modelSources}};
   if(JSON.stringify(payload).length>180000)throw Error('input_too_large');
-  return {payload,contextSignature,sourceIds:new Set(context.sources.map(s=>s.id)),sources:context.sources,criteria:context.requirements,passages};
+  return {payload,contextSignature,sourceIds:new Set(context.sources.map(s=>s.id)),sources:context.sources,criteria:context.requirements,priorities:context.hiring_priorities,passages};
 }
 export function resolveEvidence(result,prepared){
   const fail=()=>{throw Object.assign(new Error('invalid_result'),{validationIssue:'evidence_source'});};
@@ -36,6 +37,7 @@ export function resolveEvidence(result,prepared){
 }
 export function validate(result,prepared){
   const fail=issue=>{throw Object.assign(new Error('invalid_result'),{validationIssue:issue});};
+  result=validatePriorityAssessment(result,prepared.priorities,prepared.sources);
   validateDetails(result,prepared.sources,{suggestions:true,criteria:prepared.criteria||[]});
   if(!result||!['jd_score','manager_score'].every(k=>typeof result[k]==='number'&&Number.isFinite(result[k])&&result[k]>=0&&result[k]<=10)
     ||!['low','medium','high'].includes(result.confidence)
@@ -57,8 +59,8 @@ export function validate(result,prepared){
   }
   return {...result,manager_score:Math.round(result.manager_score*10)/10,jd_score:Math.round(result.jd_score*10)/10,context_signature:prepared.contextSignature};
 }
-export const schema=prepared=>withDetails({type:'object',additionalProperties:false,required:['jd_score','manager_score','confidence','summary','manager_reason','jd_reason','evidence_support','questions'],properties:{
+export const schema=prepared=>withPriorityAssessment(withDetails({type:'object',additionalProperties:false,required:['jd_score','manager_score','confidence','summary','manager_reason','jd_reason','evidence_support','questions'],properties:{
   jd_score:{type:'number',minimum:0,maximum:10},manager_score:{type:'number',minimum:0,maximum:10},confidence:{type:'string',enum:['low','medium','high']},
   evidence_support:{type:'array',minItems:1,maxItems:5,items:{type:'object',additionalProperties:false,required:['passage_id','claim'],properties:{passage_id:{type:'string',enum:prepared.passages.map(p=>p.id)},claim:{type:'string',minLength:1,maxLength:800}}}},
   summary:{type:'string',maxLength:320},manager_reason:{type:'string',maxLength:320},jd_reason:{type:'string',maxLength:320},questions:{type:'array',items:{type:'string',maxLength:220},maxItems:2}
-}},true,{sources:prepared.sources,criteria:prepared.criteria});
+}},true,{sources:prepared.sources,criteria:prepared.criteria}),prepared.priorities,prepared.sources);
