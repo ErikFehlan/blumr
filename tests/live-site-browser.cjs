@@ -67,6 +67,19 @@ let browser,page,stage='setup';
   const id=await poll(()=>page.locator('#candidateWorkspace').getAttribute('data-workspace-candidate'),'Candidate was not opened');candidateIds.push(id);
   const saved=await poll(async()=> (await api(owner,'candidate_documents?select=file_name,extracted_text,storage_path&candidate_id=eq.'+id)).find(d=>d.file_name===doc.name),'Uploaded document was not persisted');
   assert.ok(saved.extracted_text?.length>80,'Resume text was not extracted');assert.ok(saved.storage_path.startsWith(owner.workspace+'/'));
+  if(doc.label==='PDF'){
+   // A new tab has no sessionStorage from the tab that submitted the resume.
+   const statusAtClose=(await api(owner,'resume_intake_tasks?select=status&candidate_id=eq.'+id))[0]?.status;
+   await page.close();page=await context.newPage();page.setDefaultTimeout(20000);
+   page.on('pageerror',()=>errors.push('Unhandled application error'));
+   await page.goto(fixture.app,{waitUntil:'domcontentloaded',timeout:45000});
+   await page.locator('#page-home.active').waitFor({timeout:60000});
+   await nav('jobs');await page.locator(`[data-activate-job="${job.id}"]`).click();
+   await nav('candidates');await page.locator(`[data-candidate-id="${id}"]`).click();
+   assert.equal(await page.locator('#candidateWorkspace').getAttribute('data-workspace-candidate'),id);
+   assert.equal((await api(owner,'candidates?select=id&id=eq.'+id)).length,1,'Tab close duplicated the saved candidate');
+   pass(`Saved resume and candidate survive closing and reopening the tab (task at close: ${statusAtClose||'not yet visible'})`);
+  }
   if(doc.ocr){
    const text=saved.extracted_text.replace(/\s+/g,' ').toLowerCase();
    for(const phrase of ['morgan sample','manual regression testing','sql queries','release checklist','invoice correction workflows','information systems'])assert.ok(text.includes(phrase),'OCR missed expected text: '+phrase);
