@@ -4,6 +4,14 @@ const tick=()=>new Promise(r=>setImmediate(r));
 // Native resume hashing can outlast 100 immediate turns on a busy CI runner.
 async function settled(batch){const deadline=Date.now()+2000;while(Date.now()<deadline){if(!batch.view().some(i=>['waiting','reading','saving'].includes(i.state)))return;await new Promise(resolve=>setTimeout(resolve,2));}throw Error('Batch did not settle: '+JSON.stringify(batch.view()));}
 const file=name=>({name,size:100});
+test('saved upload exposes its candidate and ready screening brief',()=>{
+ const host={dataset:{},hidden:false,contains:()=>false};
+ const item={id:'upload',fileName:'Morgan.pdf',jobId:'j',state:'saved',candidateId:'candidate'};
+ recruiter.renderBatch(host,[item],'j',[{id:'candidate',jobId:'j',resumeIntake:{phase:'processing'}}]);
+ assert.match(host.innerHTML,/data-batch-open="candidate">View candidate/);
+ recruiter.renderBatch(host,[item],'j',[{id:'candidate',jobId:'j',resumeIntake:{phase:'ready'}}]);
+ assert.match(host.innerHTML,/data-batch-open="candidate">View screening brief/);
+});
 test('a failed file does not block later files; retry retains original job and frees saved files',async()=>{
  let job={id:'a',title:'QA'},fail=true;const calls=[],batch=recruiter.createBatch({job:()=>job,workspace:()=> 'w',toast:()=>{},upload:async(f,o)=>{calls.push([f.name,o.jobId,o.open]);if(f.name==='bad.txt'&&fail)throw Error('Upload interrupted');return {id:f.name};}});
  batch.add([file('bad.txt'),file('good.txt')]);job={id:'b',title:'Security'};await settled(batch);
