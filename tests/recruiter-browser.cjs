@@ -12,8 +12,9 @@ const root=path.resolve(__dirname,'..');
   await page.addInitScript(()=>{
    const clone=x=>JSON.parse(JSON.stringify(x));
    const job=(id,title)=>({id,title,description:'Manual regression testing',criteria:[],weights:[],knockouts:[],status:'active',createdAt:1,updatedAt:1});
-   const fixture={jobs:[job('qa','QA Analyst'),job('security','Security Engineer')],candidates:[],feedback:[],interviewOutcomes:[]};
-   window.testGuidance={enabled:true,tips:{}};window.guidanceFail=false;window.feedbackReviewFail=false;window.testState=fixture;window.testDocs={};window.testTasks={};window.failedUpload=false;window.batchReads=0;
+   const restored=JSON.parse(sessionStorage.getItem('blumr-interruption-fixture')||'null');
+   const fixture=restored?.state||{jobs:[job('qa','QA Analyst'),job('security','Security Engineer')],candidates:[],feedback:[],interviewOutcomes:[]};
+   window.testGuidance={enabled:true,tips:{}};window.guidanceFail=false;window.feedbackReviewFail=false;window.testState=fixture;window.testDocs=restored?.docs||{};window.testTasks=restored?.tasks||{};window.failedUpload=false;window.batchReads=0;
    const api={loadGuidance:async()=>clone(window.testGuidance),saveGuidance:async(action,tip)=>{if(window.guidanceFail)throw Error('Offline');const state=window.testGuidance;if(action==='reset')window.testGuidance={enabled:true,tips:{}};else if(action==='enable'||action==='disable')state.enabled=action==='enable';else if(action==='dismiss'||!state.tips[tip])state.tips[tip]=action==='dismiss'?'dismissed':'completed';return clone(window.testGuidance);},load:async()=>clone(fixture),loadHome:async()=>null,visitHome:async()=>{},saveHome:async()=>{},loadHomeReviews:async()=>[],
     schedule:(s,e,status)=>{window.testState=clone(s);status('saved');},flush:async s=>{if(window.feedbackReviewFail&&s.feedback.some(f=>f.interpretation?.reviewStatus))throw Error('Offline');window.testState=clone(s);},trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin')},loadJobReassessments:async()=>[],
     uploadResume:async(c,file,text)=>{if(file.name==='Retry.txt'&&!window.failedUpload){window.failedUpload=true;throw Error('Connection interrupted. Retry this file.');}window.testDocs[c.id]=text;},loadResumeText:async c=>window.testDocs[c.id]||'',
@@ -22,7 +23,7 @@ const root=path.resolve(__dirname,'..');
      const c=window.testState.candidates.find(c=>c.id===id),job=window.testState.jobs.find(j=>j.id===c.jobId),text=window.testDocs[id];
      const neutral={...c,role:'',signal:'',tags:[],strengths:[],concerns:[],resumeJDScore:0,resumeIntake:null};
      const signature=window.AncalagonContext.signature(window.AncalagonContext.build(job,neutral,[],[]));
-     window.testTasks[id]={candidate_id:id,job_id:c.jobId,status:'ready',revision:'r1',result:{name:text.split('\n')[0],role:'QA Analyst',score:8,manager_score:8.5,primary_signal:'Manual testing',jd_reason:'Testing demonstrated',manager_reason:'Ownership demonstrated',concerns:[],tags:['QA'],screening_questions:['What tests did you own?'],resume_evidence:[{claim:'Manual regression',quote:'Owned manual regression testing for billing systems'}],context_signature:signature}};
+     window.testTasks[id]={candidate_id:id,job_id:c.jobId,status:window.pauseIntake?'processing':'ready',revision:'r1',result:{name:text.split('\n')[0],role:'QA Analyst',score:8,manager_score:8.5,primary_signal:'Manual testing',jd_reason:'Testing demonstrated',manager_reason:'Ownership demonstrated',concerns:[],tags:['QA'],screening_questions:['What tests did you own?'],resume_evidence:[{claim:'Manual regression',quote:'Owned manual regression testing for billing systems'}],context_signature:signature}};
     },loadResumeIntake:async id=>window.testTasks[id]||null,
     loadResumeIntakes:async ids=>{window.batchReads++;return ids.map(id=>window.testTasks[id]).filter(Boolean).map(({result,...task})=>task)},
     reviewResumeIntake:async(id,revision,state)=>{
@@ -140,8 +141,22 @@ const root=path.resolve(__dirname,'..');
   await page.locator('[data-reopen-job="qa"]').evaluate(e=>e.closest('details').open=true);await page.locator('[data-reopen-job="qa"]').click();
   await page.locator('[data-job-filter="active"]').click();await page.locator('#jobSearch').fill('');
   assert.equal(await page.locator('[data-activate-job]').count(),2);assert.equal(await page.evaluate(()=>window.testState.candidates.length),4);
+  // Close the tab after a durable save but before the assessment finishes.
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.evaluate(()=>window.pauseIntake=true);
+  await page.locator('#resumeUpload').setInputFiles(resume('Recovery Example'));
+  await page.waitForFunction(()=>window.testState.candidates.length===5&&window.testState.candidates.at(-1).resumeIntake.phase==='processing');
+  const recoveryId=await page.evaluate(()=>window.testState.candidates.at(-1).id);
+  await page.evaluate(()=>sessionStorage.setItem('blumr-interruption-fixture',JSON.stringify({state:window.testState,docs:window.testDocs,tasks:window.testTasks})));
+  page.once('dialog',dialog=>dialog.accept());await page.reload();await page.locator('#page-home.active').waitFor();
+  assert.equal(await page.evaluate(()=>window.testState.candidates.length),5,'reload lost a saved candidate');
+  await page.evaluate(id=>{window.testTasks[id].status='ready'},recoveryId);
+  await page.waitForFunction(id=>window.testState.candidates.find(c=>c.id===id)?.resumeIntake.phase==='ready',recoveryId,{timeout:20000});
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator(`[data-candidate-id="${recoveryId}"]`).click();
+  assert.match(await page.locator('#workspaceIntake').textContent(),/Review the screening brief/);
+  assert.equal(await page.evaluate(id=>window.testState.candidates.filter(c=>c.id===id).length,recoveryId),1,'reload duplicated the candidate');
+  await page.evaluate(()=>sessionStorage.removeItem('blumr-interruption-fixture'));
   await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
   if(process.env.CAPTURE_UI)await page.screenshot({path:process.env.CAPTURE_UI+'-jobs-mobile.png',fullPage:true});
-  assert.deepEqual(errors,[]);console.log('PASS: bulk intake, duplicate protection, failed-file retry, three approvals, manager feedback candidate selection after upload, background updates, correct saved candidate, empty jobs, keyboard selection, job isolation, close/reopen preservation, mobile layout.');
+  assert.deepEqual(errors,[]);console.log('PASS: bulk intake, duplicate protection, failed-file retry, three approvals, saved candidate recovery after a mid-assessment reload, manager feedback candidate selection after upload, background updates, correct saved candidate, empty jobs, keyboard selection, job isolation, close/reopen preservation, mobile layout.');
  }finally{if(browser)await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
