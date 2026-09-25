@@ -7,6 +7,12 @@ const context=require('../assets/context.js');
 const profile='Morgan Vale | Senior Software Engineer\nOwned manual regression testing for billing systems and documented defects.\nBuilt C# services and reviewed SQL queries.\n';
 const source=name=>name==='tiny.txt'?'Hi.\n':name==='Morgan Vale.txt'?profile+'Project: invoicing.\n':name==='Morgan Vále.txt'?profile+'Project: observability.\n':name.startsWith('batch-')?profile+'Unique synthetic project reference '+name.slice(6,8)+'.\n':profile;
 const file=name=>({name,size:Buffer.byteLength(source(name))});
+test('unreadable PDFs and Word files explain how to recover without hiding unrelated errors',()=>{
+ assert.match(intake.fileReadError({name:'PasswordException',message:'No password given'},'pdf').message,/unlocked copy/);
+ assert.match(intake.fileReadError(new Error('Could not find end of central directory'),'docx').message,/Save it again as a DOCX/);
+ const network=new Error('PDF reader is temporarily unavailable');
+ assert.equal(intake.fileReadError(network,'pdf'),network);
+});
 async function settled(batch){const until=Date.now()+20000;while(Date.now()<until){if(!batch.view().some(i=>['waiting','reading','saving'].includes(i.state)))return;await new Promise(r=>setTimeout(r,5));}throw Error('Upload queue stalled');}
 
 test('50 files in allowed batches, with a duplicate and a failed file, never block subsequent uploads',async()=>{

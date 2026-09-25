@@ -3,6 +3,12 @@
   const normalize=s=>String(s||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
   const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const pending=c=>!!c?.resumeIntake&&!c.resumeIntake.reviewedAt&&!c.aiReview;
+  function fileReadError(error,type){
+    if(type==='pdf'&&(error?.name==='PasswordException'||/password required|no password given/i.test(error?.message||'')))
+      return new Error('This PDF is password protected. Upload an unlocked copy.');
+    if(type==='docx')return new Error('This Word file could not be read. Save it again as a DOCX or upload a PDF.');
+    return error;
+  }
   const strings=(a,max,len)=>Array.isArray(a)&&a.length<=max&&a.every(s=>typeof s==='string'&&s.trim()&&s.length<=len);
   // Keep content identity normalization unchanged: existing uploaded resumes use it.
   // This separate index ignores only typography and maps matches back to the actual
@@ -290,5 +296,5 @@
     function releaseFile(id){files.delete(id);}
     return {upload,retry,approve,resume,render,renderCandidate,openResume,hasUnsavedFile,releaseFile};
   }
-  const api={create,validate,identity,pending,normalize,sourceQuote,evidenceForPoint,pointText};if(typeof module!=='undefined')module.exports=api;global.AncalagonIntake=api;
+  const api={create,validate,identity,pending,normalize,sourceQuote,evidenceForPoint,pointText,fileReadError};if(typeof module!=='undefined')module.exports=api;global.AncalagonIntake=api;
 })(typeof window==='undefined'?globalThis:window);
