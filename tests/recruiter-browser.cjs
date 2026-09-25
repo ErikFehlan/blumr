@@ -152,7 +152,7 @@ const root=path.resolve(__dirname,'..');
   await page.evaluate(id=>{window.testTasks[id].status='ready'},recoveryId);
   await page.waitForFunction(id=>window.testState.candidates.find(c=>c.id===id)?.resumeIntake.phase==='ready',recoveryId,{timeout:20000});
   await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator(`[data-candidate-id="${recoveryId}"]`).click();
-  assert.match(await page.locator('#workspaceIntake').textContent(),/Review the screening brief/);
+  assert.equal(await page.locator('.rf-workspace-overview h3').textContent(),'Review the screening brief');
   assert.equal(await page.evaluate(id=>window.testState.candidates.filter(c=>c.id===id).length,recoveryId),1,'reload duplicated the candidate');
   await page.evaluate(()=>sessionStorage.removeItem('blumr-interruption-fixture'));
   await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
