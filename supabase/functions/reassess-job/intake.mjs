@@ -18,7 +18,7 @@ export async function processIntakes(tasks,{rpc,analyze}){
       if(!response.ok){
         const failure=await response.json().catch(()=>({}));
         const issue=['invalid_score','invalid_profile','invalid_concerns','invalid_questions','invalid_tags','invalid_evidence','unmatched_quote','unsupported_score','incomplete_output','invalid_json','invalid_assessment_details'].includes(failure?.validation_issue)?failure.validation_issue:null;
-        throw Error(['usage_limit','ai_paused','beta_access_required','usage_check_unavailable'].includes(failure?.code)?'usage_limit':response.status===429?'ai_rate_limit':response.status===502?(issue?'verification_'+issue:'verification_failed'):'ai_unavailable');
+        throw Error(failure?.code==='ai_budget_exhausted'?'ai_budget_exhausted':['usage_limit','ai_paused','beta_access_required','usage_check_unavailable'].includes(failure?.code)?'usage_limit':response.status===429?'ai_rate_limit':response.status===502?(issue?'verification_'+issue:'verification_failed'):'ai_unavailable');
       }
       const result=await response.json();
       const accepted=await rpc('finish_resume_intake',{p_candidate:task.candidate_id,p_revision:task.revision,p_lease:task.lease_id,
@@ -26,7 +26,7 @@ export async function processIntakes(tasks,{rpc,analyze}){
       return accepted?'ready':'superseded';
     }catch(error){
       const message=error instanceof Error?error.message:'';
-      const code=['invalid_scope','invalid_resume','input_too_large','ai_rate_limit','usage_limit','verification_failed','ai_unavailable'].includes(message)||/^verification_(invalid_score|invalid_profile|invalid_concerns|invalid_questions|invalid_tags|invalid_evidence|unmatched_quote|unsupported_score|incomplete_output|invalid_json|invalid_assessment_details)$/.test(message)?message:'processing_failed';
+      const code=['invalid_scope','invalid_resume','input_too_large','ai_rate_limit','ai_budget_exhausted','usage_limit','verification_failed','ai_unavailable'].includes(message)||/^verification_(invalid_score|invalid_profile|invalid_concerns|invalid_questions|invalid_tags|invalid_evidence|unmatched_quote|unsupported_score|incomplete_output|invalid_json|invalid_assessment_details)$/.test(message)?message:'processing_failed';
       try{await rpc('finish_resume_intake',{p_candidate:task.candidate_id,p_revision:task.revision,p_lease:task.lease_id,p_result:null,p_error:code});}catch{/* The lease expires and the scheduler retries. */}
       return 'retry_or_attention';
     }
