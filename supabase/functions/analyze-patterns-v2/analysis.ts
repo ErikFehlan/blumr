@@ -250,6 +250,8 @@ ANALYSIS RULES
     const result = await response.json();
     if (!response.ok) {
       console.error("OpenAI response error", result?.error?.type, result?.error?.code);
+      if (['project_spend_limit_exceeded','organization_spend_limit_exceeded','credit_balance_exhausted'].includes(result?.error?.code))
+        return json({error:'AI assessments are paused because the service spending limit was reached. Your saved work is unchanged.',code:'ai_budget_exhausted'},503);
       return json({ error: "The analysis provider is temporarily unavailable. Please try again." }, response.status);
     }
 

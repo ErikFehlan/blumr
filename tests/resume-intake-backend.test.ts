@@ -1,7 +1,21 @@
 import {handleAnalysis} from '../supabase/functions/analyze-patterns-v2/index.ts';
+import {processIntakes} from '../supabase/functions/reassess-job/intake.mjs';
 function assert(value:unknown,message:string):asserts value{if(!value)throw Error(message);}
 const resume='Alex Carter\nQA Analyst\nOwned manual regression testing for billing systems.';
 const analysis={criteria_assessment:[],feedback_impact:{effect:'confirmation',summary:'No additional qualification evidence.',source_ids:[]},applied_lessons:[],name:'Alex Carter',role:'QA Analyst',score:8,manager_score:8.5,primary_signal:'Relevant manual testing.',jd_reason:'Manual testing demonstrated.',manager_reason:'Ownership matches approved context.',concerns:['Verify automation scope.'],tags:['QA'],screening_questions:['What testing did you personally own?'],resume_evidence:[{claim:'Manual regression',source_id:'resume-1'}]};
+Deno.test('project spending cap gives a durable, actionable intake error',async()=>{
+ const previous=globalThis.fetch,apiKey=Deno.env.get('OPENAI_API_KEY');Deno.env.set('OPENAI_API_KEY','test-only');
+ try{
+  globalThis.fetch=async()=>new Response(JSON.stringify({error:{type:'insufficient_quota',code:'project_spend_limit_exceeded'}}),{status:429});
+  const request=new Request('https://example.invalid/analysis',{method:'POST',body:JSON.stringify({analysis_type:'resume',auto_intake:true,job:{title:'QA'},resume_text:resume})});
+  const response=await handleAnalysis(request);const body=await response.json();
+  assert(response.status===503&&body.code==='ai_budget_exhausted','quota was presented as a transient rate limit');
+  let savedError='';
+  const task={candidate_id:'candidate',workspace_id:'workspace',revision:'revision',lease_id:'lease',input:{job:{id:'job',title:'QA',criteria:[]},candidate:{id:'candidate',jobId:'job'},resume_text:resume}};
+  await processIntakes([task],{analyze:async()=>new Response(JSON.stringify(body),{status:503}),rpc:async(_name:string,args:{p_error:string})=>{savedError=args.p_error;return true;}});
+  assert(savedError==='ai_budget_exhausted','durable task lost the spending-limit reason');
+ }finally{globalThis.fetch=previous;apiKey===undefined?Deno.env.delete('OPENAI_API_KEY'):Deno.env.set('OPENAI_API_KEY',apiKey);}
+});
 Deno.test('automatic intake validates quoted evidence, preserves approved context, and keeps legacy resume clients compatible',async()=>{
  const original=globalThis.fetch;Deno.env.set('OPENAI_API_KEY','test-only');let output:unknown=analysis,auto=true;
  globalThis.fetch=async(_url,init)=>{
