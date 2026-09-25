@@ -51,17 +51,18 @@
   function view(){return items.map(({file,...i})=>({...i,retained:!!file}));}
   return {add,retry,dismiss,view,hasUnsaved:()=>items.some(i=>!!i.file)};
  }
- function renderBatch(host,items,currentJob){
+ function renderBatch(host,items,currentJob,candidates=[]){
   if(!host)return;host.hidden=!items.length;if(host.hidden)return;
   const active=items.filter(i=>['waiting','reading','saving'].includes(i.state)),errors=items.filter(i=>i.state==='error'),saved=items.filter(i=>i.state==='saved');
   const summary=active.length?`${saved.length} of ${items.length} files saved · ${active.length} uploading`:errors.length?`${errors.length} upload${errors.length===1?'':'s'} need attention`:`${saved.length} file${saved.length===1?'':'s'} saved`;
   const labels={waiting:'Waiting to upload',reading:'Reading resume…',saving:'Saving resume…',saved:'Resume saved',error:'Upload needs attention'};
-  const rows=items.map(i=>`<div class="rf-upload-row"><div><strong>${esc(i.fileName)}</strong><small>${i.jobId!==currentJob?esc(i.jobTitle)+' · ':''}${i.duplicate&&i.state==='saved'?'Already attached · no duplicate created':labels[i.state]}</small>${i.error?`<p class="rf-upload-error">${esc(i.error)}</p>`:''}</div><div class="rf-actions">${i.state==='error'?`<button type="button" class="rf-btn" data-batch-retry="${i.id}">Retry</button>`:''}${['waiting','error'].includes(i.state)?`<button type="button" class="rf-linkbtn" data-batch-dismiss="${i.id}">Remove from upload queue</button>`:''}</div></div>`).join('');
+  const byId=new Map(candidates.map(c=>[c.id,c]));
+  const rows=items.map(i=>{const candidate=byId.get(i.candidateId),ready=candidate&&phase(candidate)==='ready';return `<div class="rf-upload-row"><div><strong>${esc(i.fileName)}</strong><small>${i.jobId!==currentJob?esc(i.jobTitle)+' · ':''}${i.duplicate&&i.state==='saved'?'Already attached · no duplicate created':labels[i.state]}</small>${i.error?`<p class="rf-upload-error">${esc(i.error)}</p>`:''}</div><div class="rf-actions">${i.state==='saved'&&candidate?`<button type="button" class="rf-btn" data-batch-open="${esc(candidate.id)}">${ready?'View screening brief':'View candidate'}</button>`:''}${i.state==='error'?`<button type="button" class="rf-btn" data-batch-retry="${i.id}">Retry</button>`:''}${['waiting','error'].includes(i.state)?`<button type="button" class="rf-linkbtn" data-batch-dismiss="${i.id}">Remove from upload queue</button>`:''}</div></div>`}).join('');
   const html=`<summary><strong>Resume uploads</strong><span role="status">${summary}</span></summary><div class="rf-batch-body"><p class="rf-sub">${active.length||errors.length?'Keep this tab open until each file is saved. Removing a file from this queue keeps any candidate already created.':'Your resumes are saved. You can close this tab while assessments finish.'}</p>${rows}</div>`;
   if(host.dataset.markup!==html){
    const focused=host.contains(global.document?.activeElement)?{...global.document.activeElement.dataset}:null;
    host.innerHTML=html;host.dataset.markup=html;
-   if(focused)for(const key of ['batchRetry','batchDismiss'])if(focused[key]){
+   if(focused)for(const key of ['batchOpen','batchRetry','batchDismiss'])if(focused[key]){
     const button=[...host.querySelectorAll('button')].find(b=>b.dataset[key]===focused[key]);
     (button||host.querySelector('summary'))?.focus({preventScroll:true});break;
    }

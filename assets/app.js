@@ -508,7 +508,7 @@
         upload:(file,options)=>intake.upload(file,options),release:id=>intake.releaseFile(id),toast:showToast,changed:renderRecruiterQueue});
       function renderRecruiterQueue(){
         renderSearchFlow();
-        window.AncalagonRecruiter.renderBatch(root.querySelector('#resumeBatch'),batch.view(),activeJobId);
+        window.AncalagonRecruiter.renderBatch(root.querySelector('#resumeBatch'),batch.view(),activeJobId,candidates);
         const host=root.querySelector('#resumeIntakeStatus'),q=window.AncalagonRecruiter.queue(candidates,activeJob(),c=>jobReview.canReview(c)||candidateAutomation.canReview(c));
         host.hidden=!q.ready.length&&!q.working.length&&!q.attention.length;
         const action=q.ready[0]||q.attention[0];
@@ -517,7 +517,8 @@
       }
       root.querySelector('#resumeIntakeStatus').addEventListener('click',event=>{const b=event.target.closest('[data-queue-open]');if(b)openDetail(b.dataset.queueOpen);});
       root.querySelector('#resumeBatch').addEventListener('click',event=>{
-        const retry=event.target.closest('[data-batch-retry]'),dismiss=event.target.closest('[data-batch-dismiss]');
+        const open=event.target.closest('[data-batch-open]'),retry=event.target.closest('[data-batch-retry]'),dismiss=event.target.closest('[data-batch-dismiss]');
+        if(open){const candidate=candidateForRef(open.dataset.batchOpen);if(candidate)homeOpen(candidate.jobId,candidate.id,'detail');return;}
         if(retry)batch.retry(retry.dataset.batchRetry);if(dismiss)batch.dismiss(dismiss.dataset.batchDismiss);
       });
       root.querySelector('#resumeUpload').addEventListener('change',event=>{const files=Array.from(event.target.files||[]);event.target.value='';if(files.length)batch.add(files);});
