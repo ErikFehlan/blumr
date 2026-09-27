@@ -1,7 +1,7 @@
 name: Bounded production load canary
 on:
   push:
-    branches: [main]
+    branches: [main, test/load-canary]
     paths:
       - scripts/production-load-canary.mjs
       - .github/workflows/production-load-canary.yml
