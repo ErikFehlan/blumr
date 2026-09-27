@@ -32,7 +32,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: node scripts/production-load-canary.mjs create
-      - name: Run staged 5, 25 and 50 user traffic
+      - name: Run staged 5, 25 and 50 active user traffic
         if: steps.setup.outcome == 'success'
         timeout-minutes: 7
         run: node scripts/production-load-canary.mjs run
