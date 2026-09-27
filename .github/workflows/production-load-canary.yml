@@ -1,0 +1,52 @@
+name: Bounded production load canary
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/production-load-canary.mjs
+      - .github/workflows/production-load-canary.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: production-load-canary
+  cancel-in-progress: false
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 25
+    env:
+      CANARY_STATE_FILE: /tmp/blumr-load-${{ github.run_id }}-${{ github.run_attempt }}.json
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Create 50 isolated synthetic users
+        id: setup
+        timeout-minutes: 10
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/production-load-canary.mjs create
+      - name: Run staged 5, 25 and 50 user traffic
+        if: steps.setup.outcome == 'success'
+        timeout-minutes: 7
+        run: node scripts/production-load-canary.mjs run
+      - name: Remove synthetic users and verify cleanup
+        if: always()
+        timeout-minutes: 7
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/production-load-canary.mjs cleanup
+      - name: Save aggregate metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-load-canary-metrics
+          path: test-results/load/results.json
+          retention-days: 7
+          if-no-files-found: ignore
