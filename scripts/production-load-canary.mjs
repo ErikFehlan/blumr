@@ -51,7 +51,15 @@ if(operation==='create'){
   const created=await call('/auth/v1/admin/users',service,'POST',{email:user.email,password:user.password,email_confirm:true,user_metadata:{display_name:'Synthetic load canary',blumr_load_run:state.run}});
   assert.equal(created.status,200,'Synthetic account setup failed');
   user.id=created.data.id;assert.match(user.id,/^[0-9a-f-]{36}$/);await save();
-  const logged=await call('/auth/v1/token?grant_type=password',anon,'POST',{email:user.email,password:user.password});
+  // The CI runner shares one IP for all fixtures. Stay under Auth's default
+  // token refill rate; retry only the explicit 429 within this setup budget.
+  await new Promise(resolve=>setTimeout(resolve,2300));
+  let logged;
+  for(let attempt=0;attempt<5;attempt++){
+   logged=await call('/auth/v1/token?grant_type=password',anon,'POST',{email:user.email,password:user.password});
+   if(logged.status!==429)break;
+   await new Promise(resolve=>setTimeout(resolve,15000));
+  }
   assert.equal(logged.status,200,'Synthetic login failed');user.access=logged.data.access_token;mask(user.access);
   const member=await call('/rest/v1/workspace_members?select=workspace_id&user_id=eq.'+user.id,user.access);
   assert.equal(member.status,200);assert.equal(member.data.length,1);user.workspace=member.data[0].workspace_id;await save();
