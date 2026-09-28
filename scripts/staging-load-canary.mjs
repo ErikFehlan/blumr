@@ -103,10 +103,31 @@ if(operation==='create'){
   assert.equal(cross.status,200);assert.deepEqual(cross.data,[],'Cross-workspace leak: stop immediately');
   const metric={users:count,requests:reads.length,failed_users:failures.length,p50_ms:reads.length?percentile(reads.map(r=>r.ms),.5):null,p95_ms:reads.length?percentile(reads.map(r=>r.ms),.95):null,p99_ms:reads.length?percentile(reads.map(r=>r.ms),.99):null,elapsed_ms:Math.round(performance.now()-started)};
   measurements.push(metric);console.log('STAGING_METRIC '+JSON.stringify(metric));
-  if(failures.length){console.error('Stage failed: '+failures.map(x=>x.failure).slice(0,3).join('; '));break;}
+ if(failures.length){console.error('Stage failed: '+failures.map(x=>x.failure).slice(0,3).join('; '));break;}
+ }
+ if(measurements.at(-1)?.users===50&&measurements.every(m=>m.failed_users===0)){
+  const soakStarted=performance.now(),soakRequests=[],rounds=36;
+  for(let round=0;round<rounds;round++){
+   const batch=await Promise.all(state.users.map((u,i)=>call(
+    ['/rest/v1/jobs?select=id&limit=5','/rest/v1/candidates?select=id&limit=5','/rest/v1/manager_feedback?select=id&limit=5'][(round+i)%3],u.access)));
+   soakRequests.push(...batch);
+   if(batch.some(r=>r.status!==200))break;
+   if(round%6===0){
+    const cross=await call(`/rest/v1/jobs?select=id&workspace_id=eq.${state.users[0].workspace}`,state.users[49].access);
+    assert.equal(cross.status,200);assert.deepEqual(cross.data,[],'Cross-workspace leak during soak');
+   }
+   if(round<rounds-1)await new Promise(resolve=>setTimeout(resolve,5000));
+  }
+  const failed=soakRequests.filter(r=>r.status!==200);
+  const soak={users:50,rounds_completed:soakRequests.length/50,requests:soakRequests.length,failures:failed.length,
+   failure_statuses:[...new Set(failed.map(r=>r.status))],p50_ms:percentile(soakRequests.map(r=>r.ms),.5),
+   p95_ms:percentile(soakRequests.map(r=>r.ms),.95),p99_ms:percentile(soakRequests.map(r=>r.ms),.99),
+   elapsed_ms:Math.round(performance.now()-soakStarted)};
+  measurements.push(soak);console.log('STAGING_SOAK_METRIC '+JSON.stringify(soak));
+  if(failed.length||soak.rounds_completed!==rounds)process.exitCode=1;
  }
  await mkdir('test-results/load',{recursive:true});await writeFile('test-results/load/staging-results.json',JSON.stringify({date:new Date().toISOString(),scope:'staging synthetic core persistence and storage; no AI calls',measurements},null,2));
- if(measurements.at(-1)?.users!==50||measurements.some(m=>m.failed_users))process.exitCode=1;
+ if(!measurements.some(m=>m.users===50&&m.requests===350)||measurements.some(m=>m.failed_users))process.exitCode=1;
 }else{
  let failed=0;
  for(const [index,u] of state.users.entries()){
