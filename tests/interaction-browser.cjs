@@ -69,11 +69,11 @@ async function open(t, options = {}) {
         updateUser: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); window.auditPasswordUpdates = (window.auditPasswordUpdates || 0) + 1; return { error: null }; },
         signOut: async () => { if (window.auditAuthThrows) throw Error('Synthetic connection failure'); return { error: null }; }
       },
-      from: () => ({ select: () => ({ limit: () => ({ maybeSingle: async () => {
+      from: () => ({ select: () => ({ order: async () => {
         if (options.holdMembership) await new Promise(resolve => { (window.auditReleaseMembership ||= []).push(resolve); });
         if (options.failMembership) return { data: null, error: { message: 'Synthetic workspace access failure' } };
-        return { data: { workspace_id: 'synthetic-workspace', role: 'owner', workspaces: { name: 'Synthetic workspace' } }, error: null };
-      } }) }) })
+        return { data: [{ workspace_id: 'synthetic-workspace', role: 'owner', workspaces: { name: 'Synthetic workspace' }, created_at: '2026-09-01' }], error: null };
+      } }) })
     }) };
     window.AncalagonData = { create: () => ({
       load: async () => { window.auditLoads++; if (options.holdLoad) await new Promise(resolve => { window.auditReleaseLoad = resolve; }); if (window.auditFailLoad) throw Error('Synthetic workspace failure'); return copy(state); },
