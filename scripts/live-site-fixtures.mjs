@@ -74,6 +74,10 @@ if(mode==='create'){
      const rows=await management("select name from storage.objects where bucket_id='resumes' and name like $1",[workspace.id+'/%']);
      const paths=rows.map(r=>r.name);assertStoragePaths(workspace.id,paths);
      if(paths.length)await request('/storage/v1/object/resumes',service,'DELETE',{prefixes:paths});
+     // Remove fixture-owned records before asking GoTrue to remove the user.
+     // A populated workspace has caused the Auth admin deletion to return 500.
+     await request('/rest/v1/workspaces?id=eq.'+workspace.id,service,'DELETE');
+     assert.equal((await request('/rest/v1/workspaces?select=id&id=eq.'+workspace.id)).length,0,'Fixture workspace still exists');
     }
     try{await request('/auth/v1/admin/users/'+user.id,service,'DELETE');}
     catch(error){
