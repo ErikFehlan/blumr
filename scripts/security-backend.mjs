@@ -9,6 +9,16 @@ async function api(path,method='GET',body){
 const mode=process.argv[2]||'prepare';
 if(mode==='prepare'){
  await api('/database/query','POST',{query:await readFile('supabase/migrations/20260917200000_beta_security.sql','utf8')});
+ // The security baseline predates paid pilots and replaces reserve_ai_budget.
+ // Restore the Phase 3 version after every baseline refresh when it is installed.
+ const [{phase3_installed:phase3Installed}]=await api('/database/query','POST',{query:"select to_regclass('public.workspace_plans') is not null as phase3_installed"});
+ if(phase3Installed){
+  const phase3=await readFile('supabase/migrations/20260928130000_phase3_team_plans.sql','utf8');
+  const begin=phase3.indexOf('create or replace function public.reserve_ai_budget(');
+  const end=phase3.indexOf('\ncommit;',begin);
+  if(begin<0||end<0)throw Error('Phase 3 budget function is missing from its migration.');
+  await api('/database/query','POST',{query:phase3.slice(begin,end)});
+ }
  // Never overwrite unrelated Auth settings or provider secrets.
  await api('/config/auth','PATCH',{
   mailer_autoconfirm:false,mailer_allow_unverified_email_sign_ins:false,
