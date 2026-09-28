@@ -23,9 +23,6 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Capture fictional workflow with no provider calls
         run: node scripts/record-campaign-demo.cjs test-results/campaign-demo
-      - name: Export MP4
-        if: success()
-        run: ffmpeg -y -i test-results/campaign-demo/raw.webm -c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p -movflags +faststart -an test-results/campaign-demo/blumr-fictional-ui-demo.mp4
       - name: Save recording
         if: always()
         uses: actions/upload-artifact@v4
