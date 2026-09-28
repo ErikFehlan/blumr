@@ -14,8 +14,8 @@ export async function reserveModelCall(workspace: string, actor: string | null, 
     if (!response.ok) throw new SecurityLimit('usage_check_unavailable', 503);
     const result = await response.json();
     if (result?.allowed !== true) {
-      const code = ['usage_limit','ai_paused','beta_access_required','input_too_large'].includes(result?.code) ? result.code : 'usage_check_unavailable';
-      throw new SecurityLimit(code, code==='beta_access_required'?403:code==='input_too_large'?413:code==='usage_check_unavailable'?503:429, result?.retry_after||60);
+      const code = ['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large'].includes(result?.code) ? result.code : 'usage_check_unavailable';
+      throw new SecurityLimit(code, code==='beta_access_required'||code==='plan_inactive'?403:code==='input_too_large'?413:code==='usage_check_unavailable'?503:429, result?.retry_after||60);
     }
   } catch (error) {
     if (error instanceof SecurityLimit) throw error;
@@ -25,10 +25,29 @@ export async function reserveModelCall(workspace: string, actor: string | null, 
 
 export function securityMessage(code: string) {
   return code==='beta_access_required' ? 'This account does not have approved beta access.'
+    : code==='plan_inactive' ? 'AI processing is unavailable for this team. Contact the team owner.'
     : code==='ai_paused' ? 'AI processing is temporarily paused by the administrator. Your saved work is unchanged.'
     : code==='usage_limit' ? 'The beta AI usage limit has been reached. Try later or contact the administrator. Your saved work is unchanged.'
     : code==='input_too_large' ? 'This request is too large to process.'
     : 'Usage limits could not be checked. Please try again shortly.';
+}
+
+// Save only provider usage metadata. Reservations remain the authoritative
+// limit even if this best-effort telemetry write fails.
+export async function recordProviderUsage(workspace: string, operation: string, response: any) {
+  const usage=response?.usage, id=response?.id, model=response?.model;
+  if(!workspace||typeof id!=='string'||typeof model!=='string'||!Number.isSafeInteger(usage?.input_tokens)||!Number.isSafeInteger(usage?.output_tokens))return;
+  const base=Deno.env.get('SUPABASE_URL'),key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if(!base||!key)return;
+  const cached=Math.max(0,Math.min(usage.input_tokens,Number(usage.input_tokens_details?.cached_tokens)||0));
+  try {
+    const saved=await fetch(base+'/rest/v1/ai_provider_usage?on_conflict=response_id',{
+      method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json',Prefer:'resolution=ignore-duplicates,return=minimal'},
+      body:JSON.stringify({response_id:id,workspace_id:workspace,operation,model,input_tokens:usage.input_tokens,cached_input_tokens:cached,output_tokens:usage.output_tokens}),
+      signal:AbortSignal.timeout(5000)
+    });
+    if(!saved.ok)console.error('Provider usage metadata could not be recorded',saved.status);
+  }catch{console.error('Provider usage metadata could not be recorded');}
 }
 
 // Stream rather than buffering an unlimited request body before validation.

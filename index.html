@@ -410,6 +410,19 @@
 </section>
       <section class="rf-page" id="page-backend">
         <div class="rf-sectiontitle"><div><h2>Settings</h2><p>Make blumr work the way you do.</p></div></div>
+        <section class="rf-card settings-team" aria-labelledby="teamSettingsHeading">
+          <div class="rf-cardhead"><h3 id="teamSettingsHeading">Team &amp; plan</h3><button type="button" class="rf-btn" id="teamRefresh">Refresh</button></div>
+          <p id="teamStatus" role="status">Loading team…</p>
+          <div id="teamDetails" hidden>
+            <label for="teamWorkspaceSelect">Current workspace</label><select id="teamWorkspaceSelect"></select>
+            <p id="teamPlan"></p>
+            <div id="teamManagement" hidden>
+              <form id="teamRenameForm" class="rf-form"><label for="teamName">Team name</label><div class="rf-actions"><input id="teamName" maxlength="120" required><button class="rf-btn" type="submit">Save name</button></div></form>
+              <form id="teamAddForm" class="rf-form"><label for="teamEmail">Add a teammate with an approved blumr account</label><div class="rf-actions"><input id="teamEmail" type="email" autocomplete="off" maxlength="254" required placeholder="recruiter@company.com"><select id="teamRole" aria-label="Team role"><option value="member">Recruiter</option><option value="admin">Team admin</option></select><button class="rf-btn primary" type="submit">Add teammate</button></div></form>
+            </div>
+            <ul id="teamMembers" class="settings-list"></ul>
+          </div>
+        </section>
         <form id="personalSettingsForm" class="rf-form settings-personal">
           <fieldset disabled>
             <section class="rf-card" aria-labelledby="profileSettingsHeading"><h3 id="profileSettingsHeading">Profile</h3><p class="rf-sub">Your details and preferences follow your account across devices.</p>
@@ -541,7 +554,7 @@
   <div class="rf-modalbackdrop" id="screeningModal" role="dialog" aria-modal="true" aria-labelledby="screeningTitle"><div class="rf-modal rf-screen-modal"><form class="rf-form" id="screeningForm"><div><div class="rf-kicker">Screening insight</div><h3 id="screeningTitle">Add screening evidence</h3><p>Capture only what changes the assessment. blumr will compare this evidence with the job, manager priorities, and current evaluation.</p></div><div class="rf-screen-context"><div>Current JD Fit<strong id="screenCurrentJD">—</strong></div><div>Current Manager Fit<strong id="screenCurrentManager">—</strong></div></div><div class="rf-formrow"><div><label for="screenAbility">Can they do the job?</label><select id="screenAbility" required><option value="">Select an assessment</option><option value="Yes">Yes — evidence supports it</option><option value="Maybe">Maybe — important gaps remain</option><option value="No">No — evidence shows a mismatch</option></select></div><div><label for="screenCulture">Culture / working-style fit</label><select id="screenCulture" required><option value="">Select an assessment</option><option value="Strong">Strong alignment</option><option value="Mixed">Mixed / uncertain</option><option value="Weak">Weak alignment</option></select></div></div><div><label for="screenNotes">What did you learn?</label><textarea id="screenNotes" required maxlength="4000" placeholder="Add concise, job-related evidence from the conversation—skills depth, ownership, communication, motivation, or working style."></textarea><div class="rf-sub" style="margin-top:5px">Do not include protected personal information. Notes are used as evidence, not as an automatic hiring decision.</div></div><div class="rf-actions" style="justify-content:flex-end"><button class="rf-btn" id="screenCancel" type="button">Cancel</button><button class="rf-btn primary" id="screenSubmit" type="submit">✦ Reassess & Mark Screened</button></div></form></div></div>
   <script src="assets/workspace-loader.js?v=20260924-priorities"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0" integrity="sha384-JBR+x8blGwjDRO63aHCGiZMD4VNiTR4ZUGA+N6ZKLf3zNt1fK8IBpcgPaMrxqWBp" crossorigin="anonymous"></script>
-  <script src="assets/auth.js?v=20260922-smooth-login"></script>
+  <script src="assets/auth.js?v=20260928-team-plans"></script>
 </div>
 </body>
 </html>
