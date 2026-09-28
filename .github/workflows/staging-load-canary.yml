@@ -1,0 +1,50 @@
+name: Synthetic staging load canary
+on:
+  push:
+    branches: [staging/core-load-canary]
+    paths:
+      - scripts/staging-load-canary.mjs
+      - .github/workflows/staging-load-canary.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: staging-load-canary
+  cancel-in-progress: false
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 30
+    env:
+      CANARY_STATE_FILE: /tmp/blumr-staging-load-${{ github.run_id }}-${{ github.run_attempt }}.json
+      SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Create 50 isolated synthetic staging users
+        timeout-minutes: 14
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/staging-load-canary.mjs create
+      - name: Run staged 5, 25 and 50 user workflow
+        timeout-minutes: 8
+        run: node scripts/staging-load-canary.mjs run
+      - name: Remove synthetic data and users
+        if: always()
+        timeout-minutes: 8
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/staging-load-canary.mjs cleanup
+      - name: Save aggregate metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-load-metrics
+          path: test-results/load/staging-results.json
+          retention-days: 7
+          if-no-files-found: ignore
