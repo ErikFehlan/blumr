@@ -30,6 +30,7 @@ This is an evidence log, not a claim that blumr or a Kickstarter campaign is rea
 ## 5. Campaign demo
 
 - There is already a 90-second **illustrative** product walkthrough at `how-it-works.html` (`assets/blumr-demo-90s.mp4`). It uses fictional profiles and labels itself illustrative. It is not evidence of a recorded live workflow; use it as a visual explainer only.
+- September 28: a 49-second **real frontend capture with a simulated backend** was recorded from the current branch with fictional data. It shows job creation, five priorities, resume evidence, an unsupported concern and a saved reviewer decision. The recording labels the simulated AI result, and its capture log confirms zero provider calls. It is a review copy, not a live production end-to-end recording or proof of actual model output. The browser capture is reproducible via `scripts/record-campaign-demo.cjs` and `.github/workflows/campaign-demo.yml`.
 - Film a synthetic 90-second flow: create a job; inspect its five priorities; upload a synthetic resume; review strengths, concerns and exact source evidence; correct or mark unsupported; show the saved recruiter decision. Verify those steps against the deployed version and record the commit/date used.
 - Reuse `tests/fixtures` and the passing live browser journey as a baseline. The actual campaign video, captioning, founder footage and final feature-status labels remain to be produced. No real client or candidate information belongs in campaign footage.
 
