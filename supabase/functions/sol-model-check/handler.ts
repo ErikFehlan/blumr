@@ -1,5 +1,5 @@
 import {handleAnalysis} from '../analyze-patterns-v2/analysis.ts';
-import {reserveModelCall} from '../_shared/security.ts';
+import {reserveModelCall,recordProviderUsage} from '../_shared/security.ts';
 import {assessmentModelDefault} from '../_shared/model-routing.mjs';
 
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
@@ -25,7 +25,7 @@ export async function handleSolCheck(request:Request){
  const model=body.model==='sol'?assessmentModelDefault:'gpt-4.1-mini-2025-04-14';
  const started=performance.now();
  const result=await handleAnalysis(new Request('https://synthetic.invalid/analysis',{method:'POST',body:JSON.stringify(fixture)}),{
-  modelOverride:model,beforeModel:(bytes,tokens)=>reserveModelCall(body.workspace_id,null,bytes,tokens),
+  modelOverride:model,beforeModel:(bytes,tokens)=>reserveModelCall(body.workspace_id,null,bytes,tokens),onUsage:usage=>recordProviderUsage(body.workspace_id,'synthetic_check',usage),
  });
  return json({case:body.case,requested_model:model,duration_ms:Math.round(performance.now()-started),result:await result.json()},result.status);
 }

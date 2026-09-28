@@ -32,6 +32,8 @@
         saveSettings:settings=>{hybridState.settings=settings;},
         onDenied:()=>{setAdminAccess(false);showToast('Admin access is required.','error');},
         securityLoad:()=>dataService.loadBetaSecurity(),securityAccess:(email,approved)=>dataService.manageBetaAccess(email,approved),securityPause:paused=>dataService.pauseAI(paused),
+        planLoad:()=>dataService.loadTeamPlans(),planSave:(id,plan,status,allowance,ends)=>dataService.setTeamPlan(id,plan,status,allowance,ends),
+        ratesLoad:()=>dataService.loadModelRates(),ratesSave:(model,input,cached,output)=>dataService.saveModelRate(model,input,cached,output),
         toast:showToast,saveFile:downloadBlob,supportLoad:()=>dataService.loadSupportRequests(true),supportReview:(id,status)=>dataService.reviewSupportRequest(id,status)
       });
       const candidateFilters=new Map();let candidateListJob=null,lastJobOptions=null;let jobListFilter='active';

@@ -119,7 +119,7 @@ const screeningSchema = {
   },
 };
 
-export async function handleAnalysis(request: Request, options: {feedbackModel?:string,modelOverride?:string,beforeModel?:(bytes:number,tokens:number)=>Promise<void>} = {}) {
+export async function handleAnalysis(request: Request, options: {feedbackModel?:string,modelOverride?:string,beforeModel?:(bytes:number,tokens:number)=>Promise<void>,onUsage?:(response:unknown)=>Promise<void>} = {}) {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -248,6 +248,7 @@ ANALYSIS RULES
     });
 
     const result = await response.json();
+    await options.onUsage?.(result);
     if (!response.ok) {
       console.error("OpenAI response error", result?.error?.type, result?.error?.code);
       if (['project_spend_limit_exceeded','organization_spend_limit_exceeded','credit_balance_exhausted'].includes(result?.error?.code))

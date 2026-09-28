@@ -1,4 +1,4 @@
-import {boundedJSON, reserveModelCall, SecurityLimit, securityMessage} from '../_shared/security.ts';
+import {boundedJSON, reserveModelCall, recordProviderUsage, SecurityLimit, securityMessage} from '../_shared/security.ts';
 import { handleAnalysis } from "../analyze-patterns-v2/analysis.ts";
 
 const corsHeaders = {
@@ -113,9 +113,10 @@ export async function handleAuthenticatedAnalysis(request: Request) {
     await reserveModelCall(workspaceId,user.id,bytes,tokens);
     if(!admitted){admitted=true;started=recordUsage('started');}
   };
-  let response = await handleAnalysis(analysisRequest(), {feedbackModel,beforeModel});
+  const onUsage=(result:unknown)=>recordProviderUsage(workspaceId,operation,result);
+  let response = await handleAnalysis(analysisRequest(), {feedbackModel,beforeModel,onUsage});
   const failure=response.ok?null:await response.clone().json().catch(()=>null);
-  if (feedbackModel && !response.ok && !['usage_limit','ai_paused','beta_access_required','input_too_large','usage_check_unavailable'].includes(failure?.code)) response = await handleAnalysis(analysisRequest(), {beforeModel});
+  if (feedbackModel && !response.ok && !['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large','usage_check_unavailable'].includes(failure?.code)) response = await handleAnalysis(analysisRequest(), {beforeModel,onUsage});
 
   const telemetry = admitted ? started.then(() => recordUsage(response.ok ? "succeeded" : "failed")) : Promise.resolve();
   const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;

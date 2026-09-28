@@ -94,23 +94,25 @@
     }
   });
 
-  async function workspaceForUser(client) {
+  async function workspaceForUser(client, userId) {
     const { data, error } = await client
       .from('workspace_members')
       .select('workspace_id, role, workspaces(name)')
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: true });
 
     if (error) throw error;
-    if (!data) {const {data:deleting}=await client.rpc('get_account_deletion_status');throw new Error(deleting===true?'Account deletion is in progress. Your private workspaces are locked while cleanup finishes.':'This account does not have active beta access. Contact the administrator.');}
-    const relatedWorkspace = Array.isArray(data.workspaces)
-      ? data.workspaces[0]
-      : data.workspaces;
+    if (!data?.length) {const {data:deleting}=await client.rpc('get_account_deletion_status');throw new Error(deleting===true?'Account deletion is in progress. Your private workspaces are locked while cleanup finishes.':'This account does not have active beta access. Contact the administrator.');}
+    const preferred=localStorage.getItem('blumr:workspace:'+userId);
+    const selected=data.find(item=>item.workspace_id===preferred)||data[0];
+    const relatedWorkspace = Array.isArray(selected.workspaces)
+      ? selected.workspaces[0]
+      : selected.workspaces;
 
     return {
-      id: data.workspace_id,
-      role: data.role,
-      name: relatedWorkspace?.name || 'Private workspace'
+      id: selected.workspace_id,
+      role: selected.role,
+      name: relatedWorkspace?.name || 'Private workspace',
+      available: data.map(item=>({id:item.workspace_id,name:(Array.isArray(item.workspaces)?item.workspaces[0]:item.workspaces)?.name||'Private workspace'}))
     };
   }
 
@@ -132,7 +134,7 @@
 
     const generation = sessionGeneration;
     try {
-      const workspace = await workspaceForUser(client);
+      const workspace = await workspaceForUser(client, session.user.id);
       if (generation !== sessionGeneration) return;
       // getSession and the initial auth event can resolve the same session together.
       if (session.access_token === appliedAccessToken && window.ancalagonAuth?.workspace) return;
