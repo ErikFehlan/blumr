@@ -75,7 +75,17 @@ if(mode==='create'){
      const paths=rows.map(r=>r.name);assertStoragePaths(workspace.id,paths);
      if(paths.length)await request('/storage/v1/object/resumes',service,'DELETE',{prefixes:paths});
     }
-    await request('/auth/v1/admin/users/'+user.id,service,'DELETE');
+    try{await request('/auth/v1/admin/users/'+user.id,service,'DELETE');}
+    catch(error){
+     // The admin endpoint can fail after an otherwise valid fixture run. The
+     // identity and sole membership were verified above before this fallback.
+     const remaining=await management("select id from auth.users where id=$1 and email=$2 and raw_user_meta_data->>'blumr_live_run'=$3",[user.id,entry.email,state.run]);
+     if(remaining.length){
+      assert.equal(remaining.length,1);
+      await management("delete from auth.users where id=$1 and email=$2 and raw_user_meta_data->>'blumr_live_run'=$3",[user.id,entry.email,state.run]);
+      console.log('Removed verified temporary account through database after Auth admin deletion failed:',error.message);
+     }
+    }
     assert.equal((await management('select id from auth.users where id=$1',[user.id])).length,0,'Fixture user still exists');
     assert.equal((await request('/rest/v1/workspaces?select=id&owner_id=eq.'+user.id)).length,0,'Fixture workspace still exists');
    }
