@@ -113,7 +113,7 @@ export async function handleAuthenticatedAnalysis(request: Request) {
     await reserveModelCall(workspaceId,user.id,bytes,tokens);
     if(!admitted){admitted=true;started=recordUsage('started');}
   };
-  const onUsage=(result:unknown)=>recordProviderUsage(workspaceId,operation,result);
+  const onUsage=(result:unknown)=>recordProviderUsage(workspaceId,operation,result,user.id);
   let response = await handleAnalysis(analysisRequest(), {feedbackModel,beforeModel,onUsage});
   const failure=response.ok?null:await response.clone().json().catch(()=>null);
   if (feedbackModel && !response.ok && !['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large','usage_check_unavailable'].includes(failure?.code)) response = await handleAnalysis(analysisRequest(), {beforeModel,onUsage});

@@ -14,7 +14,7 @@ export async function processIntakes(tasks,{rpc,analyze}){
   return Promise.all(tasks.map(async task=>{
     try{
       const prepared=prepareIntake(task.input);
-      const response=await analyze(new Request('https://internal.invalid/resume-intake',{method:'POST',body:JSON.stringify(prepared.payload)}),task.workspace_id);
+      const response=await analyze(new Request('https://internal.invalid/resume-intake',{method:'POST',body:JSON.stringify(prepared.payload)}),task.workspace_id,task.usage_actor_id||null);
       if(!response.ok){
         const failure=await response.json().catch(()=>({}));
         const issue=['invalid_score','invalid_profile','invalid_concerns','invalid_questions','invalid_tags','invalid_evidence','unmatched_quote','unsupported_score','incomplete_output','invalid_json','invalid_assessment_details'].includes(failure?.validation_issue)?failure.validation_issue:null;

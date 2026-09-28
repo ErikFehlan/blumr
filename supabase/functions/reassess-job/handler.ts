@@ -29,7 +29,7 @@ export async function handleReassessment(request:Request){
     // A saved resume can start immediately. Its lease and revision protect
     // concurrent workers and later edits without delaying every upload.
     const intakeTasks=await rpc('claim_resume_intakes',{p_job:jobId});
-    intakeWork=processIntakes(intakeTasks,{rpc,analyze:(request:Request,workspace:string)=>handleAnalysis(request,{beforeModel:(bytes,tokens)=>reserveModelCall(workspace,null,bytes,tokens),onUsage:result=>recordProviderUsage(workspace,'resume_intake',result)})});
+    intakeWork=processIntakes(intakeTasks,{rpc,analyze:(request:Request,workspace:string,actor:string|null)=>handleAnalysis(request,{beforeModel:(bytes,tokens)=>reserveModelCall(workspace,null,bytes,tokens),onUsage:result=>recordProviderUsage(workspace,'resume_intake',result,actor)})});
     // Job edits still coalesce while resume analysis is already running.
     await new Promise(resolve=>setTimeout(resolve,3500));
     const tasks=await rpc('claim_job_reassessments',{p_job:jobId});
@@ -43,7 +43,7 @@ export async function handleReassessment(request:Request){
             input:JSON.stringify(prepared.payload),text:{format:{type:'json_schema',name:'job_reassessment',strict:true,schema:schema(prepared)}}})});
         if(!response.ok)throw Error(response.status===429?'ai_rate_limit':'ai_unavailable');
         const body=await response.json();
-        await recordProviderUsage(task.workspace_id,'job_reassessment',body);
+        await recordProviderUsage(task.workspace_id,'job_reassessment',body,task.usage_actor_id||null);
         if(body.status==='incomplete')throw Object.assign(new Error('invalid_result'),{validationIssue:'output_incomplete'});
         const text=body.output?.flatMap((o:any)=>o.content||[]).filter((c:any)=>c.type==='output_text').map((c:any)=>c.text).join('');
         let parsed;try{parsed=JSON.parse(text||'{}');}catch{throw Object.assign(new Error('invalid_result'),{validationIssue:'invalid_json'});}

@@ -85,19 +85,18 @@ if(operation==='create'){
    return {user:u,requests:a};
   }));
   const reads=results.flatMap(r=>r.requests),failures=reads.filter(r=>r.status!==200);
-  // A small real-model sample checks that AI works during the burst while
-  // bounding this whole canary to at most 15 billable model calls.
-  const ai=await Promise.all(users.slice(0,5).map(u=>call('/functions/v1/analyze-patterns-v2',u.access,'POST',{
+  // AI is opt-in. Kickstarter readiness tests ordinary concurrent usage only.
+  const ai=process.env.CANARY_AI==='1'?await Promise.all(users.slice(0,5).map(u=>call('/functions/v1/analyze-patterns-v2',u.access,'POST',{
    workspace_id:u.workspace,analysis_type:'screening',job:{title:'Synthetic load canary',description:'Evaluate manual testing experience.'},screening:{notes:'Synthetic candidate has manual regression testing experience; automation ownership is unverified.'}
-  },90000)));
+  },90000))):[];
   const aiFailures=ai.filter(r=>r.status!==200);
   const cross=await call('/rest/v1/workspaces?select=id&id=eq.'+state.users[0].workspace,state.users[count-1].access);
   assert.equal(cross.status,200);assert.deepEqual(cross.data,[],'Cross-workspace leak: stop immediately');
-  const metric={users:count,read_requests:reads.length,read_failures:failures.length,read_statuses:[...new Set(failures.map(r=>r.status))],read_p50_ms:percentile(reads.map(r=>r.ms),.5),read_p95_ms:percentile(reads.map(r=>r.ms),.95),read_p99_ms:percentile(reads.map(r=>r.ms),.99),ai_requests:ai.length,ai_failures:aiFailures.length,ai_statuses:[...new Set(aiFailures.map(r=>r.status))],ai_p95_ms:percentile(ai.map(r=>r.ms),.95),elapsed_ms:Math.round(performance.now()-started)};
+  const metric={users:count,read_requests:reads.length,read_failures:failures.length,read_statuses:[...new Set(failures.map(r=>r.status))],read_p50_ms:percentile(reads.map(r=>r.ms),.5),read_p95_ms:percentile(reads.map(r=>r.ms),.95),read_p99_ms:percentile(reads.map(r=>r.ms),.99),ai_requests:ai.length,ai_failures:aiFailures.length,ai_statuses:[...new Set(aiFailures.map(r=>r.status))],ai_p95_ms:ai.length?percentile(ai.map(r=>r.ms),.95):null,elapsed_ms:Math.round(performance.now()-started)};
   measurements.push(metric);console.log('CANARY_METRIC '+JSON.stringify(metric));
   if(failures.length||aiFailures.length)break;
  }
- await mkdir('test-results/load',{recursive:true});await writeFile('test-results/load/results.json',JSON.stringify({date:new Date().toISOString(),scope:'production synthetic read burst plus five AI checks per stage; no resume uploads',measurements},null,2));
+ await mkdir('test-results/load',{recursive:true});await writeFile('test-results/load/results.json',JSON.stringify({date:new Date().toISOString(),scope:process.env.CANARY_AI==='1'?'production synthetic read burst and opt-in AI checks':'production synthetic read burst; no AI calls or resume uploads',measurements},null,2));
  if(measurements.at(-1).users!==50||measurements.some(m=>m.read_failures||m.ai_failures))process.exitCode=1;
 }else{
  let failed=0;
@@ -112,6 +111,7 @@ if(operation==='create'){
      assert.ok(members.data.every(m=>m.user_id===found[0].id),'Unexpected member; refusing cleanup');
      const files=await management("select name from storage.objects where bucket_id='resumes' and name like $1",[w.id+'/%']);
      assert.equal(files.length,0,'Unexpected stored file; refusing cleanup');
+     const removed=await call('/rest/v1/workspaces?id=eq.'+w.id,service,'DELETE');assert.ok(removed.status>=200&&removed.status<300,'Fixture workspace cleanup failed');
     }
     const deleted=await call('/auth/v1/admin/users/'+found[0].id,service,'DELETE');assert.ok(deleted.status>=200&&deleted.status<300);
    }
