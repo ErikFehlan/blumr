@@ -1,6 +1,6 @@
 (function(global){
  'use strict';
- function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,planLoad,planSave,ratesLoad,ratesSave,costLoad}){
+ function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,reminderLoad,reminderSave,planLoad,planSave,ratesLoad,ratesSave,costLoad}){
   let allowed=false,version=0,loading=null;
   const files={downloadServer:'server',downloadSchema:'schema',downloadPrompt:'prompt',downloadPackage:'pkg',downloadEnv:'env'};
   function clear(){version++;loading=null;host.replaceChildren();}
@@ -22,6 +22,7 @@
      // This markup is a deployment-owned resource returned by an admin-checked RPC.
      host.innerHTML=payload.html;
      if(securityLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='betaSecurityPanel';host.prepend(panel);void loadSecurity(request);}
+     if(reminderLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='onboardingRemindersPanel';host.prepend(panel);void loadReminders(request);}
      if(planLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminPlansPanel';host.prepend(panel);void loadPlans(request);}
      if(ratesLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminRatesPanel';host.prepend(panel);void loadRates(request);}
      if(costLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminCostsPanel';host.prepend(panel);void loadCosts(request);}
@@ -34,6 +35,21 @@
     }finally{if(request===version)loading=null;}
    })();
    return loading;
+  }
+  async function loadReminders(request=version){
+   const panel=host.querySelector('#onboardingRemindersPanel');if(!panel)return;panel.textContent='Loading onboarding recipients…';
+   try{
+    const rows=await reminderLoad();if(!allowed||request!==version)return;panel.replaceChildren();
+    const title=document.createElement('h3');title.textContent='Weekly onboarding reminders';
+    const note=document.createElement('p');note.className='rf-sub';note.textContent='Select beta users to receive at most one relevant reminder per week. Sending is off until the worker is configured. Users can unsubscribe.';panel.append(title,note);
+    const status=document.createElement('p');status.setAttribute('role','status');
+    const list=document.createElement('ul');
+    for(const row of rows||[]){const item=document.createElement('li'),label=document.createElement('label'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=row.enabled;toggle.disabled=row.opted_out||!row.approved;
+     label.append(toggle,document.createTextNode(' '+row.email+' · '+(row.opted_out?'Unsubscribed':row.step==='done'?'Completed onboarding':row.step.replaceAll('_',' '))));item.append(label);list.append(item);
+     toggle.addEventListener('change',async()=>{toggle.disabled=true;try{await reminderSave(row.user_id,toggle.checked);status.textContent='Recipient selection saved.';}catch(error){toggle.checked=!toggle.checked;status.textContent=error.message||'Could not save selection.';}finally{toggle.disabled=row.opted_out||!row.approved;}});
+    }
+    panel.append(list,status);
+   }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='Onboarding recipients could not be loaded.';}
   }
   async function loadSecurity(request=version){
    const panel=host.querySelector('#betaSecurityPanel');if(!panel)return;

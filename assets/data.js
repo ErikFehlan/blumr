@@ -420,6 +420,9 @@
     }
 
     async function loadBetaSecurity() { const {data,error}=await client.rpc('get_beta_security');if(error)throw error;return data; }
+    async function loadReminderRecipients() { const {data,error}=await client.rpc('get_onboarding_reminders');if(error)throw error;return data; }
+    async function setReminderRecipient(userId,enabled) { const {error}=await client.rpc('set_onboarding_reminder_recipient',{p_user:userId,p_enabled:enabled});if(error)throw error; }
+    async function optOutOnboardingReminders() { const {error}=await client.rpc('opt_out_onboarding_reminders');if(error)throw error; }
     async function manageBetaAccess(email,approved) { const {error}=await client.rpc('manage_beta_access',{p_email:email,p_approved:approved});if(error)throw error; }
     async function pauseAI(paused) { const {error}=await client.rpc('set_ai_paused',{p_paused:paused});if(error)throw error; }
     async function isAppAdmin() {
@@ -512,7 +515,7 @@
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
+    return { loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };
