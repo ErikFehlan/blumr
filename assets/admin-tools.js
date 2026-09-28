@@ -1,6 +1,6 @@
 (function(global){
  'use strict';
- function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,planLoad,planSave,ratesLoad,ratesSave}){
+ function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,planLoad,planSave,ratesLoad,ratesSave,costLoad}){
   let allowed=false,version=0,loading=null;
   const files={downloadServer:'server',downloadSchema:'schema',downloadPrompt:'prompt',downloadPackage:'pkg',downloadEnv:'env'};
   function clear(){version++;loading=null;host.replaceChildren();}
@@ -24,6 +24,7 @@
      if(securityLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='betaSecurityPanel';host.prepend(panel);void loadSecurity(request);}
      if(planLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminPlansPanel';host.prepend(panel);void loadPlans(request);}
      if(ratesLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminRatesPanel';host.prepend(panel);void loadRates(request);}
+     if(costLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminCostsPanel';host.prepend(panel);void loadCosts(request);}
      if(supportLoad){const panel=document.createElement('section');panel.className='rf-card';panel.innerHTML='<h3>Support Inbox</h3><p class="rf-sub">Private problem reports submitted from Settings.</p><button type="button" class="rf-btn" data-support-refresh>Refresh reports</button><div id="adminSupportInbox" aria-live="polite"></div>';host.append(panel);void loadSupport(request);}
      const settings=getSettings();host.querySelector('#patternFunctionUrl').value=settings.url;host.querySelector('#patternAnonKey').value=settings.anonKey;
     }catch(error){
@@ -57,6 +58,19 @@
     pause.addEventListener('click',async()=>{pause.disabled=true;try{await securityPause(!snapshot.limits.ai_paused);if(allowed&&request===version)await loadSecurity(request);}catch(error){status.textContent=error.message||'Processing control could not be saved.';}finally{pause.disabled=false;}});panel.append(pause);
    }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='Security controls could not be loaded. Reopen Admin to retry.';}
   }
+  async function loadCosts(request=version){
+   const panel=host.querySelector('#adminCostsPanel');if(!panel)return;panel.textContent='Loading AI cost coverage…';
+   try{
+    const report=await costLoad();if(!allowed||request!==version)return;panel.replaceChildren();
+    const title=document.createElement('h3');title.textContent='AI cost coverage · last 30 days';panel.append(title);
+    const note=document.createElement('p');note.className='rf-sub';
+    note.textContent=`${report.provider_calls} provider responses recorded · ${report.unattributed_calls} without a recruiter · ${report.unpriced_calls} without a model rate. Priced responses total $${Number(report.estimated_usd_for_priced_calls).toFixed(2)}. This is a partial estimate when attribution or pricing is missing; it excludes unrecorded calls, infrastructure, and support.`;panel.append(note);
+    const list=document.createElement('ul');
+    for(const row of report.rows||[]){const item=document.createElement('li');
+     item.textContent=`${row.workspace} · ${row.email||'Unattributed'}: ${row.provider_calls} recorded responses, ${row.completed_operations} completed product operations, $${Number(row.estimated_usd_for_priced_calls).toFixed(2)} priced cost${row.unpriced_calls?' ('+row.unpriced_calls+' unpriced)':''}.`;list.append(item);}
+    panel.append(list);
+   }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='AI cost coverage could not be loaded. Reopen Admin to retry.';}
+  }
   async function loadRates(request=version){
    const panel=host.querySelector('#adminRatesPanel');if(!panel)return;panel.textContent='Loading model rates…';
    try{
@@ -72,7 +86,7 @@
     const input=field('Input USD / million tokens'),cached=field('Cached input USD / million tokens'),output=field('Output USD / million tokens');
     select.addEventListener('change',()=>{const selected=rates.find(rate=>rate.model===select.value);if(!selected)return;model.value=selected.model;input.value=selected.input??'';cached.value=selected.cached??'';output.value=selected.output??'';});
     const save=document.createElement('button');save.type='submit';save.className='rf-btn primary';save.textContent='Save model rate';const status=document.createElement('p');status.setAttribute('role','status');form.append(save,status);
-    form.addEventListener('submit',async event=>{event.preventDefault();save.disabled=true;status.textContent='Saving rate…';try{await ratesSave(model.value.trim(),Number(input.value),Number(cached.value),Number(output.value));if(allowed&&request===version)await loadRates(request);}catch(error){status.textContent=error.message||'Could not save model rate.';}finally{save.disabled=false;}});
+    form.addEventListener('submit',async event=>{event.preventDefault();save.disabled=true;status.textContent='Saving rate…';try{await ratesSave(model.value.trim(),Number(input.value),Number(cached.value),Number(output.value));if(allowed&&request===version){await loadRates(request);if(costLoad)await loadCosts(request);}}catch(error){status.textContent=error.message||'Could not save model rate.';}finally{save.disabled=false;}});
     panel.append(form);
    }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='Model rates could not be loaded. Reopen Admin to retry.';}
   }

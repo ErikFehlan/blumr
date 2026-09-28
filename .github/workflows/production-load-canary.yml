@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 25
     env:
       CANARY_STATE_FILE: /tmp/blumr-load-${{ github.run_id }}-${{ github.run_attempt }}.json
+      CANARY_AI: '0'
       SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v4
