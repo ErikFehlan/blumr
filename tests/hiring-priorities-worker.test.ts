@@ -2,7 +2,30 @@ import {handleCriteria} from '../supabase/functions/refine-job-criteria/handler.
 import {handleAnalysis} from '../supabase/functions/analyze-patterns-v2/analysis.ts';
 const assert=(v:unknown,message:string)=>{if(!v)throw Error(message);};
 const json=(v:unknown)=>new Response(JSON.stringify(v));
-Deno.test('JD-only jobs generate grounded priorities through the private durable worker',async()=>{
+
+Deno.test('structured job intake finishes with code and no model request',async()=>{
+ const names=['CRITERIA_WORKER_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY'],prior=names.map(n=>Deno.env.get(n)),original=globalThis.fetch;
+ const description='Requires 5 years of .NET development experience. Azure experience is preferred. Design and build APIs for enterprise systems.';
+ let aiCalls=0,finished:any;
+ try{
+  ['worker','https://backend.invalid','service','ai'].forEach((v,i)=>Deno.env.set(names[i],v));
+  globalThis.fetch=async(url,init)=>{
+   const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
+   if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'Senior .NET Engineer',description,criteria:['requires 5 years of .NET'],manager_notes:'',knockouts:[]}}]);
+   if(path==='/v1/responses'){aiCalls++;throw Error('Model should not be called for structured intake');}
+   if(path.endsWith('/finish_job_criteria')){finished=body;return json(true);}
+   throw Error('Unexpected request: '+path);
+  };
+  const request=new Request('https://worker.invalid',{method:'POST',headers:{'x-worker-secret':'worker'},body:'{}'});
+  const response=await handleCriteria(request);
+  assert(response.ok&&aiCalls===0,'structured intake used AI');
+  assert(finished.p_result.engine==='code_first','code-first provenance missing');
+  assert(finished.p_result.criteria[0].label==='5 years of C#/.NET development experience','personalized criteria wording changed');
+  assert(finished.p_result.hiring_priorities.some((p:any)=>p.title==='5 years of C#/.NET development experience'),'structured priority missing');
+ }finally{globalThis.fetch=original;names.forEach((n,i)=>prior[i]===undefined?Deno.env.delete(n):Deno.env.set(n,prior[i]!));}
+});
+
+Deno.test('ambiguous JD-only jobs fall back to grounded AI priorities through the private durable worker',async()=>{
  const names=['CRITERIA_WORKER_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY'],prior=names.map(n=>Deno.env.get(n)),original=globalThis.fetch;
  const description='Own manual regression testing. Automation experience is preferred.';
  let calls=0,finished:any,forged=false;
@@ -13,9 +36,10 @@ Deno.test('JD-only jobs generate grounded priorities through the private durable
    if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'QA',description,criteria:[],manager_notes:'',knockouts:[]}}]);
    if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
    if(path==='/v1/responses'){
-    const input=JSON.parse(body.input);assert(input.criteria.length===0&&input.job_description_sources.length>0,'JD-only work skipped');
+    const input=JSON.parse(body.input);assert(input.job_description_sources.length>0,'JD-only work skipped');
+    assert(!Object.hasOwn(input,'criteria'),'criteria should already be handled by code');
     assert(body.text.format.schema.properties.hiring_priorities.maxItems===5,'unbounded priorities');
-    return json({output:[{content:[{type:'output_text',text:JSON.stringify({criteria:[],hiring_priorities:[{title:'Manual regression ownership',reason:'This work is central to the role.',requirement_type:'inferred',question:'What testing did you personally own?',source_id:forged?'fake':input.job_description_sources[0].id}]})}]}]});
+    return json({output:[{content:[{type:'output_text',text:JSON.stringify({hiring_priorities:[{title:'Manual regression ownership',reason:'This work is central to the role.',requirement_type:'inferred',question:'What testing did you personally own?',source_id:forged?'fake':input.job_description_sources[0].id}]})}]}]});
    }
    if(path.endsWith('/finish_job_criteria')){finished=body;return json(true);}
    throw Error('Unexpected request');
@@ -23,11 +47,13 @@ Deno.test('JD-only jobs generate grounded priorities through the private durable
   assert((await handleCriteria(new Request('https://worker.invalid',{method:'POST',body:'{}'}))).status===401&&calls===0,'public generation allowed');
   const request=()=>new Request('https://worker.invalid',{method:'POST',headers:{'x-worker-secret':'worker'},body:'{}'});
   assert((await handleCriteria(request())).ok&&finished.p_error===null,'generation failed');
+  assert(finished.p_result.engine==='hybrid_fallback','fallback provenance missing');
   assert(finished.p_lease==='l'&&finished.p_revision==='r','revision protection lost');
   assert(description.includes(finished.p_result.hiring_priorities[0].source_quote),'source quotation changed');
   forged=true;await handleCriteria(request());assert(finished.p_error==='invalid_priorities'&&finished.p_result===null,'invented source saved');
  }finally{globalThis.fetch=original;names.forEach((n,i)=>prior[i]===undefined?Deno.env.delete(n):Deno.env.set(n,prior[i]!));}
 });
+
 Deno.test('intake evaluates saved priorities with candidate sources and returns their review basis',async()=>{
  const original=globalThis.fetch,prior=Deno.env.get('OPENAI_API_KEY');
  const priorities={basis:'job_description',review_status:'suggested',items:[{id:'priority-1',title:'Manual regression ownership',reason:'Core responsibility.',question:'What work did you own?',requirement_type:'inferred',source_quote:'Own manual regression testing.'}]};
