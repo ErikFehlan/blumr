@@ -26,7 +26,7 @@ Deno.test('learning models are workspace scoped, feedback only, server selected,
   assert((await handleAuthenticatedAnalysis(request())).ok&&models.at(-1)===model,'approved model not used');
   assert((await handleAuthenticatedAnalysis(request('b'))).ok&&models.at(-1)===base,'model crossed workspace');
   lookupFail=true;assert((await handleAuthenticatedAnalysis(request())).ok&&models.at(-1)===base,'registry failure broke base');lookupFail=false;
-  modelFail=true;for(const status of [200,404,429,503]){failureStatus=status;const before=models.length;assert((await handleAuthenticatedAnalysis(request())).ok&&models.length===before+2&&models.at(-1)===base,'invalid or unavailable custom model did not fall back');}modelFail=false;
+  modelFail=true;for(const status of [200,404,429,503]){failureStatus=status;const before=models.length;const expectedCustomAttempts=[429,503].includes(status)?3:1;assert((await handleAuthenticatedAnalysis(request())).ok&&models.length===before+expectedCustomAttempts+1&&models.slice(before,before+expectedCustomAttempts).every(x=>x===model)&&models.at(-1)===base,'invalid or unavailable custom model did not retry/fall back correctly');}modelFail=false;
   const calls=lookups;assert((await handleAuthenticatedAnalysis(request('a','screening'))).ok&&lookups===calls,'learning model reached candidate scoring');
   allowed=false;const count=models.length;assert((await handleAuthenticatedAnalysis(request())).status===403&&models.length===count&&lookups===calls,'unauthorized request resolved or invoked a model');
  }finally{globalThis.fetch=saved;Object.keys(names).forEach(k=>prior[k]===undefined?Deno.env.delete(k):Deno.env.set(k,prior[k]!));}
