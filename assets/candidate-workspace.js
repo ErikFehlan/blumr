@@ -77,7 +77,18 @@
     wrap.querySelector('#workspaceNoteForm').addEventListener('submit',e=>{e.preventDefault();void quickNotes.flush(candidate);});
     wrap.querySelector('#newQuickNote').addEventListener('click',async()=>{if(await quickNotes.fresh(candidate)&&current===id){area.value='';area.focus();}});
     wrap.querySelector('#submissionDraft').addEventListener('input',e=>{drafts.set(id,e.target.value);wrap.querySelector('#submissionDraftStatus').textContent='Unsaved edits';refreshDraft();});
-    wrap.querySelector('#saveSubmissionDraft').addEventListener('click',()=>{const text=wrap.querySelector('#submissionDraft').value.trim();if(!text){api.toast('Add a submittal before saving.','error');return;}candidate.submissionDraft={text,updatedAt:Date.now()};drafts.delete(id);api.save();wrap.querySelector('#submissionDraftStatus').textContent='Draft captured · check the save indicator';});
+    wrap.querySelector('#saveSubmissionDraft').addEventListener('click',async()=>{
+      const button=wrap.querySelector('#saveSubmissionDraft'),status=wrap.querySelector('#submissionDraftStatus'),text=wrap.querySelector('#submissionDraft').value.trim();
+      if(!text){api.toast('Add a submittal before saving.','error');return;}
+      if(button.disabled)return;
+      drafts.set(id,text);candidate.submissionDraft={text,updatedAt:Date.now()};
+      button.disabled=true;button.textContent='Saving…';status.textContent='Saving draft…';
+      try{
+        await api.flush();drafts.delete(id);status.textContent='Saved draft';api.toast('Submittal draft saved.');
+      }catch(error){
+        status.textContent='Not saved — retry';api.toast(error?.message||'Submittal draft was not saved yet. Try again.','error');
+      }finally{button.disabled=false;button.textContent='Save';}
+    });
     wrap.querySelector('#workspaceCopy').addEventListener('click',copy);
     wrap.querySelector('#regenerateSubmission').addEventListener('click',()=>{if(!global.confirm('Replace this draft with a fresh submittal from the candidate’s strengths?'))return;const text=summary(candidate,job);drafts.set(id,text);wrap.querySelector('#submissionDraft').value=text;wrap.querySelector('#submissionDraftStatus').textContent='Fresh draft · not saved';refreshDraft();});
     draftObserver?.disconnect();
