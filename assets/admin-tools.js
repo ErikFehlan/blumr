@@ -1,6 +1,6 @@
 (function(global){
  'use strict';
- function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,reminderLoad,reminderSave,planLoad,planSave,ratesLoad,ratesSave,costLoad}){
+ function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,reminderLoad,reminderSave,reminderSend,planLoad,planSave,ratesLoad,ratesSave,costLoad}){
   let allowed=false,version=0,loading=null;
   const files={downloadServer:'server',downloadSchema:'schema',downloadPrompt:'prompt',downloadPackage:'pkg',downloadEnv:'env'};
   function clear(){version++;loading=null;host.replaceChildren();}
@@ -41,14 +41,28 @@
    try{
     const rows=await reminderLoad();if(!allowed||request!==version)return;panel.replaceChildren();
     const title=document.createElement('h3');title.textContent='Weekly onboarding reminders';
-    const note=document.createElement('p');note.className='rf-sub';note.textContent='Select beta users to receive at most one relevant reminder per week. Only selected users receive emails, and they can opt out in Settings.';panel.append(title,note);
+    const note=document.createElement('p');note.className='rf-sub';note.textContent='Checking a user enables the weekly reminder. Send now sends their current onboarding email immediately, at most once per week. Users can opt out in Settings.';panel.append(title,note);
     const status=document.createElement('p');status.setAttribute('role','status');
     const list=document.createElement('ul');
+    const subjects={create_job:'Create your first job in blumr',add_candidate:'Add your first candidates to blumr',review_assessment:'Review your first assessment in blumr'};
     for(const row of rows||[]){const item=document.createElement('li'),label=document.createElement('label'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=row.enabled;toggle.disabled=row.opted_out||!row.approved;
      label.append(toggle,document.createTextNode(' '+row.email+' · '+(row.opted_out?'Unsubscribed':row.step==='done'?'Completed onboarding':row.step.replaceAll('_',' '))));item.append(label);list.append(item);
-     toggle.addEventListener('change',async()=>{toggle.disabled=true;try{await reminderSave(row.user_id,toggle.checked);status.textContent='Recipient selection saved.';}catch(error){toggle.checked=!toggle.checked;status.textContent=error.message||'Could not save selection.';}finally{toggle.disabled=row.opted_out||!row.approved;}});
+     const send=document.createElement('button');send.type='button';send.className='rf-btn';send.textContent=row.send_status==='sent'?'Sent this week':row.send_status==='claimed'?'Sending…':'Send now';
+     const syncSend=()=>{send.hidden=!toggle.checked||row.opted_out||!row.approved||!subjects[row.step];send.disabled=row.send_status==='sent'||row.send_status==='claimed';};syncSend();item.append(document.createTextNode(' '),send);
+     toggle.addEventListener('change',async()=>{toggle.disabled=true;send.disabled=true;try{await reminderSave(row.user_id,toggle.checked);row.enabled=toggle.checked;status.textContent='Recipient selection saved.';}catch(error){toggle.checked=!toggle.checked;status.textContent=error.message||'Could not save selection.';}finally{toggle.disabled=row.opted_out||!row.approved;syncSend();}});
+     send.addEventListener('click',async()=>{if(!window.confirm(`Send “${subjects[row.step]}” to ${row.email} now? This counts as this week's reminder.`))return;
+      send.disabled=true;send.textContent='Sending…';status.textContent='Sending the reminder…';
+      try{await reminderSend(row.user_id);row.send_status='sent';send.textContent='Sent this week';status.textContent='Reminder sent to '+row.email+'.';}
+      catch(error){status.textContent=error.message||'Reminder could not be sent.';send.textContent='Send now';syncSend();}
+     });
     }
     panel.append(list,status);
+    const draft=document.createElement('section');draft.className='rf-card';
+    const heading=document.createElement('h3');heading.textContent='Referral email draft';
+    const detail=document.createElement('p');detail.className='rf-sub';detail.textContent='Draft only. Referral tracking and free-month credits must be built before this offer can be sent.';
+    const subject=document.createElement('p');subject.textContent='Subject: Share blumr with five recruiters, get a free month';
+    const body=document.createElement('p');body.textContent='Know five recruiters who would benefit from blumr? Invite them to try it. When five new recruiters join through your referral link and each completes their first assessment, you’ll earn one month of blumr usage free. We’ll send you a link and the full terms when the referral program opens.';
+    draft.append(heading,detail,subject,body);panel.append(draft);
    }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='Onboarding recipients could not be loaded.';}
   }
   async function loadSecurity(request=version){
