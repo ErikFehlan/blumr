@@ -20,6 +20,7 @@
      if(!allowed||request!==version)return;
      if(typeof payload?.html!=='string')throw Error('Admin tools are unavailable.');
      // This markup is a deployment-owned resource returned by an admin-checked RPC.
+     host.innerHTML=payload.html;
      const technical=document.createElement('div');technical.append(...Array.from(host.childNodes));
      host.replaceChildren();
      const tabs=document.createElement('nav');tabs.className='rf-admin-tabs';tabs.setAttribute('aria-label','Admin areas');host.append(tabs);

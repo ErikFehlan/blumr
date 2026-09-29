@@ -26,7 +26,7 @@
     'assets/recruiter-workflow.js?v=20260915-phase2',
     'assets/tutorial.js?v=20260915-tutorial',
     'assets/tutorial-ui.js?v=20260915-settings',
-    'assets/admin-tools.js?v=20260929-admin-layout',
+    'assets/admin-tools.js?v=20260929-admin-layout-fix',
     'assets/settings.js?v=20260915-settings',
     'assets/settings-ui.js?v=20260928-team-plans',
     'assets/guidance.js?v=20260916-polish',
