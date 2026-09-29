@@ -3,7 +3,7 @@
 
   const sources = [
     'assets/hiring-priorities.js?v=20260924-priorities',
-    'assets/data.js?v=20260928-team-plans',
+    'assets/data.js?v=20260929-manual-reminders',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20260917-concise',
     'assets/evidence.js?v=20260911-quick-feedback',
@@ -26,12 +26,12 @@
     'assets/recruiter-workflow.js?v=20260915-phase2',
     'assets/tutorial.js?v=20260915-tutorial',
     'assets/tutorial-ui.js?v=20260915-settings',
-    'assets/admin-tools.js?v=20260928-team-plans',
+    'assets/admin-tools.js?v=20260929-manual-reminders',
     'assets/settings.js?v=20260915-settings',
     'assets/settings-ui.js?v=20260928-team-plans',
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
-    'assets/app.js?v=20260928-team-plans'
+    'assets/app.js?v=20260929-manual-reminders'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
