@@ -4,7 +4,7 @@ const boilerplate=/\b(equal opportunity|e-?verify|benefits?|compensation|salary|
 const negated=/\b(no|not|without|never|isn't|is not|aren't|are not)\b/i;
 const requirementWords=/\b(required|requires?|must(?: have)?|mandatory|minimum|need(?:ed)?|needs to|essential)\b/i;
 const preferredWords=/\b(preferred|preferably|nice to have|a plus|bonus|optional)\b/i;
-const nonRequirement=/\b(?:not required|not mandatory|no requirement|not necessary|not needed|optional only)\b/i;
+const nonRequirement=/(?:\b(?:not required|not mandatory|no requirement|not necessary|not needed|optional only)\b|\bno\b.{0,80}\b(?:required|needed|necessary|mandatory)\b)/i;
 const responsibilityWords=/\b(design|build|develop|implement|maintain|lead|own|manage|architect|create|drive|deliver|define|establish|partner|troubleshoot|support|automate|integrate|deploy|perform|ensure|collaborate)\b/i;
 const capabilityWords=/\b(experience|hands[- ]on|proficien|expertise|knowledge|background|skill|ability|familiarity)\b/i;
 
@@ -22,9 +22,10 @@ const families=[
  {id:'spring_boot',rx:/\bspring\s+boot\b/i,display:'Spring Boot',suffix:'development experience'},
  {id:'spring',rx:/\bspring\b/i,display:'Spring',suffix:'development experience'},
  {id:'kafka',rx:/\b(?:apache\s+)?kafka\b/i,display:'Kafka',suffix:'event-driven development experience'},
+ {id:'azure_devops',rx:/\bazure devops\b/i,display:'Azure DevOps',suffix:'CI/CD experience'},
  {id:'azure',rx:/\b(?:microsoft\s+)?azure\b/i,display:'Azure',suffix:'cloud experience'},
  {id:'aws',rx:/\b(?:aws|amazon web services)\b/i,display:'AWS',suffix:'cloud experience'},
- {id:'gcp',rx:/\b(?:gcp|google cloud(?: platform)?)\b/i,display:'Google Cloud',suffix:'cloud experience'},
+ {id:'gcp',rx:/\b(?:gcp|google cloud(?: platform)?)\b/i,display:'Google Cloud',suffix:'experience'},
  {id:'react',rx:/\breact(?:\.js|js)?\b/i,display:'React',suffix:'development experience'},
  {id:'sqlserver',rx:/\b(?:sql server|mssql|microsoft sql)\b/i,display:'SQL Server',suffix:'database experience'},
  {id:'sql',rx:/\bsql\b/i,display:'SQL',suffix:'database experience'},
