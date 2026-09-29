@@ -89,7 +89,8 @@ jobs:
           supabase functions deploy reassess-job --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy refine-job-criteria --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy account-controls --project-ref "$SUPABASE_PROJECT_REF"
-          supabase secrets set ASSESSMENT_MODEL=gpt-5.6-sol FEEDBACK_MODEL=gpt-5.6-sol REASSESSMENT_MODEL=gpt-5.6-sol --project-ref "$SUPABASE_PROJECT_REF"
+          supabase secrets set ASSESSMENT_MODEL=gpt-5.6-sol FEEDBACK_MODEL=gpt-5.6-sol REASSESSMENT_MODEL=gpt-5.6-sol JOB_INTAKE_ENGINE=hybrid --project-ref "$SUPABASE_PROJECT_REF"
+          JOB_INTAKE_EXPECTED_MODE=hybrid node scripts/criteria-backend.mjs verify
           node scripts/usage-analytics-backend.mjs activate
       - name: Verify worker transport and activate scheduler
         run: node scripts/job-reassessment-backend.mjs activate
