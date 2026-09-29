@@ -3,6 +3,7 @@ import {prepare,validate} from './logic.mjs';
 import {jobPassages,prioritiesSchema,priorityInstructions,validatePriorities} from './priorities.mjs';
 import {personalizeCriteria,suggestPriorities} from './code-first.mjs';
 import {analysisModel,modelReasoning} from '../_shared/model-routing.mjs';
+import {fetchWithRetry} from '../_shared/provider-retry.ts';
 
 const response=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 type IntakeEngine='legacy_ai'|'hybrid';
@@ -57,7 +58,7 @@ export async function handleCriteria(request:Request){
       const input=legacy
         ? {job:{title:task.input.title},criteria:source,job_description_sources:passages}
         : {job:{title:task.input.title},job_description_sources:passages};
-      const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(90000),body:JSON.stringify({model,...modelReasoning(model,'reassessment'),store:false,max_output_tokens:legacy?8000:4000,instructions,input:JSON.stringify(input),text:{format:{type:'json_schema',name:legacy?'criteria_refinement':'job_priorities',strict:true,schema}}})});
+      const r=await fetchWithRetry('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model,...modelReasoning(model,'reassessment'),store:false,max_output_tokens:legacy?8000:4000,instructions,input:JSON.stringify(input),text:{format:{type:'json_schema',name:legacy?'criteria_refinement':'job_priorities',strict:true,schema}}})},{timeoutMs:90000,maxRetries:2,requestId:crypto.randomUUID()});
       if(!r.ok)throw Error(r.status===429?'ai_rate_limit':'ai_unavailable');
       const body=await r.json();
       await recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null);
