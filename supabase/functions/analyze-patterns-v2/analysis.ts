@@ -4,6 +4,7 @@ import {analysisModel,modelReasoning} from '../_shared/model-routing.mjs';
 import {resumeSources,resolveResumeSources} from './resume-sources.mjs';
 import {withPriorityAssessment,validatePriorityAssessment,priorityAssessmentInstructions} from '../_shared/priority-assessment.mjs';
 import {depthInstructions,withDetails,validateDetails} from '../_shared/assessment-depth.mjs';
+import {fetchWithRetry} from '../_shared/provider-retry.ts';
 import '../../../assets/resume-intake.js';
 // Deployed as analyze-patterns-v2, matching the dashboard's configured endpoint.
 const corsHeaders = {
@@ -221,14 +222,14 @@ ANALYSIS RULES
     const outputLimit=isFeedback?700:(isResumeAnalysis||isScreeningAnalysis)?(attempt?8000:6000):3200;
     // Reserve a conservative bound including schema/instructions and source expansion.
     await options.beforeModel?.(new TextEncoder().encode(modelInput).length+20000,outputLimit);
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const providerTimeout=isFeedback && options.feedbackModel ? 15000 : deepAssessment?90000:55000;
+    const response = await fetchWithRetry("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       // Leave enough of the browser timeout for one base-model fallback.
-      signal: AbortSignal.timeout(isFeedback && options.feedbackModel ? 15000 : deepAssessment?90000:55000),
       body: JSON.stringify({
         model,
         ...modelReasoning(model,isFeedback?'feedback':isResumeAnalysis?'resume':isScreeningAnalysis?'screening':'patterns'),
@@ -245,7 +246,7 @@ ANALYSIS RULES
           },
         },
       }),
-    });
+    },{timeoutMs:providerTimeout,maxRetries:2,requestId:crypto.randomUUID()});
 
     const result = await response.json();
     await options.onUsage?.(result);
