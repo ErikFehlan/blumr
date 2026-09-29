@@ -41,7 +41,6 @@ const families=[
  {id:'oauth',rx:/\boauth\s*2?\b/i,display:'OAuth',suffix:'authentication and authorization experience'},
  {id:'jwt',rx:/\bjwt\b/i,display:'JWT',suffix:'authentication and authorization experience'},
  {id:'github_actions',rx:/\bgithub actions\b/i,display:'GitHub Actions',suffix:'CI/CD experience'},
- {id:'azure_devops',rx:/\bazure devops\b/i,display:'Azure DevOps',suffix:'CI/CD experience'},
  {id:'jenkins',rx:/\bjenkins\b/i,display:'Jenkins',suffix:'CI/CD experience'},
  {id:'cicd',rx:/\b(?:ci\/?cd|continuous integration|continuous delivery)\b/i,display:'CI/CD',suffix:'pipeline automation experience'},
 ];
