@@ -4,11 +4,11 @@ const assert=(v:unknown,message:string)=>{if(!v)throw Error(message);};
 const json=(v:unknown)=>new Response(JSON.stringify(v));
 
 Deno.test('structured job intake finishes with code and no model request',async()=>{
- const names=['CRITERIA_WORKER_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY'],prior=names.map(n=>Deno.env.get(n)),original=globalThis.fetch;
+ const names=['CRITERIA_WORKER_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY','JOB_INTAKE_ENGINE'],prior=names.map(n=>Deno.env.get(n)),original=globalThis.fetch;
  const description='Requires 5 years of .NET development experience. Azure experience is preferred. Design and build APIs for enterprise systems.';
  let aiCalls=0,finished:any;
  try{
-  ['worker','https://backend.invalid','service','ai'].forEach((v,i)=>Deno.env.set(names[i],v));
+  ['worker','https://backend.invalid','service','ai','hybrid'].forEach((v,i)=>Deno.env.set(names[i],v));
   globalThis.fetch=async(url,init)=>{
    const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
    if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'Senior .NET Engineer',description,criteria:['requires 5 years of .NET'],manager_notes:'',knockouts:[]}}]);
@@ -26,11 +26,11 @@ Deno.test('structured job intake finishes with code and no model request',async(
 });
 
 Deno.test('ambiguous JD-only jobs fall back to grounded AI priorities through the private durable worker',async()=>{
- const names=['CRITERIA_WORKER_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY'],prior=names.map(n=>Deno.env.get(n)),original=globalThis.fetch;
+ const names=['CRITERIA_WORKER_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY','JOB_INTAKE_ENGINE'],prior=names.map(n=>Deno.env.get(n)),original=globalThis.fetch;
  const description='Own manual regression testing. Automation experience is preferred.';
  let calls=0,finished:any,forged=false;
  try{
-  ['worker','https://backend.invalid','service','ai'].forEach((v,i)=>Deno.env.set(names[i],v));
+  ['worker','https://backend.invalid','service','ai','hybrid'].forEach((v,i)=>Deno.env.set(names[i],v));
   globalThis.fetch=async(url,init)=>{
    calls++;const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
    if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'QA',description,criteria:[],manager_notes:'',knockouts:[]}}]);
