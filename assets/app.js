@@ -587,15 +587,16 @@
         try{
         if(action==='apply'){
           if(!approveCandidateProposal(candidate,proposal))return;
-          state.status='applied';showToast('Updated assessment approved.');
-        }else{proposal.status='ignored';state.status='ignored';showToast('Kept the current assessment.');}
-        appliedReview=candidate.aiReview;state.updatedAt=Date.now();saveState();recalibrateAll();window.AncalagonWorkspace.refreshFeedback();
+          state.status='applied';
+        }else{proposal.status='ignored';state.status='ignored';}
+        appliedReview=candidate.aiReview;state.updatedAt=Date.now();recalibrateAll();window.AncalagonWorkspace.refreshFeedback();
         root.querySelector('#detailManagerScore').innerHTML=`${candidate.managerScore.toFixed(1)}<span>/10</span>`;
         root.querySelector('#detailRec').textContent=candidate.rec;root.querySelector('#detailRec').className='rf-pill '+recClass(candidate.rec);
         root.querySelector('#detailScreenEvidence').innerHTML=screeningEvidenceHTML(candidate);
         root.querySelector('[data-edit-screening]')?.addEventListener('click',()=>openScreeningInsight(candidate));
         loadEvaluationReview(candidate);
-        await dataService.flush(stateSnapshot());
+        await flushCriticalState();
+        showToast(action==='apply'?'Updated assessment approved and saved.':'Kept the current assessment.');
         void guidance?.complete('approval');
         if(next)advanceAfterReview(candidate);
         }catch(error){if(candidate.aiReview===appliedReview)candidate.aiReview=beforeReview;if(candidate.feedbackEvaluation===state)candidate.feedbackEvaluation=beforeEvaluation;saveState();recalibrateAll();window.AncalagonWorkspace.refreshFeedback();showToast(error.message||'Approval could not be saved.','error');}
@@ -914,7 +915,26 @@ function renderJobs(){
       root.querySelectorAll('[data-review-reason]').forEach(button=>button.addEventListener('click',()=>button.classList.toggle('active')));
       root.querySelector('#clearReviewBtn').addEventListener('click',clearEvaluationReview);
       root.querySelector('#copySubmissionSummary').addEventListener('click',copySubmissionSummary);
-      root.querySelector('#evaluationReviewForm').addEventListener('submit',e=>{e.preventDefault();const c=candidateForRef(root.querySelector('#reviewCandidateId').value);const verdict=e.currentTarget.dataset.verdict;if(!c||!verdict){showToast('Choose whether the evaluation was accurate first.','error');return}const correctedScore=Math.max(0,Math.min(10,Number(root.querySelector('#reviewCorrectedScore').value)));if(verdict==='Needs Adjustment'&&!Number.isFinite(correctedScore)){showToast('Enter a valid corrected score.','error');return}const reasons=[...root.querySelectorAll('[data-review-reason].active')].map(b=>b.dataset.reviewReason),notes=root.querySelector('#reviewNotes').value.trim();c.aiReview={verdict,assessment:c.aiReview?.assessment||c.resumeIntake?.brief||null,originalScores:{jd:c.jdScore,manager:c.managerScore},correctedJDScore:c.aiReview?.correctedJDScore,correctedScore:verdict==='Accurate'?c.managerScore:correctedScore,reasons,notes,createdAt:Date.now()};c.updatedAt=Date.now();recalibrateAll();saveState();openDetail(c.id);void jobReview.request(c);showToast('Correction saved. Preparing a new assessment and any reusable learning suggestions.')});
+      root.querySelector('#evaluationReviewForm').addEventListener('submit',async e=>{
+        e.preventDefault();
+        const form=e.currentTarget,submit=e.submitter||form.querySelector('button[type="submit"]'),c=candidateForRef(root.querySelector('#reviewCandidateId').value),verdict=form.dataset.verdict;
+        if(submit?.disabled)return;
+        if(!c||!verdict){showToast('Choose whether the evaluation was accurate first.','error');return;}
+        const correctedScore=Math.max(0,Math.min(10,Number(root.querySelector('#reviewCorrectedScore').value)));
+        if(verdict==='Needs Adjustment'&&!Number.isFinite(correctedScore)){showToast('Enter a valid corrected score.','error');return;}
+        const reasons=[...root.querySelectorAll('[data-review-reason].active')].map(b=>b.dataset.reviewReason),notes=root.querySelector('#reviewNotes').value.trim();
+        c.aiReview={verdict,assessment:c.aiReview?.assessment||c.resumeIntake?.brief||null,originalScores:{jd:c.jdScore,manager:c.managerScore},correctedJDScore:c.aiReview?.correctedJDScore,correctedScore:verdict==='Accurate'?c.managerScore:correctedScore,reasons,notes,createdAt:Date.now()};c.updatedAt=Date.now();
+        recalibrateAll();
+        const previousLabel=submit?.textContent;
+        if(submit){submit.disabled=true;submit.textContent='Saving…';}
+        try{
+          await flushCriticalState();openDetail(c.id);void jobReview.request(c);
+          showToast('Correction saved. Preparing a new assessment and any reusable learning suggestions.');
+        }catch(error){
+          console.error('Assessment correction save failed',error);
+          showToast(error.code==='SAVE_CONFLICT'?error.message:'Correction was not saved yet. Your changes are still on this screen—retry before leaving blumr.','error');
+        }finally{if(submit){submit.disabled=false;submit.textContent=previousLabel||'Save review';}}
+      });
       root.querySelector('#benchmarkForm').addEventListener('submit',()=>setTimeout(()=>showToast('Benchmark added to the active job.'),0));
       window.AncalagonCriteria.init({root,ready:()=>dataReady,job:activeJob,fetch:jobId=>dataService.loadCriteriaTask(jobId),persist:()=>dataService.flush(stateSnapshot()),requestPriorities:id=>dataService.requestHiringPriorities(id),reviewPriorities:(...args)=>dataService.reviewHiringPriorities(...args),toggle:(jobId,revision,original)=>dataService.toggleCriteriaOriginal(jobId,revision,original),toast:showToast,updated:()=>{renderCriteria();renderJobContext();window.AncalagonWorkspace?.refreshEvaluation();if(root.querySelector('#page-detail').classList.contains('active'))window.AncalagonWorkspace.render(candidateForRef(root.querySelector('#reviewCandidateId').value));}});
       window.AncalagonWorkspace.init({
