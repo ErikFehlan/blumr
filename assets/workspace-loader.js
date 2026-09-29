@@ -3,7 +3,7 @@
 
   const sources = [
     'assets/hiring-priorities.js?v=20260924-priorities',
-    'assets/data.js?v=20260929-manual-reminders',
+    'assets/data.js?v=20260929-reliability',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20260917-concise',
     'assets/evidence.js?v=20260911-quick-feedback',
@@ -19,7 +19,7 @@
     'assets/job-review.js?v=20260923-verification',
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
-    'assets/candidate-workspace.js?v=20260922-resume-panel-v2',
+    'assets/candidate-workspace.js?v=20260929-reliability',
     'assets/criteria-automation.js?v=20260924-priorities',
     'assets/home.js?v=20260918-blumr',
     'assets/focus-ui.js?v=20260918-blumr',
