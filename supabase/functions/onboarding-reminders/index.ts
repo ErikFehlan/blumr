@@ -14,7 +14,8 @@ Deno.serve(async request=>{
  if(!base||!key)return reply({error:'Worker configuration incomplete'},503);
  const rpc=async(name:string,payload:unknown)=>{
   const response=await fetch(`${base}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(!response.ok)throw Error('Database unavailable');return response.json();
+  if(!response.ok)throw Error('Database unavailable');
+  const body=await response.text();return body?JSON.parse(body):null;
  };
  try{
   if(!await rpc('verify_onboarding_reminder_secret',{p_secret:suppliedSecret}))return reply({error:'Unauthorized'},401);
