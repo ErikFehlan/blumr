@@ -3,18 +3,21 @@ const stripPrefix=s=>normalize(s).replace(/^\s*(?:[-•▪●*]+\s*)?/,'').repla
 const boilerplate=/\b(equal opportunity|e-?verify|benefits?|compensation|salary|pay range|401\s*\(?k\)?|medical insurance|dental insurance|vision insurance|about us|our company|we offer|apply now)\b/i;
 const negated=/\b(no|not|without|never|isn't|is not|aren't|are not)\b/i;
 const requirementWords=/\b(required|requires?|must(?: have)?|mandatory|minimum|need(?:ed)?|needs to|essential)\b/i;
-const preferredWords=/\b(preferred|preferably|nice to have|a plus|plus|bonus|optional)\b/i;
+const preferredWords=/\b(preferred|preferably|nice to have|a plus|bonus|optional)\b/i;
+const nonRequirement=/\b(?:not required|not mandatory|no requirement|not necessary|not needed|optional only)\b/i;
 const responsibilityWords=/\b(design|build|develop|implement|maintain|lead|own|manage|architect|create|drive|deliver|define|establish|partner|troubleshoot|support|automate|integrate|deploy|perform|ensure|collaborate)\b/i;
 const capabilityWords=/\b(experience|hands[- ]on|proficien|expertise|knowledge|background|skill|ability|familiarity)\b/i;
 
 const families=[
- {id:'dotnet',rx:/(?:\bc#\b|\bcsharp\b|\basp\.?net(?:\s+core)?\b|(?:^|[^\w])\.net(?:\s+core|\s+framework)?\b|\bdotnet\b|\bentity framework\b)/i,display:'C#/.NET',suffix:'development experience'},
+ {id:'dotnet',rx:/(?:\bc#(?=$|[\s,.;/()])|\bcsharp\b|\basp\.?net(?:\s+core)?\b|(?:^|[^\w])\.net(?:\s+core|\s+framework)?\b|\bdotnet\b|\bentity framework\b)/i,display:'C#/.NET',suffix:'development experience'},
  {id:'playwright',rx:/\bplaywright\b/i,display:'Playwright',suffix:'test automation experience'},
- {id:'typescript_js',rx:/\b(?:typescript|javascript)\b/i,display:'TypeScript/JavaScript',suffix:'development experience'},
+ {id:'typescript',rx:/\btypescript\b/i,display:'TypeScript',suffix:'development experience'},
+ {id:'javascript',rx:/\bjavascript\b/i,display:'JavaScript',suffix:'development experience'},
  {id:'selenium',rx:/\bselenium\b/i,display:'Selenium',suffix:'test automation experience'},
  {id:'java',rx:/\bjava\b/i,display:'Java',suffix:'development experience'},
  {id:'spring_webflux',rx:/\bspring\s+webflux\b/i,display:'Spring WebFlux',suffix:'reactive development experience'},
- {id:'spring',rx:/\bspring(?:\s+boot)?\b/i,display:'Spring Boot',suffix:'development experience'},
+ {id:'spring_boot',rx:/\bspring\s+boot\b/i,display:'Spring Boot',suffix:'development experience'},
+ {id:'spring',rx:/\bspring\b/i,display:'Spring',suffix:'development experience'},
  {id:'kafka',rx:/\b(?:apache\s+)?kafka\b/i,display:'Kafka',suffix:'event-driven development experience'},
  {id:'azure',rx:/\b(?:microsoft\s+)?azure\b/i,display:'Azure',suffix:'cloud experience'},
  {id:'aws',rx:/\b(?:aws|amazon web services)\b/i,display:'AWS',suffix:'cloud experience'},
@@ -23,13 +26,16 @@ const families=[
  {id:'sqlserver',rx:/\b(?:sql server|mssql|microsoft sql)\b/i,display:'SQL Server',suffix:'database experience'},
  {id:'sql',rx:/\bsql\b/i,display:'SQL',suffix:'database experience'},
  {id:'servicenow',rx:/\bservice\s*now\b/i,display:'ServiceNow',suffix:'platform experience'},
- {id:'sast_dast',rx:/\b(?:sast|dast|static application security|dynamic application security)\b/i,display:'SAST/DAST',suffix:'application security testing experience'},
- {id:'paloalto',rx:/\b(?:palo alto|panorama)\b/i,display:'Palo Alto/Panorama',suffix:'network security experience'},
+ {id:'sast',rx:/\b(?:sast|static application security)\b/i,display:'SAST',suffix:'application security testing experience'},
+ {id:'dast',rx:/\b(?:dast|dynamic application security)\b/i,display:'DAST',suffix:'application security testing experience'},
+ {id:'paloalto',rx:/\bpalo alto\b/i,display:'Palo Alto',suffix:'network security experience'},
+ {id:'panorama',rx:/\bpanorama\b/i,display:'Panorama',suffix:'network security experience'},
  {id:'kubernetes',rx:/\b(?:kubernetes|k8s)\b/i,display:'Kubernetes',suffix:'container orchestration experience'},
  {id:'docker',rx:/\bdocker\b/i,display:'Docker',suffix:'containerization experience'},
  {id:'python',rx:/\bpython\b/i,display:'Python',suffix:'development experience'},
  {id:'node',rx:/\bnode(?:\.js|js)\b/i,display:'Node.js',suffix:'development experience'},
- {id:'oauth',rx:/\b(?:oauth\s*2?|jwt)\b/i,display:'OAuth/JWT',suffix:'authentication and authorization experience'},
+ {id:'oauth',rx:/\boauth\s*2?\b/i,display:'OAuth',suffix:'authentication and authorization experience'},
+ {id:'jwt',rx:/\bjwt\b/i,display:'JWT',suffix:'authentication and authorization experience'},
  {id:'cicd',rx:/\b(?:ci\/?cd|continuous integration|continuous delivery|github actions|azure devops|jenkins)\b/i,display:'CI/CD',suffix:'pipeline automation experience'},
 ];
 
@@ -43,7 +49,7 @@ function years(text){
  return '';
 }
 function skill(text){return families.find(f=>f.rx.test(text))||null;}
-function requirementType(text){if(preferredWords.test(text))return 'preferred';if(requirementWords.test(text))return 'required';return 'inferred';}
+function requirementType(text){if(nonRequirement.test(text))return 'inferred';if(preferredWords.test(text))return 'preferred';if(requirementWords.test(text))return 'required';return 'inferred';}
 function titleCaseFallback(text){
  const clean=stripPrefix(text).replace(/\s*[.;,:]+\s*$/,'').replace(/^\s*(?:candidate|you)\s+(?:must|should|will)\s+/i,'').replace(/^\s*(?:must|required to|requires?\s+(?:someone\s+with\s+)?|minimum\s+of)\s+/i,'').trim();
  if(!clean)return 'Relevant role experience';
@@ -85,7 +91,7 @@ function sentenceCandidates(passages){
  for(const passage of passages||[]){
    const parts=String(passage.text||'').split(/\n+|(?<=[.!?])\s+(?=[A-Z0-9•▪●*-])/).map(stripPrefix).filter(x=>x.length>=12);
    for(const text of parts){
-     if(boilerplate.test(text))continue;
+     if(boilerplate.test(text)||nonRequirement.test(text))continue;
      const f=skill(text),y=years(text),type=requirementType(text);
      let score=0;
      if(type==='required')score+=10;else if(type==='preferred')score+=8;
@@ -110,7 +116,7 @@ export function suggestPriorities(passages){
    chosen.push(row);seenTitles.add(titleKey);if(row.family)seenFamilies.add(row.family);
    if(chosen.length===5)break;
  }
- const items=chosen.map((row,i)=>({id:'priority-'+(i+1),title:row.title.slice(0,140),reason:row.reason.slice(0,240),requirement_type:row.requirement_type,source_quote:row.passage.text,question:row.question.slice(0,220)}));
+ const items=chosen.map((row,i)=>({id:'priority-'+(i+1),title:row.title.slice(0,140),reason:row.reason.slice(0,240),requirement_type:row.requirement_type,source_quote:row.text,question:row.question.slice(0,220)}));
  const explicit=chosen.filter(x=>x.requirement_type!=='inferred').length;
  const strong=chosen.filter(x=>x.score>=9).length;
  const sufficient=items.length>=3&&strong>=2 || items.length>=2&&explicit>=1 || items.length>=1&&chosen[0].score>=14;
