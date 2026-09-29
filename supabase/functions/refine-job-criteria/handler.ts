@@ -18,7 +18,10 @@ export async function handleCriteria(request:Request){
   let task;
   try{[task]=await rpc(jobId?'claim_job_criteria_for_job':'claim_job_criteria',jobId?{p_job:jobId}:{});if(!task)return response({status:'idle'});
     const source=prepare(task.input),passages=jobPassages(task.input),criteriaResult=personalizeCriteria(source),priorityResult=suggestPriorities(passages);
-    let result={...criteriaResult,hiring_priorities:priorityResult.sufficient?priorityResult.items:[]},model='code-first-v1',engine='code_first',confidence:priorityResult.confidence;
+    let model:string='code-first-v1';
+    let engine:'code_first'|'hybrid_fallback'='code_first';
+    const confidence=priorityResult.confidence;
+    let result:any={...criteriaResult,hiring_priorities:priorityResult.sufficient?priorityResult.items:[],engine,confidence};
     if(passages.length&&!priorityResult.sufficient){
       if(!apiKey)throw Error('ai_unavailable');
       model=analysisModel('reassessment',name=>Deno.env.get(name));
@@ -28,7 +31,7 @@ export async function handleCriteria(request:Request){
         input:JSON.stringify({job:{title:task.input.title},job_description_sources:passages}),text:{format:{type:'json_schema',name:'job_priorities',strict:true,schema:{type:'object',additionalProperties:false,required:['hiring_priorities'],properties:{hiring_priorities:prioritiesSchema(passages)}}}}})});
       if(!r.ok)throw Error(r.status===429?'ai_rate_limit':'ai_unavailable');const body=await r.json();await recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null);const text=body.output?.flatMap((o:any)=>o.content||[]).filter((c:any)=>c.type==='output_text').map((c:any)=>c.text).join('');
       if(body.status==='incomplete')throw Error('invalid_result');
-      const parsed=JSON.parse(text||'{}');result={...criteriaResult,hiring_priorities:validatePriorities(parsed.hiring_priorities,passages),engine:'hybrid_fallback',confidence:priorityResult.confidence};
+      const parsed=JSON.parse(text||'{}');engine='hybrid_fallback';result={...criteriaResult,hiring_priorities:validatePriorities(parsed.hiring_priorities,passages),engine,confidence};
     }
     const applied=await rpc('finish_job_criteria',{p_job:task.job_id,p_revision:task.revision,p_lease:task.lease_id,p_result:{...result,model,generated_at:new Date().toISOString()},p_error:null});
     return response({status:applied?'ready':'superseded',engine:result.engine});
