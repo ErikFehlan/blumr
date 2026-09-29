@@ -7,16 +7,18 @@ const content={
 type Step=keyof typeof content;
 const escapeHtml=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 Deno.serve(async request=>{
- const secret=Deno.env.get('ONBOARDING_REMINDER_SECRET');
  if(request.method!=='POST')return reply({error:'Method not allowed'},405);
- if(!secret||request.headers.get('x-worker-secret')!==secret)return reply({error:'Unauthorized'},401);
+ const suppliedSecret=request.headers.get('x-worker-secret');
+ if(!suppliedSecret)return reply({error:'Unauthorized'},401);
  const base=Deno.env.get('SUPABASE_URL'),key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),resend=Deno.env.get('RESEND_API_KEY');
- if(!base||!key||!resend)return reply({error:'Worker configuration incomplete'},503);
+ if(!base||!key)return reply({error:'Worker configuration incomplete'},503);
  const rpc=async(name:string,payload:unknown)=>{
   const response=await fetch(`${base}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
   if(!response.ok)throw Error('Database unavailable');return response.json();
  };
  try{
+  if(!await rpc('verify_onboarding_reminder_secret',{p_secret:suppliedSecret}))return reply({error:'Unauthorized'},401);
+  if(!resend)return reply({error:'Worker configuration incomplete'},503);
   const claimed=await rpc('claim_onboarding_reminders',{}) as Array<{user_id:string,email:string,week_start:string,step:Step}>;
   let sent=0,failed=0;
   for(const row of claimed){
