@@ -5,13 +5,13 @@ const result={name:'Alex Carter',role:'QA Analyst',score:8,manager_score:8.7,pri
 const clone=x=>JSON.parse(JSON.stringify(x));
 const until=async fn=>{for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,2));}throw Error('Timed out');};
 function fixture(){
- const candidates=[],jobs=[{id:'a',title:'QA',status:'active'},{id:'b',title:'Other',status:'active'}],docs=new Map(),calls=[],saved=[];let current='a',failSave=false,failUpload=false,analyze=async()=>clone(result);
+ const candidates=[],jobs=[{id:'a',title:'QA',status:'active'},{id:'b',title:'Other',status:'active'}],docs=new Map(),calls=[],saved=[];let current='a',failSave=false,failUpload=false,uploadFailure=null,uploadCalls=0,analyze=async()=>clone(result);
  const api={job:id=>jobs.find(j=>j.id===(id||current)),workspace:()=> 'workspace',candidates:()=>candidates,extract:async()=>text,
   add:c=>{c.short=c.name;candidates.push(c);return c;},persist:async()=>{if(failSave){failSave=false;throw Error('save failed');}saved.push(clone(candidates));},
-  upload:async(c,f,t)=>{if(failUpload){failUpload=false;throw Error('upload failed');}docs.set(c.id,t);},text:async c=>docs.get(c.id)||'',
+  upload:async(c,f,t)=>{uploadCalls++;if(failUpload){failUpload=false;throw uploadFailure||Error('upload failed');}docs.set(c.id,t);},text:async c=>docs.get(c.id)||'',wait:async()=>{},
   context:c=>({jobId:c.jobId,title:jobs.find(j=>j.id===c.jobId)?.title}),fullContext:c=>({jobId:c.jobId}),signature:x=>JSON.stringify(x),
   analyze:async(...a)=>{calls.push(a);return analyze(...a);},changed:()=>{},toast:()=>{},track:()=>{},open:()=>{},recommendation:()=> 'Strong Consideration'};
- return {api,candidates,jobs,docs,calls,saved,flow:intake.create(api),file:{name:'Alex.txt',size:200},setCurrent:id=>{current=id;},setAnalysis:f=>{analyze=f;},failSave:()=>{failSave=true;},failUpload:()=>{failUpload=true;}};
+ return {api,candidates,jobs,docs,calls,saved,flow:intake.create(api),file:{name:'Alex.txt',size:200},setCurrent:id=>{current=id;},setAnalysis:f=>{analyze=f;},failSave:()=>{failSave=true;},failUpload:error=>{uploadFailure=error||null;failUpload=true;},uploadCalls:()=>uploadCalls};
 }
 test('one upload saves a candidate and source, then proposes scores without applying them',async()=>{
  const f=fixture();const c=await f.flow.upload(f.file);await until(()=>c.resumeIntake.phase==='ready');
@@ -33,6 +33,11 @@ test('switching jobs while AI runs preserves the captured job and saves only its
 test('failed source upload remains recoverable and never starts AI until storage succeeds',async()=>{
  const f=fixture();f.failUpload();await f.flow.upload(f.file);const c=f.candidates[0];assert.equal(c.resumeIntake.phase,'error');assert.equal(f.calls.length,0);
  await f.flow.upload(f.file);await until(()=>c.resumeIntake.phase==='ready');assert.equal(f.candidates.length,1);assert.equal(f.calls.length,1);
+});
+test('transient source upload failure retries automatically without duplicating the candidate or assessment',async()=>{
+ const f=fixture(),temporary=Object.assign(Error('temporarily unavailable'),{statusCode:'503'});f.failUpload(temporary);
+ const c=await f.flow.upload(f.file);await until(()=>c.resumeIntake.phase==='ready');
+ assert.equal(f.uploadCalls(),2);assert.equal(f.candidates.length,1);assert.equal(f.calls.length,1);assert.equal(f.docs.get(c.id),text);
 });
 test('interrupted intake resumes from the saved document; a completed brief is not rerun',async()=>{
  const f=fixture(),id=await intake.identity('workspace','a',text);const c={id:id.id,jobId:'a',name:'Alex.txt',short:'Alex.txt',resumeIntake:{phase:'processing',hash:id.hash,fileName:'Alex.txt',stored:true}};f.candidates.push(c);f.docs.set(c.id,text);
