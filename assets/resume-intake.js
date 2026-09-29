@@ -70,6 +70,30 @@
   }
   async function hash(text){const bytes=await global.crypto.subtle.digest('SHA-256',new TextEncoder().encode(normalize(text)));return [...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');}
   async function identity(workspace,jobId,text){const contentHash=await hash(text),key=await hash(workspace+'|'+jobId+'|'+contentHash);return {hash:contentHash,id:key.slice(0,8)+'-'+key.slice(8,12)+'-5'+key.slice(13,16)+'-a'+key.slice(17,20)+'-'+key.slice(20,32)};}
+  const transientStatuses=new Set([408,425,429,500,502,503,504,520,522,524]);
+  function retryableNetworkError(error){
+    if(!error||['SAVE_CONFLICT','PT409','23505'].includes(String(error.code||'')))return false;
+    const status=Number(error.status??error.statusCode??error.context?.status??0);
+    if(transientStatuses.has(status))return true;
+    const name=String(error.name||error.constructor?.name||'');
+    if(['FunctionsFetchError','FunctionsRelayError'].includes(name))return true;
+    const code=String(error.code||'').toLowerCase(),message=String(error.message||'').toLowerCase();
+    return ['econnreset','etimedout','eai_again','connection_failed'].includes(code)
+      || /failed to fetch|network(?: request)? (?:failed|error)|connection (?:failed|reset)|timed? ?out|temporar(?:y|ily) unavailable/.test(message);
+  }
+  async function retryTransient(operation,{attempts=3,baseDelay=250,wait}={}){
+    const sleep=wait||((ms)=>new Promise(resolve=>global.setTimeout(resolve,ms)));
+    let lastError;
+    for(let attempt=0;attempt<attempts;attempt++){
+      try{return await operation(attempt);}
+      catch(error){
+        lastError=error;
+        if(attempt===attempts-1||!retryableNetworkError(error))throw error;
+        await sleep(baseDelay*(2**attempt));
+      }
+    }
+    throw lastError;
+  }
   function create(api){
     const files=new Map(),queue=new Set(),reviewing=new Set();let running=false,extracting=false;
     const valid=c=>api.candidates().includes(c)&&!!api.job(c.jobId)&&api.job(c.jobId).status!=='closed';
@@ -117,7 +141,7 @@
       if(!valid(c))return;
       const source=files.get(c.id);
       if(source&&!c.resumeIntake.stored){
-        await api.upload(c,source.file,source.text);c.resumeIntake.stored=true;files.delete(c.id);
+        await retryTransient(()=>api.upload(c,source.file,source.text),{wait:api.wait});c.resumeIntake.stored=true;files.delete(c.id);
       }
       set(c,'queued');await api.persist();
     }
@@ -296,5 +320,5 @@
     function releaseFile(id){files.delete(id);}
     return {upload,retry,approve,resume,render,renderCandidate,openResume,hasUnsavedFile,releaseFile};
   }
-  const api={create,validate,identity,pending,normalize,sourceQuote,evidenceForPoint,pointText,fileReadError};if(typeof module!=='undefined')module.exports=api;global.AncalagonIntake=api;
+  const api={create,validate,identity,pending,normalize,sourceQuote,evidenceForPoint,pointText,fileReadError,retryableNetworkError,retryTransient};if(typeof module!=='undefined')module.exports=api;global.AncalagonIntake=api;
 })(typeof window==='undefined'?globalThis:window);

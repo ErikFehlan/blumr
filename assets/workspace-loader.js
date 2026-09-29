@@ -3,7 +3,7 @@
 
   const sources = [
     'assets/hiring-priorities.js?v=20260924-priorities',
-    'assets/data.js?v=20260929-manual-reminders',
+    'assets/data.js?v=20260929-reliability',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20260917-concise',
     'assets/evidence.js?v=20260911-quick-feedback',
@@ -14,12 +14,12 @@
     'assets/quality-ui.js?v=20260918-blumr',
     'assets/feedback.js?v=20260916-learning',
     'assets/pdf-text.js?v=20260915-intake',
-    'assets/resume-intake.js?v=20260923-learning',
+    'assets/resume-intake.js?v=20260929-reliability',
     'assets/resume-remote.js?v=20260917-security',
     'assets/job-review.js?v=20260923-verification',
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
-    'assets/candidate-workspace.js?v=20260922-resume-panel-v2',
+    'assets/candidate-workspace.js?v=20260929-reliability',
     'assets/criteria-automation.js?v=20260924-priorities',
     'assets/home.js?v=20260918-blumr',
     'assets/focus-ui.js?v=20260918-blumr',
@@ -31,7 +31,7 @@
     'assets/settings-ui.js?v=20260928-team-plans',
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
-    'assets/app.js?v=20260929-manual-reminders'
+    'assets/app.js?v=20260929-reliability'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;

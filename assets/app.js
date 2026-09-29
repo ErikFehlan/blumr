@@ -129,6 +129,17 @@
       let lastSuccessfulSave=null,lastSaveProblem='';
       function setSyncStatus(state,problem=''){if(state==='saved'){lastSuccessfulSave=new Date();lastSaveProblem=''}else if(problem)lastSaveProblem=problem;const status=root.querySelector('#syncStatus');if(!status)return;const labels={saved:'Saved',saving:'Saving…',offline:'Offline — changes pending',error:'Not saved'};status.dataset.state=state;status.querySelector('span').textContent=labels[state]||labels.saved;if(state==='saved')syncErrorShown=false;const details=root.querySelector('#saveDetails');if(details)details.textContent='Status: '+(labels[state]||state)+'. Last confirmed sync: '+(lastSuccessfulSave?personalDate(lastSuccessfulSave,{timeStyle:'medium'}):'not yet confirmed in this tab')+'. '+lastSaveProblem;}
       function saveState(){if(!dataReady)return;queueMicrotask(renderSearchFlow);if(!navigator.onLine){dataService?.markPending(stateSnapshot());setSyncStatus('offline');return}const state=stateSnapshot();dataService?.schedule(state,error=>{console.error('Workspace sync failed',error);setSyncStatus('error',error.message||'Save request failed');if(error.code==='SAVE_CONFLICT'){setSyncStatus('error');showToast(error.message,'error');return}if(!syncErrorShown){syncErrorShown=true;showToast('Changes are still on this screen but are not saved. Retry before closing blumr.','error')}},setSyncStatus)}
+      async function flushCriticalState(){
+        if(!dataReady||!dataService)throw Error('Workspace data is not ready yet.');
+        const state=stateSnapshot();
+        if(!navigator.onLine){
+          dataService.markPending(state);setSyncStatus('offline');
+          const error=Error('You are offline. Your changes are still on this screen.');error.code='OFFLINE';throw error;
+        }
+        setSyncStatus('saving');
+        try{await dataService.flush(state);setSyncStatus('saved');queueMicrotask(renderSearchFlow);return state;}
+        catch(error){setSyncStatus('error',error.message||'Save request failed');throw error;}
+      }
       async function retrySync(){
         if(!navigator.onLine){setSyncStatus('offline');showToast('You are offline. blumr will retry when the connection returns.','error');return;}
         if(!dataReady){
@@ -576,15 +587,16 @@
         try{
         if(action==='apply'){
           if(!approveCandidateProposal(candidate,proposal))return;
-          state.status='applied';showToast('Updated assessment approved.');
-        }else{proposal.status='ignored';state.status='ignored';showToast('Kept the current assessment.');}
-        appliedReview=candidate.aiReview;state.updatedAt=Date.now();saveState();recalibrateAll();window.AncalagonWorkspace.refreshFeedback();
+          state.status='applied';
+        }else{proposal.status='ignored';state.status='ignored';}
+        appliedReview=candidate.aiReview;state.updatedAt=Date.now();recalibrateAll();window.AncalagonWorkspace.refreshFeedback();
         root.querySelector('#detailManagerScore').innerHTML=`${candidate.managerScore.toFixed(1)}<span>/10</span>`;
         root.querySelector('#detailRec').textContent=candidate.rec;root.querySelector('#detailRec').className='rf-pill '+recClass(candidate.rec);
         root.querySelector('#detailScreenEvidence').innerHTML=screeningEvidenceHTML(candidate);
         root.querySelector('[data-edit-screening]')?.addEventListener('click',()=>openScreeningInsight(candidate));
         loadEvaluationReview(candidate);
-        await dataService.flush(stateSnapshot());
+        await flushCriticalState();
+        showToast(action==='apply'?'Updated assessment approved and saved.':'Kept the current assessment.');
         void guidance?.complete('approval');
         if(next)advanceAfterReview(candidate);
         }catch(error){if(candidate.aiReview===appliedReview)candidate.aiReview=beforeReview;if(candidate.feedbackEvaluation===state)candidate.feedbackEvaluation=beforeEvaluation;saveState();recalibrateAll();window.AncalagonWorkspace.refreshFeedback();showToast(error.message||'Approval could not be saved.','error');}
@@ -903,11 +915,30 @@ function renderJobs(){
       root.querySelectorAll('[data-review-reason]').forEach(button=>button.addEventListener('click',()=>button.classList.toggle('active')));
       root.querySelector('#clearReviewBtn').addEventListener('click',clearEvaluationReview);
       root.querySelector('#copySubmissionSummary').addEventListener('click',copySubmissionSummary);
-      root.querySelector('#evaluationReviewForm').addEventListener('submit',e=>{e.preventDefault();const c=candidateForRef(root.querySelector('#reviewCandidateId').value);const verdict=e.currentTarget.dataset.verdict;if(!c||!verdict){showToast('Choose whether the evaluation was accurate first.','error');return}const correctedScore=Math.max(0,Math.min(10,Number(root.querySelector('#reviewCorrectedScore').value)));if(verdict==='Needs Adjustment'&&!Number.isFinite(correctedScore)){showToast('Enter a valid corrected score.','error');return}const reasons=[...root.querySelectorAll('[data-review-reason].active')].map(b=>b.dataset.reviewReason),notes=root.querySelector('#reviewNotes').value.trim();c.aiReview={verdict,assessment:c.aiReview?.assessment||c.resumeIntake?.brief||null,originalScores:{jd:c.jdScore,manager:c.managerScore},correctedJDScore:c.aiReview?.correctedJDScore,correctedScore:verdict==='Accurate'?c.managerScore:correctedScore,reasons,notes,createdAt:Date.now()};c.updatedAt=Date.now();recalibrateAll();saveState();openDetail(c.id);void jobReview.request(c);showToast('Correction saved. Preparing a new assessment and any reusable learning suggestions.')});
+      root.querySelector('#evaluationReviewForm').addEventListener('submit',async e=>{
+        e.preventDefault();
+        const form=e.currentTarget,submit=e.submitter||form.querySelector('button[type="submit"]'),c=candidateForRef(root.querySelector('#reviewCandidateId').value),verdict=form.dataset.verdict;
+        if(submit?.disabled)return;
+        if(!c||!verdict){showToast('Choose whether the evaluation was accurate first.','error');return;}
+        const correctedScore=Math.max(0,Math.min(10,Number(root.querySelector('#reviewCorrectedScore').value)));
+        if(verdict==='Needs Adjustment'&&!Number.isFinite(correctedScore)){showToast('Enter a valid corrected score.','error');return;}
+        const reasons=[...root.querySelectorAll('[data-review-reason].active')].map(b=>b.dataset.reviewReason),notes=root.querySelector('#reviewNotes').value.trim();
+        c.aiReview={verdict,assessment:c.aiReview?.assessment||c.resumeIntake?.brief||null,originalScores:{jd:c.jdScore,manager:c.managerScore},correctedJDScore:c.aiReview?.correctedJDScore,correctedScore:verdict==='Accurate'?c.managerScore:correctedScore,reasons,notes,createdAt:Date.now()};c.updatedAt=Date.now();
+        recalibrateAll();
+        const previousLabel=submit?.textContent;
+        if(submit){submit.disabled=true;submit.textContent='Saving…';}
+        try{
+          await flushCriticalState();openDetail(c.id);void jobReview.request(c);
+          showToast('Correction saved. Preparing a new assessment and any reusable learning suggestions.');
+        }catch(error){
+          console.error('Assessment correction save failed',error);
+          showToast(error.code==='SAVE_CONFLICT'?error.message:'Correction was not saved yet. Your changes are still on this screen—retry before leaving blumr.','error');
+        }finally{if(submit){submit.disabled=false;submit.textContent=previousLabel||'Save review';}}
+      });
       root.querySelector('#benchmarkForm').addEventListener('submit',()=>setTimeout(()=>showToast('Benchmark added to the active job.'),0));
       window.AncalagonCriteria.init({root,ready:()=>dataReady,job:activeJob,fetch:jobId=>dataService.loadCriteriaTask(jobId),persist:()=>dataService.flush(stateSnapshot()),requestPriorities:id=>dataService.requestHiringPriorities(id),reviewPriorities:(...args)=>dataService.reviewHiringPriorities(...args),toggle:(jobId,revision,original)=>dataService.toggleCriteriaOriginal(jobId,revision,original),toast:showToast,updated:()=>{renderCriteria();renderJobContext();window.AncalagonWorkspace?.refreshEvaluation();if(root.querySelector('#page-detail').classList.contains('active'))window.AncalagonWorkspace.render(candidateForRef(root.querySelector('#reviewCandidateId').value));}});
       window.AncalagonWorkspace.init({
-        guidance:(candidate,tip)=>guidance?.show(root.querySelector('#candidateGuidance'),tip),completeGuidance:tip=>{void guidance?.complete(tip);},root,formatDate:personalDate,job:activeJob,candidate:candidateForRef,feedback:()=>feedback,readiness:submissionReadinessFor,context:evaluationContext,signature:window.AncalagonContext.signature,questions:screeningQuestions,reviewQuestions:c=>jobReview.questions(c),reviewReady:c=>jobReview.canReview(c)||candidateAutomation.canReview(c),toast:showToast,save:saveState,interpretationHTML:feedbackInterpretationHTML,bindInterpretations:bindFeedbackInterpretations,evaluationPhase:c=>candidateAutomation.phase(c),canReview:c=>candidateAutomation.canReview(c),reviewEvaluation:reviewAutomaticEvaluation,intakeBrief:(c,wrap)=>intake.renderCandidate(c,wrap),openResume:(c,kind,index)=>intake.openResume(c,kind,index),remoteEvaluation:(c,wrap)=>jobReview.renderCandidate(c,wrap),
+        guidance:(candidate,tip)=>guidance?.show(root.querySelector('#candidateGuidance'),tip),completeGuidance:tip=>{void guidance?.complete(tip);},root,formatDate:personalDate,job:activeJob,candidate:candidateForRef,feedback:()=>feedback,readiness:submissionReadinessFor,context:evaluationContext,signature:window.AncalagonContext.signature,questions:screeningQuestions,reviewQuestions:c=>jobReview.questions(c),reviewReady:c=>jobReview.canReview(c)||candidateAutomation.canReview(c),toast:showToast,save:saveState,flush:flushCriticalState,interpretationHTML:feedbackInterpretationHTML,bindInterpretations:bindFeedbackInterpretations,evaluationPhase:c=>candidateAutomation.phase(c),canReview:c=>candidateAutomation.canReview(c),reviewEvaluation:reviewAutomaticEvaluation,intakeBrief:(c,wrap)=>intake.renderCandidate(c,wrap),openResume:(c,kind,index)=>intake.openResume(c,kind,index),remoteEvaluation:(c,wrap)=>jobReview.renderCandidate(c,wrap),
         noteId:()=>makeId('feedback'),validCandidate:c=>candidates.includes(c)&&jobs.some(j=>j.id===c.jobId),saveNote:saveQuickNote,
         editPreference:index=>{showPage('feedback');editFeedback(index);root.querySelector('#feedbackScope').value='job';root.querySelector('#feedbackSignal').value=feedback[index].signalLabel||proposedSignal(feedback[index].text);root.querySelector('#feedbackSignal').focus();},insights:()=>{showPage('insights');renderReevaluationResults();}
       });
@@ -938,10 +969,85 @@ function renderJobs(){
       root.querySelector('#feedbackSignal').addEventListener('input',event=>{event.target.dataset.edited='true'});
       root.querySelector('#feedbackScope').addEventListener('change',event=>{if(event.target.value==='job'&&!root.querySelector('#feedbackSignal').value)root.querySelector('#feedbackSignal').value=proposedSignal(root.querySelector('#feedbackText').value)});
       root.querySelector('#outcomeForm').addEventListener('submit',()=>setTimeout(()=>{showToast('Interview outcome saved.');trackProductEvent('interview_outcome_saved')},0));
-      root.querySelector('#candidateForm').addEventListener('submit',()=>setTimeout(()=>{showToast('Candidate added to the active job.');trackProductEvent('candidate_added')},0));
-      root.querySelector('#jobForm').addEventListener('submit',()=>{const creating=!root.querySelector('#jobId').value;setTimeout(()=>{showToast('Job saved.');if(creating)trackProductEvent('job_created')},0)});
+      
       document.addEventListener('click',e=>{if(!e.target.closest('.rf-cardmenu-wrap'))root.querySelectorAll('.rf-cardmenu.open').forEach(m=>m.classList.remove('open'))});
-      root.querySelectorAll('.rf-nav button').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));root.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.goto)));root.querySelector('#candidateSearch').addEventListener('input',e=>renderCandidates(e.target.value));root.querySelector('#backCandidates').addEventListener('click',()=>showPage('candidates'));root.querySelector('#rankExportBtn').addEventListener('click',exportCSV);root.querySelector('#exportBtn').addEventListener('click',exportReport);root.querySelector('#runCompare').addEventListener('click',renderComparison);root.querySelector('#resetWeights').addEventListener('click',()=>{activeJob().weights=deriveJobWeights(activeJob());loadActiveJobWeights();renderCriteria()});root.querySelector('#cancelFeedbackEdit').addEventListener('click',resetFeedbackForm);root.querySelector('#outcomeForm').addEventListener('submit',e=>{e.preventDefault();const candidateId=root.querySelector('#outcomeCandidate').value;const candidateRecord=candidateForRef(candidateId);if(!candidateRecord)return;const candidate=candidateRecord.short;const entry={id:makeId('outcome'),createdAt:Date.now(),updatedAt:Date.now(),jobId:activeJobId,candidateId:candidateRecord.id,candidate,previousStage:candidateRecord.stage,stage:root.querySelector('#outcomeStage').value,decision:root.querySelector('#outcomeDecision').value,positives:root.querySelector('#outcomePositives').value.trim(),concerns:root.querySelector('#outcomeConcerns').value.trim(),notes:root.querySelector('#outcomeNotes').value.trim()};const editIndex=root.querySelector('#outcomeEditIndex').value;if(editIndex!==''){entry.id=interviewOutcomes[Number(editIndex)].id||entry.id;entry.createdAt=interviewOutcomes[Number(editIndex)].createdAt||entry.createdAt;entry.previousStage=interviewOutcomes[Number(editIndex)].previousStage||entry.previousStage;interviewOutcomes[Number(editIndex)]=entry}else interviewOutcomes.push(entry);const c=candidateRecord;c.updatedAt=Date.now();c.stage=stageForDecision(entry.decision,c.stage);resetOutcomeForm();renderOutcomes();recalibrateAll();saveState()});root.querySelector('#cancelOutcomeEdit').addEventListener('click',resetOutcomeForm);root.querySelector('#benchmarkForm').addEventListener('submit',e=>{e.preventDefault();const c=candidateForRef(root.querySelector('#benchmarkCandidate').value);if(!c)return;c.benchmark=true;c.updatedAt=Date.now();saveState();recalibrateAll()});root.querySelector('#addCandidateBtn').addEventListener('click',openAddCandidate);root.querySelector('#openAddCandidate').addEventListener('click',openAddCandidate);root.querySelector('#closeAddCandidate').addEventListener('click',closeAddCandidate);root.querySelector('#candidateForm').addEventListener('submit',e=>{e.preventDefault();const name=root.querySelector('#candidateName').value.trim();const role=root.querySelector('#candidateRole').value.trim();const score=Math.max(0,Math.min(10,Number(root.querySelector('#candidateScore').value)));const rec=root.querySelector('#candidateRec').value;const signal=root.querySelector('#candidateSignal').value.trim();const strengths=root.querySelector('#candidateStrengths').value.split('\n').map(x=>x.trim()).filter(Boolean);const concerns=root.querySelector('#candidateConcerns').value.split('\n').map(x=>x.trim()).filter(Boolean);const tags=root.querySelector('#candidateTags').value.split(',').map(x=>x.trim()).filter(Boolean);if(!name||!role||!Number.isFinite(score)||!signal||!strengths.length)return;const short=name;const now=Date.now();candidates.push(ensureScores({id:makeId('candidate'),name,short,initials:initialsFor(name),score,rec,signal,role,strengths,concerns,tags,jobId:activeJobId,stage:'Sourced',createdAt:now,updatedAt:now}));root.querySelector('#candidateForm').reset();root.querySelector('#resumeUploadNote').textContent='Upload a text-based PDF, DOCX, or TXT resume. blumr extracts the text locally, sends the text—not the file—to the configured hybrid engine, and auto-fills the profile.';closeAddCandidate();renderJobs();recalibrateAll();renderFeedback();saveState();openDetail(name)});root.querySelector('#newJobBtn').addEventListener('click',openJobForm);root.querySelector('#cancelJobEdit').addEventListener('click',resetJobForm);root.querySelector('#jobForm').addEventListener('submit',e=>{e.preventDefault();const existingId=root.querySelector('#jobId').value;const title=root.querySelector('#jobTitle').value.trim();const client=root.querySelector('#jobClient').value.trim();const description=root.querySelector('#jobDescription').value.trim();const managerFeedback=root.querySelector('#jobManagerFeedback').value.trim();const criteria=root.querySelector('#jobCriteria').value.split('\n').map(x=>x.trim()).filter(Boolean);const knockouts=root.querySelector('#jobKnockouts').value.split('\n').map(x=>x.trim()).filter(Boolean);if(!title||!description)return;if(existingId){const j=jobs.find(x=>x.id===existingId);if(j){Object.assign(j,{title,client,description,managerFeedback,criteria,knockouts});j.weights=deriveJobWeights(j)}}else{const id=makeId('job');const j={id,title,client,description,managerFeedback,criteria,knockouts};j.weights=deriveJobWeights(j);jobs.push(j);activeJobId=id}loadActiveJobWeights();resetJobForm();renderJobs();recalibrateAll();renderFeedback();renderOutcomes();saveState();showPage(existingId?'dashboard':'candidates');if(!existingId)root.querySelector('#resumeUpload').focus()});
+      root.querySelectorAll('.rf-nav button').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));root.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.goto)));root.querySelector('#candidateSearch').addEventListener('input',e=>renderCandidates(e.target.value));root.querySelector('#backCandidates').addEventListener('click',()=>showPage('candidates'));root.querySelector('#rankExportBtn').addEventListener('click',exportCSV);root.querySelector('#exportBtn').addEventListener('click',exportReport);root.querySelector('#runCompare').addEventListener('click',renderComparison);root.querySelector('#resetWeights').addEventListener('click',()=>{activeJob().weights=deriveJobWeights(activeJob());loadActiveJobWeights();renderCriteria()});root.querySelector('#cancelFeedbackEdit').addEventListener('click',resetFeedbackForm);root.querySelector('#outcomeForm').addEventListener('submit',e=>{e.preventDefault();const candidateId=root.querySelector('#outcomeCandidate').value;const candidateRecord=candidateForRef(candidateId);if(!candidateRecord)return;const candidate=candidateRecord.short;const entry={id:makeId('outcome'),createdAt:Date.now(),updatedAt:Date.now(),jobId:activeJobId,candidateId:candidateRecord.id,candidate,previousStage:candidateRecord.stage,stage:root.querySelector('#outcomeStage').value,decision:root.querySelector('#outcomeDecision').value,positives:root.querySelector('#outcomePositives').value.trim(),concerns:root.querySelector('#outcomeConcerns').value.trim(),notes:root.querySelector('#outcomeNotes').value.trim()};const editIndex=root.querySelector('#outcomeEditIndex').value;if(editIndex!==''){entry.id=interviewOutcomes[Number(editIndex)].id||entry.id;entry.createdAt=interviewOutcomes[Number(editIndex)].createdAt||entry.createdAt;entry.previousStage=interviewOutcomes[Number(editIndex)].previousStage||entry.previousStage;interviewOutcomes[Number(editIndex)]=entry}else interviewOutcomes.push(entry);const c=candidateRecord;c.updatedAt=Date.now();c.stage=stageForDecision(entry.decision,c.stage);resetOutcomeForm();renderOutcomes();recalibrateAll();saveState()});root.querySelector('#cancelOutcomeEdit').addEventListener('click',resetOutcomeForm);root.querySelector('#benchmarkForm').addEventListener('submit',e=>{e.preventDefault();const c=candidateForRef(root.querySelector('#benchmarkCandidate').value);if(!c)return;c.benchmark=true;c.updatedAt=Date.now();saveState();recalibrateAll()});root.querySelector('#addCandidateBtn').addEventListener('click',openAddCandidate);root.querySelector('#openAddCandidate').addEventListener('click',openAddCandidate);root.querySelector('#closeAddCandidate').addEventListener('click',closeAddCandidate);root.querySelector('#candidateForm').addEventListener('submit',async e=>{
+        e.preventDefault();
+        const form=e.currentTarget,submit=e.submitter||form.querySelector('button[type="submit"]');
+        if(submit?.disabled)return;
+        const name=root.querySelector('#candidateName').value.trim();
+        const role=root.querySelector('#candidateRole').value.trim();
+        const score=Math.max(0,Math.min(10,Number(root.querySelector('#candidateScore').value)));
+        const rec=root.querySelector('#candidateRec').value;
+        const signal=root.querySelector('#candidateSignal').value.trim();
+        const strengths=root.querySelector('#candidateStrengths').value.split('\n').map(x=>x.trim()).filter(Boolean);
+        const concerns=root.querySelector('#candidateConcerns').value.split('\n').map(x=>x.trim()).filter(Boolean);
+        const tags=root.querySelector('#candidateTags').value.split(',').map(x=>x.trim()).filter(Boolean);
+        if(!name||!role||!Number.isFinite(score)||!signal||!strengths.length)return;
+        let candidate=form.dataset.pendingCandidate&&candidates.find(c=>c.id===form.dataset.pendingCandidate);
+        const now=Date.now();
+        if(candidate){
+          Object.assign(candidate,{name,short:name,initials:initialsFor(name),role,score,resumeJDScore:score,jdScore:score,originalManagerScore:score,managerScore:score,rec,signal,strengths,concerns,tags,updatedAt:now});
+        }else{
+          candidate=ensureScores({id:makeId('candidate'),name,short:name,initials:initialsFor(name),score,rec,signal,role,strengths,concerns,tags,jobId:activeJobId,stage:'Sourced',createdAt:now,updatedAt:now});
+          candidates.push(candidate);form.dataset.pendingCandidate=candidate.id;
+        }
+        renderJobs();recalibrateAll();renderFeedback();
+        const previousLabel=submit?.textContent;
+        if(submit){submit.disabled=true;submit.textContent='Saving…';}
+        try{
+          await flushCriticalState();
+          delete form.dataset.pendingCandidate;form.reset();
+          root.querySelector('#resumeUploadNote').textContent='Upload a text-based PDF, DOCX, or TXT resume. blumr extracts the text locally, sends the text—not the file—to the configured hybrid engine, and auto-fills the profile.';
+          closeAddCandidate();openDetail(candidate.id);
+          showToast('Candidate added to the active job.');trackProductEvent('candidate_added');
+        }catch(error){
+          console.error('Candidate save failed',error);
+          showToast(error.code==='SAVE_CONFLICT'?error.message:'Candidate was not saved yet. Your changes are still on this screen—retry before leaving blumr.','error');
+        }finally{
+          if(submit){submit.disabled=false;submit.textContent=previousLabel||'Add candidate';}
+        }
+      });root.querySelector('#newJobBtn').addEventListener('click',openJobForm);root.querySelector('#cancelJobEdit').addEventListener('click',resetJobForm);root.querySelector('#jobForm').addEventListener('submit',async e=>{
+        e.preventDefault();
+        const form=e.currentTarget,submit=e.submitter||form.querySelector('button[type="submit"]');
+        if(submit?.disabled)return;
+        const existingId=root.querySelector('#jobId').value;
+        const pendingCreate=form.dataset.pendingCreate==='true';
+        const title=root.querySelector('#jobTitle').value.trim();
+        const client=root.querySelector('#jobClient').value.trim();
+        const description=root.querySelector('#jobDescription').value.trim();
+        const managerFeedback=root.querySelector('#jobManagerFeedback').value.trim();
+        const criteria=root.querySelector('#jobCriteria').value.split('\n').map(x=>x.trim()).filter(Boolean);
+        const knockouts=root.querySelector('#jobKnockouts').value.split('\n').map(x=>x.trim()).filter(Boolean);
+        if(!title||!description)return;
+        const creating=!existingId||pendingCreate;
+        if(existingId){
+          const j=jobs.find(x=>x.id===existingId);
+          if(!j){showToast('This job is no longer available. Refresh and try again.','error');return;}
+          Object.assign(j,{title,client,description,managerFeedback,criteria,knockouts});j.weights=deriveJobWeights(j);
+        }else{
+          const id=makeId('job'),j={id,title,client,description,managerFeedback,criteria,knockouts};
+          j.weights=deriveJobWeights(j);jobs.push(j);activeJobId=id;
+          root.querySelector('#jobId').value=id;form.dataset.pendingCreate='true';
+        }
+        loadActiveJobWeights();renderJobs();recalibrateAll();renderFeedback();renderOutcomes();
+        const previousLabel=submit?.textContent;let confirmed=false;
+        if(submit){submit.disabled=true;submit.textContent='Saving…';}
+        try{
+          await flushCriticalState();confirmed=true;
+          showToast('Job saved.');
+          if(creating)trackProductEvent('job_created');
+          delete form.dataset.pendingCreate;resetJobForm();
+          showPage(creating?'candidates':'dashboard');
+          if(creating)root.querySelector('#resumeUpload').focus();
+        }catch(error){
+          console.error('Job save failed',error);
+          setSyncStatus('error',error.message||'Job save failed');
+          showToast(error.code==='SAVE_CONFLICT'?error.message:'Job was not saved yet. Your changes are still on this screen—retry before leaving blumr.','error');
+        }finally{
+          if(submit){submit.disabled=false;submit.textContent=previousLabel||'Save job';}
+        }
+      });
       window.addEventListener('ancalagon:auth-ready',event=>initializeWorkspace(event.detail),{once:true});
       window.addEventListener('ancalagon:auth-cleared',()=>{window.BlumrHiringPriorities?.clear(root);assessmentMemory.clear();workspaceGeneration++;dataReady=false;workspaceLoading=false;adminRequest++;setAdminAccess(false);settings?.clear();jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;home?.dispose();tutorial?.dispose();guidance?.dispose();root.querySelectorAll('.rf-guidance-slot,#guidanceSettings').forEach(el=>{el.replaceChildren();delete el.dataset.guidanceMarkup;delete el.dataset.markup;});root.querySelector('#personalUsage').textContent='';});
       document.documentElement.dataset.blumrReady='true';
