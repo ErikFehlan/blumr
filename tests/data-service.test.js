@@ -16,7 +16,7 @@ function fixture() {
       calls.push({table,operation,payload,filters});
       if(fail){fail=false;return {data:null,error:new Error('network unavailable')}}
       if(operation==='insert'){if(rows[table].some(r=>(r.id&&r.id===payload.id)||(r.event_id&&r.event_id===payload.event_id)))return {data:null,error:{code:'23505'}};const row=clone(payload);rows[table].push(row);if(lose){lose=false;return {data:null,error:new Error('Response lost after commit')}}return {data:[row],error:null}}
-      if(operation==='update')matching.forEach(row=>Object.assign(row,clone(payload)));
+      if(operation==='update'){matching.forEach(row=>Object.assign(row,clone(payload)));if(lose){lose=false;return {data:null,error:new Error('Response lost after commit')}}}
       if(operation==='delete')rows[table]=rows[table].filter(row=>!matching.includes(row));
       return {data:clone(matching),error:null};
     }).then(resolve,reject)}
@@ -147,6 +147,11 @@ test('intake metadata and pending status round-trip without redundant writes; so
  assert.equal(await f.service.loadResumeText(restored.candidates[0]),'Correct resume');
 });
 
+test('lost update response is verified against the stored row instead of reported as unsaved',async()=>{
+ const f=fixture(),state=await f.service.load();state.jobs[0].title='Committed update';f.loseNextInsert();
+ await f.service.flush(state);assert.equal(f.rows.jobs[0].title,'Committed update');assert.equal(f.service.hasPendingChanges(),false);
+ const restored=await f.service.load();assert.equal(restored.jobs[0].title,'Committed update');
+});
 test('retry after a lost insert response recovers the same record without a duplicate',async()=>{
  const f=fixture(),state=await f.service.load();state.candidates.push({id:'stable-candidate',jobId:'job',name:'Synthetic',short:'Synthetic',strengths:[],concerns:[],tags:[],jdScore:7,managerScore:7,createdAt:1,updatedAt:1});
  f.loseNextInsert();await assert.rejects(f.service.flush(state),/Response lost/);assert.equal(f.rows.candidates.length,1);assert.equal(f.service.hasPendingChanges(),true);
