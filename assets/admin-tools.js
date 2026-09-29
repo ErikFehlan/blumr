@@ -20,13 +20,30 @@
      if(!allowed||request!==version)return;
      if(typeof payload?.html!=='string')throw Error('Admin tools are unavailable.');
      // This markup is a deployment-owned resource returned by an admin-checked RPC.
-     host.innerHTML=payload.html;
-     if(securityLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='betaSecurityPanel';host.prepend(panel);void loadSecurity(request);}
-     if(reminderLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='onboardingRemindersPanel';host.prepend(panel);void loadReminders(request);}
-     if(planLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminPlansPanel';host.prepend(panel);void loadPlans(request);}
-     if(ratesLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminRatesPanel';host.prepend(panel);void loadRates(request);}
-     if(costLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminCostsPanel';host.prepend(panel);void loadCosts(request);}
-     if(supportLoad){const panel=document.createElement('section');panel.className='rf-card';panel.innerHTML='<h3>Support Inbox</h3><p class="rf-sub">Private problem reports submitted from Settings.</p><button type="button" class="rf-btn" data-support-refresh>Refresh reports</button><div id="adminSupportInbox" aria-live="polite"></div>';host.append(panel);void loadSupport(request);}
+     const technical=document.createElement('div');technical.append(...Array.from(host.childNodes));
+     host.replaceChildren();
+     const tabs=document.createElement('nav');tabs.className='rf-admin-tabs';tabs.setAttribute('aria-label','Admin areas');host.append(tabs);
+     const areas={};
+     for(const [key,label] of [['overview','Overview'],['users','Users & access'],['emails','Emails'],['usage','Usage & costs'],['advanced','Advanced']]){
+      const button=document.createElement('button');button.type='button';button.className='rf-admin-tab';button.textContent=label;button.dataset.adminArea=key;button.setAttribute('aria-pressed',key==='overview'?'true':'false');tabs.append(button);
+      const area=document.createElement('div');area.className='rf-admin-area';area.dataset.adminPanel=key;area.hidden=key!=='overview';host.append(area);areas[key]=area;
+     }
+     const showArea=key=>{for(const [name,area] of Object.entries(areas))area.hidden=name!==key;for(const button of tabs.querySelectorAll('button'))button.setAttribute('aria-pressed',button.dataset.adminArea===key?'true':'false');};
+     tabs.addEventListener('click',event=>{const key=event.target.closest('button')?.dataset.adminArea;if(key&&areas[key])showArea(key);});
+     const heading=document.createElement('h3');heading.textContent='Admin overview';areas.overview.append(heading);
+     const summary=document.createElement('div');summary.className='rf-admin-summary';
+     for(const [key,label] of [['users','Beta users'],['emails','Weekly recipients'],['support','Open reports'],['usage','AI calls today']]){
+      const card=document.createElement('button');card.type='button';card.className='rf-admin-summary-card';card.dataset.adminJump=key==='support'?'users':key;card.innerHTML=`<strong data-admin-count="${key}">—</strong><span>${label}</span>`;card.addEventListener('click',()=>showArea(card.dataset.adminJump));summary.append(card);
+     }
+     areas.overview.append(summary);
+     const intro=document.createElement('p');intro.className='rf-sub';intro.textContent='Choose an area above to manage people, reminders, usage, or technical setup.';areas.overview.append(intro);
+     areas.advanced.append(technical);
+     if(securityLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='betaSecurityPanel';areas.users.append(panel);void loadSecurity(request);}
+     if(reminderLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='onboardingRemindersPanel';areas.emails.append(panel);void loadReminders(request);}
+     if(planLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminPlansPanel';areas.usage.append(panel);void loadPlans(request);}
+     if(ratesLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminRatesPanel';areas.usage.append(panel);void loadRates(request);}
+     if(costLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminCostsPanel';areas.usage.append(panel);void loadCosts(request);}
+     if(supportLoad){const panel=document.createElement('section');panel.className='rf-card';panel.innerHTML='<h3>Support Inbox</h3><p class="rf-sub">Private problem reports submitted from Settings.</p><button type="button" class="rf-btn" data-support-refresh>Refresh reports</button><div id="adminSupportInbox" aria-live="polite"></div>';areas.users.append(panel);void loadSupport(request);}
      const settings=getSettings();host.querySelector('#patternFunctionUrl').value=settings.url;host.querySelector('#patternAnonKey').value=settings.anonKey;
     }catch(error){
      if(request!==version)return;
@@ -36,29 +53,43 @@
    })();
    return loading;
   }
+  function count(key,value){const target=host.querySelector(`[data-admin-count="${key}"]`);if(target)target.textContent=String(value);}
   async function loadReminders(request=version){
    const panel=host.querySelector('#onboardingRemindersPanel');if(!panel)return;panel.textContent='Loading onboarding recipients…';
    try{
     const rows=await reminderLoad();if(!allowed||request!==version)return;panel.replaceChildren();
     const title=document.createElement('h3');title.textContent='Weekly onboarding reminders';
     const note=document.createElement('p');note.className='rf-sub';note.textContent='Checking a user enables the weekly reminder. Send now sends their current onboarding email immediately, at most once per week. Users can opt out in Settings.';panel.append(title,note);
+    count('emails',(rows||[]).filter(row=>row.enabled&&!row.opted_out).length);
     const status=document.createElement('p');status.setAttribute('role','status');
-    const list=document.createElement('ul');
+    const toolbar=document.createElement('div');toolbar.className='rf-admin-toolbar';
+    const search=document.createElement('input');search.type='search';search.placeholder='Search users';search.setAttribute('aria-label','Search reminder users');
+    const filter=document.createElement('select');filter.setAttribute('aria-label','Filter reminder users');
+    for(const [value,label] of [['all','All users'],['eligible','Eligible'],['enabled','Weekly enabled'],['completed','Completed']]){const option=document.createElement('option');option.value=value;option.textContent=label;filter.append(option);}
+    toolbar.append(search,filter);panel.append(toolbar);
+    const wrap=document.createElement('div');wrap.className='rf-tablewrap';const table=document.createElement('table');table.className='rf-table rf-admin-reminder-table';
+    const head=document.createElement('thead');const header=document.createElement('tr');for(const label of ['User','Next email','Weekly enabled','Last sent','Action']){const th=document.createElement('th');th.textContent=label;header.append(th);}head.append(header);table.append(head);
+    const tbody=document.createElement('tbody');table.append(tbody);wrap.append(table);
+    const empty=document.createElement('p');empty.className='rf-sub';empty.textContent='No users match this filter.';empty.hidden=true;
+    const visible=[];
     const subjects={create_job:'Create your first job in blumr',add_candidate:'Add your first candidates to blumr',review_assessment:'Review your first assessment in blumr'};
-    for(const row of rows||[]){const item=document.createElement('li'),label=document.createElement('label'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=row.enabled;toggle.disabled=row.opted_out||!row.approved;
-     label.append(toggle,document.createTextNode(' '+row.email+' · '+(row.opted_out?'Unsubscribed':row.step==='done'?'Completed onboarding':row.step.replaceAll('_',' '))));item.append(label);list.append(item);
+    for(const row of rows||[]){const item=document.createElement('tr'),user=document.createElement('td'),step=document.createElement('td'),enabled=document.createElement('td'),last=document.createElement('td'),action=document.createElement('td'),label=document.createElement('label'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=row.enabled;toggle.disabled=row.opted_out||!row.approved;
+     user.textContent=row.email;step.textContent=row.opted_out?'Unsubscribed':row.step==='done'?'Completed onboarding':subjects[row.step]||row.step.replaceAll('_',' ');
+     label.className='rf-admin-toggle';label.append(toggle,document.createTextNode(' '+(toggle.checked?'On':'Off')));enabled.append(label);
+     last.textContent=row.last_sent_at?new Date(row.last_sent_at).toLocaleDateString():'Never';item.append(user,step,enabled,last,action);tbody.append(item);visible.push({row,item});
      const send=document.createElement('button');send.type='button';send.className='rf-btn';send.textContent=row.send_status==='sent'?'Sent this week':row.send_status==='claimed'?'Sending…':'Send now';
-     const syncSend=()=>{send.hidden=!toggle.checked||row.opted_out||!row.approved||!subjects[row.step];send.disabled=row.send_status==='sent'||row.send_status==='claimed';};syncSend();item.append(document.createTextNode(' '),send);
-     toggle.addEventListener('change',async()=>{toggle.disabled=true;send.disabled=true;try{await reminderSave(row.user_id,toggle.checked);row.enabled=toggle.checked;status.textContent='Recipient selection saved.';}catch(error){toggle.checked=!toggle.checked;status.textContent=error.message||'Could not save selection.';}finally{toggle.disabled=row.opted_out||!row.approved;syncSend();}});
+     const syncSend=()=>{send.hidden=row.opted_out||!row.approved||!subjects[row.step];send.disabled=!toggle.checked||row.send_status==='sent'||row.send_status==='claimed';send.textContent=row.send_status==='sent'?'Sent this week':row.send_status==='claimed'?'Sending…':toggle.checked?'Send now':'Enable to send';label.lastChild.textContent=' '+(toggle.checked?'On':'Off');};syncSend();action.append(send);
+     toggle.addEventListener('change',async()=>{toggle.disabled=true;send.disabled=true;try{await reminderSave(row.user_id,toggle.checked);row.enabled=toggle.checked;count('emails',(rows||[]).filter(entry=>entry.enabled&&!entry.opted_out).length);status.textContent='Recipient selection saved.';}catch(error){toggle.checked=!toggle.checked;status.textContent=error.message||'Could not save selection.';}finally{toggle.disabled=row.opted_out||!row.approved;syncSend();}});
      send.addEventListener('click',async()=>{if(!window.confirm(`Send “${subjects[row.step]}” to ${row.email} now? This counts as this week's reminder.`))return;
       send.disabled=true;send.textContent='Sending…';status.textContent='Sending the reminder…';
-      try{await reminderSend(row.user_id);row.send_status='sent';send.textContent='Sent this week';status.textContent='Reminder sent to '+row.email+'.';}
+      try{await reminderSend(row.user_id);row.send_status='sent';row.last_sent_at=new Date().toISOString();last.textContent=new Date(row.last_sent_at).toLocaleDateString();syncSend();status.textContent='Reminder sent to '+row.email+'.';}
       catch(error){status.textContent=error.message||'Reminder could not be sent.';send.textContent='Send now';syncSend();}
      });
     }
-    panel.append(list,status);
-    const draft=document.createElement('section');draft.className='rf-card';
-    const heading=document.createElement('h3');heading.textContent='Referral email draft';
+    const applyFilter=()=>{let matches=0;for(const {row,item} of visible){const eligible=!!subjects[row.step]&&!row.opted_out&&row.approved;const show=row.email.toLowerCase().includes(search.value.trim().toLowerCase())&&(filter.value==='all'||filter.value==='eligible'&&eligible||filter.value==='enabled'&&row.enabled||filter.value==='completed'&&row.step==='done');item.hidden=!show;if(show)matches++;}empty.hidden=matches>0;};search.addEventListener('input',applyFilter);filter.addEventListener('change',applyFilter);applyFilter();
+    panel.append(wrap,empty,status);
+    const draft=document.createElement('details');draft.className='rf-admin-draft';
+    const heading=document.createElement('summary');heading.textContent='Referral email draft';
     const detail=document.createElement('p');detail.className='rf-sub';detail.textContent='Draft only. Referral tracking and free-month credits must be built before this offer can be sent.';
     const subject=document.createElement('p');subject.textContent='Subject: Share blumr with five recruiters, get a free month';
     const body=document.createElement('p');body.textContent='Know five recruiters who would benefit from blumr? Invite them to try it. When five new recruiters join through your referral link and each completes their first assessment, you’ll earn one month of blumr usage free. We’ll send you a link and the full terms when the referral program opens.';
@@ -83,6 +114,7 @@
      button.type='button';button.className='rf-btn';button.textContent=account.approved?'Revoke access':'Restore access';
      button.addEventListener('click',async()=>{button.disabled=true;try{await securityAccess(account.email,!account.approved);if(allowed&&request===version)await loadSecurity(request);}catch(error){status.textContent=error.message||'Access could not be updated.';}finally{button.disabled=false;}});row.append(text,button);list.append(row);}
     panel.append(list);
+    count('users',(snapshot.accounts||[]).filter(account=>account.approved).length);count('usage',snapshot.today?.calls||0);
     const usage=document.createElement('p');usage.textContent=`AI calls today: ${snapshot.today?.calls||0} / ${snapshot.limits.global_day}. Per workspace: ${snapshot.limits.workspace_day} per day, ${snapshot.limits.workspace_minute} per minute. Retries count toward these limits.`;panel.append(usage);
     const pause=document.createElement('button');pause.type='button';pause.className='rf-btn';pause.textContent=snapshot.limits.ai_paused?'Resume AI processing':'Pause AI processing';
     pause.addEventListener('click',async()=>{pause.disabled=true;try{await securityPause(!snapshot.limits.ai_paused);if(allowed&&request===version)await loadSecurity(request);}catch(error){status.textContent=error.message||'Processing control could not be saved.';}finally{pause.disabled=false;}});panel.append(pause);
@@ -143,7 +175,7 @@
   }
   async function loadSupport(request=version){
    const inbox=host.querySelector('#adminSupportInbox');if(!inbox)return;
-   try{const rows=await supportLoad();if(!allowed||request!==version)return;inbox.replaceChildren();
+   try{const rows=await supportLoad();if(!allowed||request!==version)return;inbox.replaceChildren();count('support',rows.filter(row=>row.status==='open').length);
     if(!rows.length){inbox.textContent='No reports yet.';return;}
     for(const row of rows){const item=document.createElement('article');item.className='settings-details';const title=document.createElement('h4'),meta=document.createElement('p'),description=document.createElement('p'),actions=document.createElement('div');title.textContent=row.subject;meta.textContent=row.reply_email+' · '+row.status+' · '+row.id.slice(0,8);description.textContent=row.description;description.style.whiteSpace='pre-wrap';actions.className='rf-actions';
      for(const status of ['open','reviewed','resolved']){const b=document.createElement('button');b.type='button';b.className='rf-btn';b.textContent=status==='open'?'Reopen':'Mark '+status;b.disabled=row.status===status;b.addEventListener('click',async()=>{b.disabled=true;try{await supportReview(row.id,status);if(allowed&&request===version)await loadSupport(request);}catch(error){if(request!==version)return;if(error.code==='42501')deny();else toast('Report could not be updated. Try again.','error');}finally{if(b.isConnected)b.disabled=false;}});actions.append(b);}

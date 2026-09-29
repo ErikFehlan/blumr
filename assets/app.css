@@ -473,3 +473,16 @@
 .rf-learning-proposal select,.rf-memory-item textarea{width:100%;max-width:100%;font:inherit;color:inherit;background:var(--ui-panel,#f4faf6);border:1px solid var(--ui-line,#d8e4de);border-radius:10px;padding:10px}
 .rf-memory-item textarea{min-height:86px;resize:vertical}
 #assessmentMemory{margin-top:18px}
+/* Admin tools: short overview and focused task areas. */
+#adminToolsContent .rf-admin-area[hidden],#adminToolsContent .rf-admin-reminder-table tr[hidden]{display:none}
+.rf-admin-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px;padding:5px;border:1px solid var(--ui-line);border-radius:14px;background:var(--ui-rail)}
+.rf-admin-tab{border:0;border-radius:10px;background:transparent;color:var(--ui-muted);padding:10px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.rf-admin-tab[aria-pressed="true"]{background:var(--ui-panel);color:var(--ui-text);box-shadow:var(--ui-shadow)}
+.rf-admin-tab:focus-visible,.rf-admin-summary-card:focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}
+.rf-admin-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}
+.rf-admin-summary-card{min-height:95px;text-align:left;border:1px solid var(--ui-line);border-radius:14px;background:var(--ui-panel);color:var(--ui-text);padding:18px;cursor:pointer}
+.rf-admin-summary-card strong,.rf-admin-summary-card span{display:block}.rf-admin-summary-card strong{font-size:27px;line-height:1.1}.rf-admin-summary-card span{color:var(--ui-muted);font-size:12px;margin-top:9px}
+.rf-admin-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.rf-admin-toolbar input,.rf-admin-toolbar select{font:inherit;color:var(--ui-text);background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:9px;padding:9px 12px}.rf-admin-toolbar input{flex:1;min-width:210px}
+.rf-admin-reminder-table{min-width:720px}.rf-admin-reminder-table td,.rf-admin-reminder-table th{color:var(--ui-text);border-color:var(--ui-line);vertical-align:middle}.rf-admin-reminder-table td:first-child{font-weight:650;overflow-wrap:anywhere}.rf-admin-reminder-table .rf-btn{white-space:nowrap}.rf-admin-toggle{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer}
+.rf-admin-draft{margin-top:18px;padding:14px 16px;border:1px solid var(--ui-line);border-radius:12px}.rf-admin-draft summary{font-weight:700;cursor:pointer}.rf-admin-draft p{line-height:1.5}
+@media(max-width:760px){.rf-admin-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.rf-admin-tabs{flex-wrap:nowrap;overflow-x:auto}.rf-admin-tab{white-space:nowrap}}
