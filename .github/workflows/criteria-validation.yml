@@ -26,7 +26,7 @@ jobs:
       - name: Test code-first job intake
         run: |
           deno test --allow-env tests/hiring-priorities-worker.test.ts
-          node --test tests/code-first-job-intake.test.js tests/criteria-automation.test.js tests/hiring-priorities.test.js
+          node --test tests/code-first-job-intake.test.js tests/code-first-job-intake-corpus.test.js tests/criteria-automation.test.js tests/hiring-priorities.test.js
       - name: Test focused feedback and authentication
         run: deno test --allow-env tests/sol-routing.test.ts tests/security-backend.test.ts tests/learning-routing.test.ts tests/account-controls.test.ts tests/analysis-latency.test.ts tests/job-reassessment-worker.test.ts tests/resume-intake-backend.test.ts
       - name: Test queue transactions and permissions
