@@ -9,7 +9,10 @@ const responsibilityWords=/\b(design|build|develop|implement|maintain|lead|own|m
 const capabilityWords=/\b(experience|hands[- ]on|proficien|expertise|knowledge|background|skill|ability|familiarity)\b/i;
 
 const families=[
- {id:'dotnet',rx:/(?:\bc#(?=$|[\s,.;/()])|\bcsharp\b|\basp\.?net(?:\s+core)?\b|(?:^|[^\w])\.net(?:\s+core|\s+framework)?\b|\bdotnet\b|\bentity framework\b)/i,display:'C#/.NET',suffix:'development experience'},
+ {id:'aspnet',rx:/\basp\.?net(?:\s+core)?\b/i,display:'ASP.NET/.NET',suffix:'development experience'},
+ {id:'dotnet',rx:/(?:^|[^\w])\.net(?:\s+core|\s+framework)?\b|\bdotnet\b/i,display:'C#/.NET',suffix:'development experience'},
+ {id:'csharp',rx:/(?:\bc#(?=$|[\s,.;/()])|\bcsharp\b)/i,display:'C#',suffix:'development experience'},
+ {id:'entity_framework',rx:/\bentity framework\b/i,display:'Entity Framework',suffix:'development experience'},
  {id:'playwright',rx:/\bplaywright\b/i,display:'Playwright',suffix:'test automation experience'},
  {id:'typescript',rx:/\btypescript\b/i,display:'TypeScript',suffix:'development experience'},
  {id:'javascript',rx:/\bjavascript\b/i,display:'JavaScript',suffix:'development experience'},
@@ -36,7 +39,10 @@ const families=[
  {id:'node',rx:/\bnode(?:\.js|js)\b/i,display:'Node.js',suffix:'development experience'},
  {id:'oauth',rx:/\boauth\s*2?\b/i,display:'OAuth',suffix:'authentication and authorization experience'},
  {id:'jwt',rx:/\bjwt\b/i,display:'JWT',suffix:'authentication and authorization experience'},
- {id:'cicd',rx:/\b(?:ci\/?cd|continuous integration|continuous delivery|github actions|azure devops|jenkins)\b/i,display:'CI/CD',suffix:'pipeline automation experience'},
+ {id:'github_actions',rx:/\bgithub actions\b/i,display:'GitHub Actions',suffix:'CI/CD experience'},
+ {id:'azure_devops',rx:/\bazure devops\b/i,display:'Azure DevOps',suffix:'CI/CD experience'},
+ {id:'jenkins',rx:/\bjenkins\b/i,display:'Jenkins',suffix:'CI/CD experience'},
+ {id:'cicd',rx:/\b(?:ci\/?cd|continuous integration|continuous delivery)\b/i,display:'CI/CD',suffix:'pipeline automation experience'},
 ];
 
 function years(text){
