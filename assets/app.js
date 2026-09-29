@@ -993,10 +993,10 @@ function renderJobs(){
           candidates.push(candidate);form.dataset.pendingCandidate=candidate.id;
         }
         renderJobs();recalibrateAll();renderFeedback();
-        const previousLabel=submit?.textContent;let confirmed=false;
+        const previousLabel=submit?.textContent;
         if(submit){submit.disabled=true;submit.textContent='Saving…';}
         try{
-          await flushCriticalState();confirmed=true;
+          await flushCriticalState();
           delete form.dataset.pendingCandidate;form.reset();
           root.querySelector('#resumeUploadNote').textContent='Upload a text-based PDF, DOCX, or TXT resume. blumr extracts the text locally, sends the text—not the file—to the configured hybrid engine, and auto-fills the profile.';
           closeAddCandidate();openDetail(candidate.id);
@@ -1005,7 +1005,7 @@ function renderJobs(){
           console.error('Candidate save failed',error);
           showToast(error.code==='SAVE_CONFLICT'?error.message:'Candidate was not saved yet. Your changes are still on this screen—retry before leaving blumr.','error');
         }finally{
-          if(submit){submit.disabled=false;if(!confirmed)submit.textContent=previousLabel||'Add candidate';}
+          if(submit){submit.disabled=false;submit.textContent=previousLabel||'Add candidate';}
         }
       });root.querySelector('#newJobBtn').addEventListener('click',openJobForm);root.querySelector('#cancelJobEdit').addEventListener('click',resetJobForm);root.querySelector('#jobForm').addEventListener('submit',async e=>{
         e.preventDefault();
@@ -1045,7 +1045,7 @@ function renderJobs(){
           setSyncStatus('error',error.message||'Job save failed');
           showToast(error.code==='SAVE_CONFLICT'?error.message:'Job was not saved yet. Your changes are still on this screen—retry before leaving blumr.','error');
         }finally{
-          if(submit){submit.disabled=false;if(!confirmed)submit.textContent=previousLabel||'Save job';}
+          if(submit){submit.disabled=false;submit.textContent=previousLabel||'Save job';}
         }
       });
       window.addEventListener('ancalagon:auth-ready',event=>initializeWorkspace(event.detail),{once:true});
