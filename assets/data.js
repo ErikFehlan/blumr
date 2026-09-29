@@ -120,6 +120,18 @@
       return request;
     }
 
+    async function storedMatch(table,payload,old,insertKey) {
+      let lookup=client.from(table).select().eq('workspace_id',workspaceId);
+      if(old?.id) lookup=lookup.eq('id',old.id);
+      else if(table==='candidate_benchmarks') lookup=lookup.eq('candidate_id',payload.candidate_id).eq('job_id',payload.job_id);
+      else if(payload.id) lookup=lookup.eq('id',payload.id);
+      else if(insertKey&&insertIds.get(insertKey)) lookup=lookup.eq('id',insertIds.get(insertKey));
+      else return null;
+      const found=await lookup;
+      if(found.error)return null;
+      return found.data?.find(item=>Object.entries(payload).every(([k,v])=>k==='updated_at'||k==='created_at'||JSON.stringify(item[k])===JSON.stringify(v)))||null;
+    }
+
     async function replaceChildren(table, rows) {
       if (seeding) { baselines.set(table, new Map(rows.map(row => [rowKey(table, row), copy(row)]))); return; }
       const baseline = baselines.get(table) || new Map();
@@ -137,14 +149,11 @@
         if (!insertIds.has(insertKey)) insertIds.set(insertKey, payload.id || crypto.randomUUID());
         const request = old ? guard(client.from(table).update(payload), old) : client.from(table).insert({...payload, ...(table === 'candidate_benchmarks' ? {} : {id: insertIds.get(insertKey)})});
         let {data, error} = await request.select();
-        // A response can be lost after an insert commits. Reuse its stable ID,
-        // and accept it only if every intended field matches the stored record.
-        if(error?.code==='23505'&&!old){
-          let lookup=client.from(table).select().eq('workspace_id',workspaceId);
-          lookup=table==='candidate_benchmarks'?lookup.eq('candidate_id',payload.candidate_id).eq('job_id',payload.job_id):lookup.eq('id',insertIds.get(insertKey));
-          const found=await lookup;
-          const same=found.data?.find(item=>Object.entries(payload).every(([k,v])=>k==='updated_at'||k==='created_at'||JSON.stringify(item[k])===JSON.stringify(v)));
-          if(!found.error&&same){data=[same];error=null;}
+        // A write can commit even if its response is lost. Verify the exact
+        // intended record before surfacing a failure or attempting a duplicate.
+        if(error&&((error.code==='23505'&&!old)||old)){
+          const same=await storedMatch(table,payload,old,insertKey);
+          if(same){data=[same];error=null;}
         }
         if (error) throw error;
         if (!data?.length) throw Object.assign(new Error('This record changed in another tab. Copy your pending changes before reloading.'), {code:'SAVE_CONFLICT'});
