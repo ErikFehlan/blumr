@@ -129,6 +129,17 @@
       let lastSuccessfulSave=null,lastSaveProblem='';
       function setSyncStatus(state,problem=''){if(state==='saved'){lastSuccessfulSave=new Date();lastSaveProblem=''}else if(problem)lastSaveProblem=problem;const status=root.querySelector('#syncStatus');if(!status)return;const labels={saved:'Saved',saving:'Saving…',offline:'Offline — changes pending',error:'Not saved'};status.dataset.state=state;status.querySelector('span').textContent=labels[state]||labels.saved;if(state==='saved')syncErrorShown=false;const details=root.querySelector('#saveDetails');if(details)details.textContent='Status: '+(labels[state]||state)+'. Last confirmed sync: '+(lastSuccessfulSave?personalDate(lastSuccessfulSave,{timeStyle:'medium'}):'not yet confirmed in this tab')+'. '+lastSaveProblem;}
       function saveState(){if(!dataReady)return;queueMicrotask(renderSearchFlow);if(!navigator.onLine){dataService?.markPending(stateSnapshot());setSyncStatus('offline');return}const state=stateSnapshot();dataService?.schedule(state,error=>{console.error('Workspace sync failed',error);setSyncStatus('error',error.message||'Save request failed');if(error.code==='SAVE_CONFLICT'){setSyncStatus('error');showToast(error.message,'error');return}if(!syncErrorShown){syncErrorShown=true;showToast('Changes are still on this screen but are not saved. Retry before closing blumr.','error')}},setSyncStatus)}
+      async function flushCriticalState(){
+        if(!dataReady||!dataService)throw Error('Workspace data is not ready yet.');
+        const state=stateSnapshot();
+        if(!navigator.onLine){
+          dataService.markPending(state);setSyncStatus('offline');
+          const error=Error('You are offline. Your changes are still on this screen.');error.code='OFFLINE';throw error;
+        }
+        setSyncStatus('saving');
+        try{await dataService.flush(state);setSyncStatus('saved');queueMicrotask(renderSearchFlow);return state;}
+        catch(error){setSyncStatus('error',error.message||'Save request failed');throw error;}
+      }
       async function retrySync(){
         if(!navigator.onLine){setSyncStatus('offline');showToast('You are offline. blumr will retry when the connection returns.','error');return;}
         if(!dataReady){
@@ -965,17 +976,11 @@ function renderJobs(){
           root.querySelector('#jobId').value=id;form.dataset.pendingCreate='true';
         }
         loadActiveJobWeights();renderJobs();recalibrateAll();renderFeedback();renderOutcomes();
-        if(!navigator.onLine){
-          dataService?.markPending(stateSnapshot());setSyncStatus('offline');
-          showToast('Job is ready but not saved yet. Reconnect and retry before leaving this screen.','error');
-          return;
-        }
         const previousLabel=submit?.textContent;let confirmed=false;
         if(submit){submit.disabled=true;submit.textContent='Saving…';}
-        setSyncStatus('saving');
         try{
-          await dataService.flush(stateSnapshot());confirmed=true;
-          setSyncStatus('saved');showToast('Job saved.');
+          await flushCriticalState();confirmed=true;
+          showToast('Job saved.');
           if(creating)trackProductEvent('job_created');
           delete form.dataset.pendingCreate;resetJobForm();
           showPage(creating?'candidates':'dashboard');
