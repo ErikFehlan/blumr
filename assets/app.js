@@ -970,11 +970,11 @@ function renderJobs(){
           showToast('Job is ready but not saved yet. Reconnect and retry before leaving this screen.','error');
           return;
         }
-        const previousLabel=submit?.textContent;
+        const previousLabel=submit?.textContent;let confirmed=false;
         if(submit){submit.disabled=true;submit.textContent='Saving…';}
         setSyncStatus('saving');
         try{
-          await dataService.flush(stateSnapshot());
+          await dataService.flush(stateSnapshot());confirmed=true;
           setSyncStatus('saved');showToast('Job saved.');
           if(creating)trackProductEvent('job_created');
           delete form.dataset.pendingCreate;resetJobForm();
@@ -985,7 +985,7 @@ function renderJobs(){
           setSyncStatus('error',error.message||'Job save failed');
           showToast(error.code==='SAVE_CONFLICT'?error.message:'Job was not saved yet. Your changes are still on this screen—retry before leaving blumr.','error');
         }finally{
-          if(submit){submit.disabled=false;submit.textContent=previousLabel||'Save job';}
+          if(submit){submit.disabled=false;if(!confirmed)submit.textContent=previousLabel||'Save job';}
         }
       });
       window.addEventListener('ancalagon:auth-ready',event=>initializeWorkspace(event.detail),{once:true});
