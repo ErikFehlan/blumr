@@ -54,6 +54,30 @@ Deno.test('ambiguous JD-only jobs fall back to grounded AI priorities through th
  }finally{globalThis.fetch=original;names.forEach((n,i)=>prior[i]===undefined?Deno.env.delete(n):Deno.env.set(n,prior[i]!));}
 });
 
+Deno.test('legacy rollout mode preserves the existing AI criteria path',async()=>{
+ const names=['CRITERIA_WORKER_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY','JOB_INTAKE_ENGINE'],prior=names.map(n=>Deno.env.get(n)),original=globalThis.fetch;
+ let aiCalls=0,finished:any;
+ try{
+  ['worker','https://backend.invalid','service','ai','legacy_ai'].forEach((v,i)=>Deno.env.set(names[i],v));
+  globalThis.fetch=async(url,init)=>{
+   const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
+   if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'Senior .NET Engineer',description:'Requires 5 years of .NET development experience.',criteria:['requires 5 years of .NET'],manager_notes:'',knockouts:[]}}]);
+   if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
+   if(path==='/v1/responses'){
+    aiCalls++;
+    const input=JSON.parse(body.input),sourceId=input.job_description_sources[0].id;
+    assert(Array.isArray(input.criteria)&&input.criteria.length===1,'legacy criteria were not sent to AI');
+    return json({output:[{content:[{type:'output_text',text:JSON.stringify({criteria:[{index:0,label:'5 years of .NET development experience',question:'Describe your .NET experience.'}],hiring_priorities:[{title:'5 years of .NET development experience',reason:'Core requirement.',requirement_type:'required',question:'Describe your .NET experience.',source_id:sourceId}]})}]}]});
+   }
+   if(path.endsWith('/finish_job_criteria')){finished=body;return json(true);}
+   throw Error('Unexpected request: '+path);
+  };
+  const response=await handleCriteria(new Request('https://worker.invalid',{method:'POST',headers:{'x-worker-secret':'worker'},body:'{}'}));
+  assert(response.ok&&aiCalls===1,'legacy mode did not preserve AI path');
+  assert(finished.p_result.engine==='legacy_ai','legacy provenance missing');
+ }finally{globalThis.fetch=original;names.forEach((n,i)=>prior[i]===undefined?Deno.env.delete(n):Deno.env.set(n,prior[i]!));}
+});
+
 Deno.test('intake evaluates saved priorities with candidate sources and returns their review basis',async()=>{
  const original=globalThis.fetch,prior=Deno.env.get('OPENAI_API_KEY');
  const priorities={basis:'job_description',review_status:'suggested',items:[{id:'priority-1',title:'Manual regression ownership',reason:'Core responsibility.',question:'What work did you own?',requirement_type:'inferred',source_quote:'Own manual regression testing.'}]};
