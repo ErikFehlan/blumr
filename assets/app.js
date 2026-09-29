@@ -32,6 +32,7 @@
         saveSettings:settings=>{hybridState.settings=settings;},
         onDenied:()=>{setAdminAccess(false);showToast('Admin access is required.','error');},
         securityLoad:()=>dataService.loadBetaSecurity(),securityAccess:(email,approved)=>dataService.manageBetaAccess(email,approved),securityPause:paused=>dataService.pauseAI(paused),
+        reminderLoad:()=>dataService.loadReminderRecipients(),reminderSave:(id,enabled)=>dataService.setReminderRecipient(id,enabled),
         planLoad:()=>dataService.loadTeamPlans(),planSave:(id,plan,status,allowance,ends)=>dataService.setTeamPlan(id,plan,status,allowance,ends),
         ratesLoad:()=>dataService.loadModelRates(),ratesSave:(model,input,cached,output)=>dataService.saveModelRate(model,input,cached,output),
         costLoad:()=>dataService.loadAICostReport(),
