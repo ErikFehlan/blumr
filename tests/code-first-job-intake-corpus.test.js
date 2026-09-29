@@ -16,7 +16,7 @@ test('production corpus preserves explicit facts across common recruiting requir
   ['3 years Kafka required','3 years of Kafka event-driven development experience',[]],
   ['Azure experience preferred','Hands-on Azure cloud experience',[]],
   ['AWS experience required','Hands-on AWS cloud experience',[]],
-  ['Google Cloud experience required','Hands-on Google Cloud cloud experience',[]],
+  ['Google Cloud experience required','Hands-on Google Cloud experience',[]],
   ['4 years React required','4 years of React development experience',[]],
   ['5 years SQL Server required','5 years of SQL Server database experience',[]],
   ['ServiceNow experience required','Hands-on ServiceNow platform experience',[]],
