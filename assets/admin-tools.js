@@ -41,7 +41,7 @@
    try{
     const rows=await reminderLoad();if(!allowed||request!==version)return;panel.replaceChildren();
     const title=document.createElement('h3');title.textContent='Weekly onboarding reminders';
-    const note=document.createElement('p');note.className='rf-sub';note.textContent='Select beta users to receive at most one relevant reminder per week. Sending is off until the worker is configured. Users can unsubscribe.';panel.append(title,note);
+    const note=document.createElement('p');note.className='rf-sub';note.textContent='Select beta users to receive at most one relevant reminder per week. Only selected users receive emails, and they can opt out in Settings.';panel.append(title,note);
     const status=document.createElement('p');status.setAttribute('role','status');
     const list=document.createElement('ul');
     for(const row of rows||[]){const item=document.createElement('li'),label=document.createElement('label'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=row.enabled;toggle.disabled=row.opted_out||!row.approved;
