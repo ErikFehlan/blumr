@@ -44,3 +44,19 @@ test('pending polling is faster, completed polling slows, and switching jobs nev
  job={...job,id:'two'};await app.refresh(job);assert.equal(calls,4);
  job={...job,title:'Changed'};await app.refresh(job);assert.equal(calls,5);
 });
+
+test('failed criteria can be retried without editing or losing the saved job input',async()=>{
+ const vm=require('node:vm'),fs=require('node:fs');
+ const sandbox={module:{exports:{}},setInterval:()=>1,document:{visibilityState:'visible',addEventListener(){}}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../assets/criteria-automation.js'),'utf8'),sandbox);
+ const app=sandbox.module.exports,job={id:'a',title:'QA',description:'Manual testing',criteria:['5+ years QA'],managerFeedback:'',knockouts:[]};
+ const task={job_id:'a',revision:'rev',status:'failed',error_code:'ai_unavailable',attempts:3,input:{title:job.title,description:job.description,criteria:job.criteria,manager_notes:'',knockouts:[]}};
+ let retryClick,retries=0,toasts=[];
+ const button={disabled:false,textContent:'Try again',addEventListener:(name,fn)=>{retryClick=fn;}};
+ const wrap={innerHTML:'',querySelector:selector=>selector==='#retryCriteriaTask'&&wrap.innerHTML.includes('retryCriteriaTask')?button:null};
+ app.init({root:{querySelector:()=>wrap},ready:()=>true,job:()=>job,fetch:async()=>task,retry:async(id,revision)=>{retries++;assert.equal(id,'a');assert.equal(revision,'rev');return true;},updated(){},toast:(m)=>toasts.push(m)});
+ await app.refresh(job,true);
+ assert.match(wrap.innerHTML,/Try again/);assert.match(wrap.innerHTML,/original criteria are still saved/i);
+ await retryClick();
+ assert.equal(retries,1);assert.equal(task.status,'queued');assert.equal(task.error_code,null);assert.equal(task.attempts,0);assert.ok(toasts.some(x=>/retry queued/i.test(x)));
+});
