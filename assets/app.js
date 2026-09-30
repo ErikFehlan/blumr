@@ -48,7 +48,7 @@
       function showToast(message,type='success'){const region=root.querySelector('#toastRegion'),toast=document.createElement('div');toast.className='rf-toast '+type;toast.textContent=message;region.appendChild(toast);setTimeout(()=>{toast.style.opacity='0';toast.style.transform='translateY(8px)';setTimeout(()=>toast.remove(),220)},3200)}
       function trackProductEvent(eventType,jobId=activeJobId,metadata={}){if(!dataService)return;dataService.trackEvent(eventType,{jobId,sessionId:analyticsSessionId,metadata}).catch(error=>console.warn('Analytics event failed',error))}
       let reliabilityBound=false;
-      function recordReliability(source,category,operation,severity='error',errorCode=null,durationMs=null,metadata={}){if(!dataService)return;void dataService.recordReliabilityEvent(source,category,operation,severity,errorCode,durationMs,metadata);}
+      function recordReliability(source,category,operation,severity='error',errorCode=null,durationMs=null,metadata={}){if(!dataService?.recordReliabilityEvent)return;try{void dataService.recordReliabilityEvent(source,category,operation,severity,errorCode,durationMs,metadata);}catch{/* Monitoring must never interrupt recruiter recovery paths. */}}
       function bindReliabilityCapture(){
         if(reliabilityBound)return;reliabilityBound=true;
         window.addEventListener('error',()=>recordReliability('browser','page','window_error','error','runtime_error'));
