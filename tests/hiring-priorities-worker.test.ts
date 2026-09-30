@@ -33,9 +33,10 @@ Deno.test('ambiguous JD-only jobs fall back to grounded AI priorities through th
   ['worker','https://backend.invalid','service','ai','hybrid'].forEach((v,i)=>Deno.env.set(names[i],v));
   globalThis.fetch=async(url,init)=>{
    calls++;const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
-   if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'QA',description,criteria:[],manager_notes:'',knockouts:[]}}]);
+   if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',usage_run_id:'run-criteria',input:{title:'QA',description,criteria:[],manager_notes:'',knockouts:[]}}]);
    if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
    if(path==='/v1/responses'){
+    assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('criteria-run-criteria-priorities-')===true,'durable criteria request identity missing');
     const input=JSON.parse(body.input);assert(input.job_description_sources.length>0,'JD-only work skipped');
     assert(!Object.hasOwn(input,'criteria'),'criteria should already be handled by code');
     assert(body.text.format.schema.properties.hiring_priorities.maxItems===5,'unbounded priorities');
@@ -61,10 +62,11 @@ Deno.test('legacy rollout mode preserves the existing AI criteria path',async()=
   ['worker','https://backend.invalid','service','ai','legacy_ai'].forEach((v,i)=>Deno.env.set(names[i],v));
   globalThis.fetch=async(url,init)=>{
    const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
-   if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'Senior .NET Engineer',description:'Requires 5 years of .NET development experience.',criteria:['requires 5 years of .NET'],manager_notes:'',knockouts:[]}}]);
+   if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',usage_run_id:'run-legacy',input:{title:'Senior .NET Engineer',description:'Requires 5 years of .NET development experience.',criteria:['requires 5 years of .NET'],manager_notes:'',knockouts:[]}}]);
    if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
    if(path==='/v1/responses'){
     aiCalls++;
+    assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('criteria-run-legacy-legacy-')===true,'legacy criteria request identity missing');
     const input=JSON.parse(body.input),sourceId=input.job_description_sources[0].id;
     assert(Array.isArray(input.criteria)&&input.criteria.length===1,'legacy criteria were not sent to AI');
     return json({output:[{content:[{type:'output_text',text:JSON.stringify({criteria:[{index:0,label:'5 years of .NET development experience',question:'Describe your .NET experience.'}],hiring_priorities:[{title:'5 years of .NET development experience',reason:'Core requirement.',requirement_type:'required',question:'Describe your .NET experience.',source_id:sourceId}]})}]}]});
