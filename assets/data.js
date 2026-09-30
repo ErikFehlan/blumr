@@ -4,6 +4,7 @@
   const iso = value => new Date(Number(value) || value || Date.now()).toISOString();
   const epoch = value => value ? new Date(value).getTime() : Date.now();
   const compact = value => value == null ? null : value;
+  const clock = () => globalThis.performance?.now?.() ?? Date.now();
 
   function createDataService(auth) {
     const client = auth.client;
@@ -20,13 +21,13 @@
       } catch(error) { console.warn('Reliability event could not be recorded', error); }
     }
     async function monitored(source,category,operation,action,{slowMs=5000,metadata={}}={}) {
-      const started=performance.now();
+      const started=clock();
       try { return await action(); }
       catch(error) {
-        void recordReliabilityEvent(source,category,operation,'error',error?.code||error?.name||'operation_failed',performance.now()-started,metadata);
+        void recordReliabilityEvent(source,category,operation,'error',error?.code||error?.name||'operation_failed',clock()-started,metadata);
         throw error;
       } finally {
-        const duration=performance.now()-started;
+        const duration=clock()-started;
         if(duration>=slowMs)void recordReliabilityEvent(source,'performance',operation,'warn',null,duration,metadata);
       }
     }
