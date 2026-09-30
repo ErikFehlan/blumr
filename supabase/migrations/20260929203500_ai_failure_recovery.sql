@@ -41,7 +41,8 @@ begin
   set status='queued',attempts=0,next_run_at=now(),lease_id=null,lease_until=null,error_code=null,updated_at=now()
   where job_id=j.id;
 
-  perform public.wake_criteria_worker();
+  -- The existing durable cron worker picks this due task up on its next pass.
+  -- Do not call the trigger-only immediate-dispatch function outside trigger context.
   return true;
 end
 $$;
