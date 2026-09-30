@@ -18,7 +18,7 @@
           p_workspace:workspaceId,p_source:source,p_category:category,p_operation:operation,p_severity:severity,
           p_error_code:errorCode||null,p_duration_ms:Number.isFinite(durationMs)?Math.round(durationMs):null,p_metadata:metadata||{}
         });
-      } catch(error) { console.warn('Reliability event could not be recorded', error); }
+      } catch { /* Monitoring is best effort and never blocks recruiter work. */ }
     }
     async function monitored(source,category,operation,action,{slowMs=5000,metadata={}}={}) {
       const started=clock();
