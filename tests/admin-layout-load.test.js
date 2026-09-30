@@ -31,7 +31,7 @@ test('admin layout loads the server panel before accessing its controls',async()
   await admin.open();
   assert.equal(host.querySelector('#patternFunctionUrl').value,'https://example.supabase.co/functions/v1/analyze-patterns');
   assert.equal(host.querySelector('#patternAnonKey').value,'public-key');
-  assert.deepEqual(host.find(node=>node.tag==='nav').childNodes.map(node=>node.textContent),['Overview','Users & access','Emails','Usage & costs','Advanced']);
+  assert.deepEqual(host.find(node=>node.tag==='nav').childNodes.map(node=>node.textContent),['Overview','System health','Users & access','Emails','Usage & costs','Advanced']);
   assert.equal(host.find(node=>node.dataset.adminPanel==='overview').hidden,false);
   assert.equal(host.find(node=>node.dataset.adminPanel==='advanced').hidden,true);
   assert.equal(host.find(node=>node.textContent==='Admin tools could not be loaded. Please try again.'),null);
