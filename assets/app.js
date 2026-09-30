@@ -17,6 +17,7 @@
       const LIGHT_THEMES=new Set(['light','paper','sage']);
       const DEFAULT_HYBRID_SETTINGS={url:'https://zqiqjzxcpznhzjengfff.supabase.co/functions/v1/analyze-patterns-beta',anonKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxaXFqenhjcHpuaHpqZW5nZmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NjcwNDEsImV4cCI6MjEwMzM0MzA0MX0.Xbm_rHVt8Ku7GT7YY8PLUqbd8_6sXL4dZf0V6PGs7TA'};
       let hybridState={settings:{...DEFAULT_HYBRID_SETTINGS},analyses:{}};
+      const hybridRequests=window.BlumrIdempotency.createCoalescer();
       let dataService=null,dataReady=false,workspaceLoading=false,syncErrorShown=false;
       let home=null,tutorial=null,guidance=null,workspaceLoadError="";
       let adminAccess=false,adminRequest=0;
@@ -298,14 +299,20 @@
       async function callHybrid(payload,errorLabel='Analysis',{signal}={}){
         const url=(hybridState.settings?.url||'').trim(),anonKey=(hybridState.settings?.anonKey||'').trim(),auth=window.ancalagonAuth,accessToken=auth?.session?.access_token;
         if(!url||!anonKey)throw new Error('Hybrid engine is not configured');if(!accessToken)throw new Error('Sign in again before using AI analysis');
-        const controller=new AbortController(),abort=()=>controller.abort();
-        if(signal?.aborted)controller.abort();else signal?.addEventListener('abort',abort,{once:true});
-        const timer=setTimeout(abort,110000);
-        try{
-          const response=await fetch(url,{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken,'apikey':anonKey},body:JSON.stringify({...payload,evaluation_context:payload.evaluation_context||evaluationContext(payload.candidate_ref?candidateForRef(payload.candidate_ref):null),workspace_id:auth.workspace.id})});
-          const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error||`${errorLabel} failed (${response.status})`);return body;
-        }catch(error){if(controller.signal.aborted)throw new Error(signal?.aborted?'Analysis cancelled':'Analysis timed out. Try again.');throw error;}
-        finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+        const requestBody={...payload,evaluation_context:payload.evaluation_context||evaluationContext(payload.candidate_ref?candidateForRef(payload.candidate_ref):null),workspace_id:auth.workspace.id};
+        const execute=async()=>{
+          const controller=new AbortController(),abort=()=>controller.abort();
+          if(signal?.aborted)controller.abort();else signal?.addEventListener('abort',abort,{once:true});
+          const timer=setTimeout(abort,110000);
+          try{
+            const response=await fetch(url,{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken,'apikey':anonKey},body:JSON.stringify(requestBody)});
+            const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error||`${errorLabel} failed (${response.status})`);return body;
+          }catch(error){if(controller.signal.aborted)throw new Error(signal?.aborted?'Analysis cancelled':'Analysis timed out. Try again.');throw error;}
+          finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+        };
+        // Cancelable background evaluations need their own AbortSignal. Ordinary
+        // user actions with identical evidence share one in-flight provider call.
+        return signal?execute():hybridRequests.run(requestBody,execute);
       }
       async function analyzeResumeWithHybrid(resumeText,fileName,job,context){
         return callHybrid({analysis_type:'resume',auto_intake:true,file_name:fileName,resume_text:resumeText,

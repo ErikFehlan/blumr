@@ -120,7 +120,7 @@ const screeningSchema = {
   },
 };
 
-export async function handleAnalysis(request: Request, options: {feedbackModel?:string,modelOverride?:string,beforeModel?:(bytes:number,tokens:number)=>Promise<void>,onUsage?:(response:unknown)=>Promise<void>} = {}) {
+export async function handleAnalysis(request: Request, options: {feedbackModel?:string,modelOverride?:string,providerRequestId?:string,beforeModel?:(bytes:number,tokens:number)=>Promise<void>,onUsage?:(response:unknown)=>Promise<void>} = {}) {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -246,7 +246,7 @@ ANALYSIS RULES
           },
         },
       }),
-    },{timeoutMs:providerTimeout,maxRetries:2,requestId:crypto.randomUUID()});
+    },{timeoutMs:providerTimeout,maxRetries:2,requestId:options.providerRequestId||crypto.randomUUID()});
 
     const result = await response.json();
     await options.onUsage?.(result);

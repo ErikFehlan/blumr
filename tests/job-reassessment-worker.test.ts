@@ -3,7 +3,7 @@ function assert(condition:unknown,message='Assertion failed'){if(!condition)thro
 Deno.test('reassessment worker resolves evidence selections and keeps unsupported findings rejected',async()=>{
  const names=['JOB_REASSESSMENT_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY'],previous=names.map(n=>Deno.env.get(n));
  const fetchBefore=globalThis.fetch,timerBefore=globalThis.setTimeout;
- const task={workspace_id:'workspace-a',candidate_id:'c',revision:'r',lease_id:'lease',input:{job:{id:'j',title:'QA',description:'Manual testing required.',criteria:['-manual testing required']},candidate:{id:'c',jobId:'j',jdScore:7,managerScore:7,strengths:['Owned manual testing but did not write automation.']},feedback:[],outcomes:[]}};
+ const task={workspace_id:'workspace-a',candidate_id:'c',revision:'r',lease_id:'lease',usage_run_id:'run-reassess',input:{job:{id:'j',title:'QA',description:'Manual testing required.',criteria:['-manual testing required']},candidate:{id:'c',jobId:'j',jdScore:7,managerScore:7,strengths:['Owned manual testing but did not write automation.']},feedback:[],outcomes:[]}};
  let forged=false,finished:any;
  try{
   for(const [i,value] of ['worker','https://backend.invalid','service','ai'].entries())Deno.env.set(names[i],value);
@@ -14,6 +14,7 @@ Deno.test('reassessment worker resolves evidence selections and keeps unsupporte
    if(path.endsWith('/claim_job_reassessments'))return json([task]);
    if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
    if(path==='/v1/responses'){
+    assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('reassessment-run-reassess-')===true,'durable reassessment request identity missing');
     const format=body.text.format.schema,support=format.properties.evidence_support.items.properties;
     assert(!support.quote&&!support.source_id&&support.passage_id.enum.length,'model can write quotations');
     const context=JSON.parse(body.input).evaluation_context,source=context.sources.find((s:any)=>s.id==='profile-strength-1');
@@ -55,7 +56,7 @@ Deno.test('saved resumes start while job edits are still coalescing and retain t
  let releaseDelay:()=>void=()=>{},markStarted:()=>void=()=>{},markDelayed:()=>void=()=>{},timer:ReturnType<typeof setTimeout>|undefined;
  const started=new Promise<void>(resolve=>markStarted=resolve),delayed=new Promise<void>(resolve=>markDelayed=resolve);
  let finished=false,jobClaimed=false,run:Promise<Response>|undefined;
- const task={workspace_id:'workspace-a',candidate_id:'c',revision:'revision-1',lease_id:'lease-1',input:{job:{id:'j',title:'Synthetic QA',criteria:[],weights:[],knockouts:[]},candidate:{id:'c',jobId:'j'},feedback:[],outcomes:[],resume_text:'Synthetic QA Analyst. Owned manual regression testing and documented defects.',file_name:'Synthetic.txt'}};
+ const task={workspace_id:'workspace-a',candidate_id:'c',revision:'revision-1',lease_id:'lease-1',usage_run_id:'run-resume',input:{job:{id:'j',title:'Synthetic QA',criteria:[],weights:[],knockouts:[]},candidate:{id:'c',jobId:'j'},feedback:[],outcomes:[],resume_text:'Synthetic QA Analyst. Owned manual regression testing and documented defects.',file_name:'Synthetic.txt'}};
  try{
   for(const [name,value] of Object.entries({JOB_REASSESSMENT_SECRET:'test-worker',SUPABASE_URL:'https://backend.invalid',SUPABASE_SERVICE_ROLE_KEY:'test-service',OPENAI_API_KEY:'test-ai'}))Deno.env.set(name,value);
   globalThis.setTimeout=((callback:()=>void,ms:number)=>{
@@ -69,6 +70,7 @@ Deno.test('saved resumes start while job edits are still coalescing and retain t
    if(path.endsWith('/claim_account_deletions'))return json([]);
    if(path.endsWith('/claim_resume_intakes'))return json([task]);
    if(path==='/v1/responses'){
+    assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('resume-run-resume-')===true,'durable resume request identity missing');
     markStarted();
     return json({output_text:JSON.stringify({criteria_assessment:[],feedback_impact:{effect:'confirmation',summary:'No additional qualification evidence.',source_ids:[]},applied_lessons:[],name:'Synthetic QA Analyst',role:'QA Analyst',score:7,manager_score:7,primary_signal:'Testing ownership',jd_reason:'Testing evidence',manager_reason:'Ownership evidence',concerns:[],tags:['QA'],screening_questions:[],resume_evidence:[{claim:'Manual regression ownership',source_id:'resume-1'}]})});
    }
