@@ -854,8 +854,10 @@ function renderJobs(){
         loadAdminUsage();
         window.ancalagonFlush=async()=>{try{if(batch.hasUnsaved()||intake.hasUnsavedFile())throw Error('Wait for the resume uploads to finish or remove failed files from the upload queue.');await window.AncalagonWorkspace?.flushNotes();await dataService.flush(stateSnapshot());await home?.flush();await tutorial?.flush();await settings?.flush();}catch(error){setSyncStatus('error');showToast('Your latest changes have not saved. Retry before signing out.','error');throw error;}};
         jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;
+        const workspaceLoadStarted=performance.now();
         try{
           const [remote]=await Promise.all([dataService.load(),settings.load()]);if(workspaceRequest!==workspaceGeneration)return;
+          const workspaceLoadDuration=performance.now()-workspaceLoadStarted;if(workspaceLoadDuration>=5000)recordReliability('database','performance','workspace_load','warn',null,workspaceLoadDuration);
           if(remote.jobs.length){
             hydrateState({...remote,activeJobId:remote.jobs[0].id});
             hybridState.analyses=Object.fromEntries(remote.jobs.filter(job=>job.patternAnalysis).map(job=>[job.id,job.patternAnalysis]));
@@ -863,6 +865,7 @@ function renderJobs(){
           dataReady=true;
           renderInitialState();void home.load();void tutorial.load();void guidance.load();setSyncStatus('saved');candidateAutomation.resume(candidates);intake.resume();
         }catch(error){
+          recordReliability('database','supabase','workspace_load','error',error?.code||error?.name||'load_failed',performance.now()-workspaceLoadStarted);
           console.error('Workspace initialization failed',error);
           jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;
           dataReady=false;workspaceLoadError='Your jobs could not be loaded. Check your connection and try again.';renderInitialState();setSyncStatus('error');
