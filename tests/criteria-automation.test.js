@@ -20,7 +20,7 @@ test('matching results appear automatically and original wording can be restored
  const app=sandbox.module.exports,job={id:'a',title:'QA',criteria:['-5+ years QA required']};
  const task={job_id:'a',revision:'v1',status:'ready',input:{title:job.title,criteria:job.criteria},result:{criteria:[{original:job.criteria[0],label:'5+ years of QA experience required',priority:'Required',question:'Describe your QA experience.'}]}};
  let click,updates=0,available=true;
- const button={disabled:false,addEventListener:(name,fn)=>{click=fn;}},wrap={innerHTML:'',querySelector:()=>button};
+ const button={disabled:false,addEventListener:(name,fn)=>{click=fn;}},wrap={innerHTML:'',querySelector:selector=>selector==='#toggleCriteriaOriginal'&&wrap.innerHTML.includes('toggleCriteriaOriginal')?button:null};
  app.init({root:{querySelector:()=>wrap},ready:()=>true,job:()=>job,fetch:async()=>available?task:null,toggle:async(id,revision,original)=>{assert.equal(id,'a');assert.equal(revision,'v1');assert.equal(original,true);return true;},updated:()=>updates++,toast:()=>{throw Error('Unexpected error');}});
  await app.refresh(job,true);
  assert.equal(app.label(job.criteria[0],job),'5+ years of QA experience required');
