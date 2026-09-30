@@ -46,6 +46,16 @@ do $$begin
  exception when unique_violation then null;end;
 end$$;
 
+insert into public.candidate_assessments(workspace_id,job_id,candidate_id,assessment_type,evidence)
+values('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000021','manager_feedback','{"feedback_id":"00000000-0000-0000-0000-000000000099"}');
+do $begin
+ begin
+  insert into public.candidate_assessments(workspace_id,job_id,candidate_id,assessment_type,evidence)
+  values('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000021','manager_feedback','{"feedback_id":"00000000-0000-0000-0000-000000000099"}');
+  raise exception 'duplicate feedback assessment allowed';
+ exception when unique_violation then null;end;
+end$;
+
 insert into public.screening_insights(workspace_id,job_id,candidate_id)
 values('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000020');
 do $$begin
@@ -63,6 +73,13 @@ do $$begin
   raise exception 'unpaired lease allowed';
  exception when check_violation then null;end;
 end$$;
+
+do $begin
+ if has_function_privilege('anon','public.is_workspace_member(uuid)','EXECUTE') then raise exception 'anon workspace helper access remains';end if;
+ if has_function_privilege('anon','public.is_app_admin()','EXECUTE') then raise exception 'anon admin helper access remains';end if;
+ if has_function_privilege('authenticated','public.handle_new_user()','EXECUTE') then raise exception 'trigger helper exposed to authenticated';end if;
+ if has_function_privilege('authenticated','public.rls_auto_enable()','EXECUTE') then raise exception 'event trigger helper exposed to authenticated';end if;
+end$;
 
 set role authenticated;
 set test.actor='00000000-0000-0000-0000-000000000010';
