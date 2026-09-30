@@ -104,6 +104,7 @@ declare
  ai_paused boolean:=false;
  latest_ai_success timestamptz;
  latest_ai_failure timestamptz;
+ ai_task_failed integer:=0;
  resume_failed integer:=0;
  resume_stuck integer:=0;
  latest_resume_success timestamptz;
@@ -120,8 +121,18 @@ begin
  end if;
 
  select coalesce((select s.ai_paused from public.security_limits s where s.id=true),false) into ai_paused;
- select max(created_at) filter(where status='succeeded'),max(created_at) filter(where status='failed')
- into latest_ai_success,latest_ai_failure from public.ai_usage_events;
+ select greatest(
+   (select max(created_at) from public.ai_usage_events where status='succeeded'),
+   (select max(created_at) from public.ai_provider_usage)
+  ),
+  (select max(created_at) from public.ai_usage_events where status='failed')
+ into latest_ai_success,latest_ai_failure;
+
+ select
+  (select count(*) from public.resume_intake_tasks where status='failed' and updated_at>now()-interval '24 hours')+
+  (select count(*) from public.job_reassessment_tasks where status='failed' and updated_at>now()-interval '24 hours')+
+  (select count(*) from public.job_criteria_tasks where status='failed' and updated_at>now()-interval '24 hours')
+ into ai_task_failed;
 
  select count(*) filter(where status='failed' and updated_at>now()-interval '24 hours'),
         count(*) filter(where status='processing' and lease_until<now()-interval '5 minutes'),
@@ -153,11 +164,11 @@ begin
   'database',jsonb_build_object('status','healthy','detail','Health query completed'),
   'auth',jsonb_build_object('status','healthy','detail','Admin session verified'),
   'ai',jsonb_build_object(
-    'status',case when ai_paused then 'degraded'
+    'status',case when ai_paused or ai_task_failed>0 then 'degraded'
       when latest_ai_failure is not null and latest_ai_failure>coalesce(latest_ai_success,'epoch'::timestamptz) and latest_ai_failure>now()-interval '30 minutes' then 'degraded'
       when latest_ai_success is not null and latest_ai_success>now()-interval '24 hours' then 'healthy'
       else 'unknown' end,
-    'paused',ai_paused,'latest_success',latest_ai_success,'latest_failure',latest_ai_failure),
+    'paused',ai_paused,'task_failed_24h',ai_task_failed,'latest_success',latest_ai_success,'latest_failure',latest_ai_failure),
   'resume',jsonb_build_object(
     'status',case when resume_stuck>0 or resume_failed>0 then 'degraded' when latest_resume_success is not null then 'healthy' else 'unknown' end,
     'failed_24h',resume_failed,'stuck',resume_stuck,'latest_success',latest_resume_success),
