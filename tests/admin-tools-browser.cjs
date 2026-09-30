@@ -72,7 +72,7 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
   failUsage=false;await page.locator('#refreshAdminUsage').click();await page.getByText(/^Updated .*Refresh to load newer activity\.$/).waitFor();
   assert.equal(usageCalls,beforeFocus+2,'Manual refresh requests not recorded');
   await page.locator('#adminToolsNav').waitFor({state:'visible'});await page.locator('#adminToolsNav').click();
-  await page.getByRole('button',{name:'Overview',exact:true}).waitFor();
+  await page.getByLabel('Admin areas').getByRole('button',{name:'Overview',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Advanced',exact:true}).getAttribute('aria-pressed'),'false');
   await page.getByRole('button',{name:'Users & access',exact:true}).click();
   await page.locator('#betaAccessEmail').waitFor();assert.equal(await page.locator('.rf-globaljob').isVisible(),false);
