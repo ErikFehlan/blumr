@@ -12,8 +12,8 @@ test('identical in-flight operations share one promise and a later operation can
   const operation=()=>{calls++;return new Promise(resolve=>{release=resolve;});};
   const a=gate.run({analysis_type:'feedback',workspace_id:'w',text:'same'},operation);
   const b=gate.run({text:'same',workspace_id:'w',analysis_type:'feedback'},operation);
-  assert.equal(a,b);assert.equal(calls,0,'factory should start on the microtask queue');
-  await Promise.resolve();assert.equal(calls,1);assert.equal(gate.size(),1);
+  assert.equal(a,b);assert.equal(calls,1,'the first operation should start immediately');
+  assert.equal(gate.size(),1);
   release({ok:true});assert.deepEqual(await a,{ok:true});assert.deepEqual(await b,{ok:true});
   await Promise.resolve();assert.equal(gate.size(),0);
   const c=gate.run({analysis_type:'feedback',workspace_id:'w',text:'same'},async()=>{calls++;return {ok:'again'};});
