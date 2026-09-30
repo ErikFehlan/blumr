@@ -51,7 +51,7 @@ revoke all on function public.rls_auto_enable() from public,anon,authenticated;
 -- events for a workspace they belong to through the RPC below.
 create table if not exists public.reliability_events (
  id bigint generated always as identity primary key,
- workspace_id uuid not null references public.workspaces(id) on delete cascade,
+ workspace_id uuid references public.workspaces(id) on delete cascade,
  actor_id uuid references auth.users(id) on delete set null,
  source text not null check(source in ('browser','database','storage','edge','email','auth')),
  category text not null check(category in ('api','ai','supabase','resume','upload','page','auth','email','performance')),
