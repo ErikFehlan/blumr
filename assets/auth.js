@@ -46,6 +46,9 @@
     message.textContent = text;
     message.className = 'rf-auth-message' + (type ? ' ' + type : '');
   }
+  function reportAuthError(operation,error){
+    window.dispatchEvent(new CustomEvent('ancalagon:auth-error',{detail:{operation,code:error?.code||'auth_failed'}}));
+  }
 
   function showGuest() {
     sessionGeneration++;
@@ -204,6 +207,7 @@
     button.disabled = false;
     button.textContent = 'Send reset link';
     status.className = 'rf-auth-message ' + (error ? 'error' : 'success');
+    if(error)reportAuthError('password_reset_request',error);
     status.textContent = error
       ? (error.message || 'The reset link could not be sent.')
       : 'If an account exists for that email, a password-reset link has been sent.';
@@ -226,6 +230,7 @@
     button.disabled = false;
     button.textContent = 'Save new password';
     status.className = 'rf-auth-message ' + (error ? 'error' : 'success');
+    if(error)reportAuthError('password_recovery_update',error);
     status.textContent = error ? (error.message || 'Your password could not be updated.') : 'Password updated successfully.';
     if (!error) {
       document.getElementById('resetPasswordForm').reset();
@@ -298,6 +303,7 @@
       submitButton.textContent = 'Create account';
 
       if (error) {
+        reportAuthError('sign_up',error);
         showMessage(error.code==='unexpected_failure'?'Account creation could not finish. Confirm that this email has beta approval, then try again.':error.message || 'Your account could not be created.', 'error');
         return;
       }
@@ -320,6 +326,7 @@
     const { error } = await requestAuth(() => client.auth.signInWithPassword({ email, password }));
 
     if (error) {
+      reportAuthError('sign_in',error);
       setSignInProgress(false);
       showMessage(error.code === 'invalid_credentials' || /invalid.*credentials/i.test(error.message || '')
         ? 'The email or password is incorrect.'
@@ -358,6 +365,7 @@
     button.textContent = 'Set Password';
 
     if (error) {
+      reportAuthError('password_update',error);
       status.textContent = error.message || 'Your password could not be updated.';
       return;
     }
