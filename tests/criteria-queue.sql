@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 create role anon; create role authenticated; create role service_role bypassrls;
-create schema auth;create function auth.uid() returns uuid language sql stable as $select nullif(current_setting('test.actor',true),'')::uuid$;
+create schema auth;create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
 create table public.workspaces(id uuid primary key);
 create table public.jobs(id uuid primary key,workspace_id uuid not null references public.workspaces(id),title text,description text,criteria jsonb,manager_feedback text,knockouts jsonb,status text default 'active');
 create function public.is_workspace_member(w uuid) returns boolean language sql stable as $$select w::text=current_setting('test.workspace',true)$$;
