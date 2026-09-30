@@ -25,7 +25,7 @@ jobs:
       - name: Check core code and authenticated handlers
         run: |
           node --test tests/*.test.js
-          deno check supabase/functions/account-controls/index.ts supabase/functions/reassess-job/index.ts supabase/functions/analyze-patterns-beta/index.ts supabase/functions/analyze-patterns-v2/index.ts supabase/functions/sol-model-check/index.ts
+          deno check supabase/functions/account-controls/index.ts supabase/functions/reassess-job/index.ts supabase/functions/analyze-patterns-beta/index.ts supabase/functions/analyze-patterns-v2/index.ts supabase/functions/onboarding-reminders/index.ts supabase/functions/sol-model-check/index.ts
           deno test --allow-env tests/provider-retry.test.ts tests/sol-routing.test.ts tests/assessment-memory-routing.test.ts tests/security-backend.test.ts tests/learning-routing.test.ts tests/account-controls.test.ts tests/analysis-latency.test.ts tests/resume-intake-backend.test.ts tests/job-reassessment-worker.test.ts tests/hiring-priorities-worker.test.ts
       - name: Check database transactions and permissions
         env:
@@ -46,6 +46,8 @@ jobs:
           createdb -h localhost -U postgres beta_security
           psql -h localhost -U postgres -d beta_security -f tests/beta-security.sql
           node tests/security-concurrency.mjs
+          createdb -h localhost -U postgres reliability_health
+          psql -h localhost -U postgres -d reliability_health -f tests/reliability-health.sql
   deploy:
     needs: validate
     if: github.ref == 'refs/heads/main'
@@ -89,6 +91,7 @@ jobs:
           supabase functions deploy reassess-job --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy refine-job-criteria --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy account-controls --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy onboarding-reminders --project-ref "$SUPABASE_PROJECT_REF"
           supabase secrets set ASSESSMENT_MODEL=gpt-5.6-sol FEEDBACK_MODEL=gpt-5.6-sol REASSESSMENT_MODEL=gpt-5.6-sol JOB_INTAKE_ENGINE=hybrid --project-ref "$SUPABASE_PROJECT_REF"
           JOB_INTAKE_EXPECTED_MODE=hybrid node scripts/criteria-backend.mjs verify
           node scripts/usage-analytics-backend.mjs activate

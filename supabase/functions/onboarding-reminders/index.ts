@@ -21,6 +21,9 @@ Deno.serve(async request=>{
   if(!response.ok)throw Error('Database unavailable');
   const body=await response.text();return body?JSON.parse(body):null;
  };
+ const logReliability=async(category:string,operation:string,severity:'warn'|'error',errorCode:string|null,durationMs:number|null,metadata:Record<string,unknown>={})=>{
+  try{await fetch(base+'/rest/v1/reliability_events',{method:'POST',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({workspace_id:null,actor_id:null,source:'email',category,operation,severity,error_code:errorCode,duration_ms:durationMs==null?null:Math.round(durationMs),metadata})});}catch{/* Monitoring cannot block reminder delivery. */}
+ };
  try{
   let claimed:Array<{user_id:string,email:string,week_start:string,step:Step}>;
   if(suppliedSecret){
@@ -52,14 +55,15 @@ Deno.serve(async request=>{
    const url='https://blumr.io'+item.path;
    const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(item.subject)}</title></head><body style="font-family:Arial,sans-serif;color:#173d2d;max-width:580px;margin:auto;padding:28px"><p style="font-size:24px;font-weight:bold">blumr</p><h1>${escapeHtml(item.heading)}</h1><p>${escapeHtml(item.body)}</p><p><a href="${url}" style="display:inline-block;background:#206846;color:white;padding:12px 18px;text-decoration:none;border-radius:6px">${escapeHtml(item.button)}</a></p><p style="font-size:13px">To stop onboarding reminders, open blumr Settings and turn them off.</p></body></html>`;
    const plain=`${item.heading}\n\n${item.body}\n\n${item.button}: ${url}\n\nTo stop onboarding reminders, open blumr Settings and turn them off.`;
-   let providerId:string|null=null,success=false;
+   let providerId:string|null=null,success=false;const started=performance.now();
    try{
     const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${resend}`,'Content-Type':'application/json','Idempotency-Key':`onboarding-${row.user_id}-${row.week_start}`},body:JSON.stringify({from:'blumr <hello@blumr.io>',to:[row.email],subject:item.subject,html,text:plain})});
-    if(!response.ok)throw Error('Email provider unavailable');
+    if(!response.ok)throw Object.assign(Error('Email provider unavailable'),{code:`http_${response.status}`});
     providerId=(await response.json()).id;success=true;sent++;
-   }catch{failed++;}
+   }catch(error){failed++;void logReliability('email','onboarding_email_send','error',(error as {code?:string})?.code||'email_failed',performance.now()-started,{manual:!suppliedSecret});}
+   const duration=performance.now()-started;if(duration>=10000)void logReliability('performance','onboarding_email_send','warn',null,duration,{manual:!suppliedSecret});
    await rpc('finish_onboarding_reminder',{p_user:row.user_id,p_week:row.week_start,p_provider:providerId,p_sent:success});
   }
   return reply({claimed:claimed.length,sent,failed},!suppliedSecret&&failed?502:200);
- }catch{return reply({error:'Reminder worker unavailable'},503);}
+ }catch(error){void logReliability('api','onboarding_reminder_worker','error',(error as {code?:string})?.code||'worker_failed',null,{});return reply({error:'Reminder worker unavailable'},503);}
 });

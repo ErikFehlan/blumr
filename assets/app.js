@@ -36,7 +36,7 @@
         reminderLoad:()=>dataService.loadReminderRecipients(),reminderSave:(id,enabled)=>dataService.setReminderRecipient(id,enabled),reminderSend:id=>dataService.sendOnboardingReminder(id),
         planLoad:()=>dataService.loadTeamPlans(),planSave:(id,plan,status,allowance,ends)=>dataService.setTeamPlan(id,plan,status,allowance,ends),
         ratesLoad:()=>dataService.loadModelRates(),ratesSave:(model,input,cached,output)=>dataService.saveModelRate(model,input,cached,output),
-        costLoad:()=>dataService.loadAICostReport(),
+        costLoad:()=>dataService.loadAICostReport(),healthLoad:()=>dataService.loadSystemHealth(),
         toast:showToast,saveFile:downloadBlob,supportLoad:()=>dataService.loadSupportRequests(true),supportReview:(id,status)=>dataService.reviewSupportRequest(id,status)
       });
       const candidateFilters=new Map();let candidateListJob=null,lastJobOptions=null;let jobListFilter='active';
@@ -47,6 +47,14 @@
       function emptyState(icon,title,copy,action='',label=''){return `<div class="rf-card rf-empty"><div class="rf-empty-icon">${icon}</div><h3>${escapeHTML(title)}</h3><p>${escapeHTML(copy)}</p>${action?`<button class="rf-btn primary" type="button" data-goto="${action}">${escapeHTML(label)}</button>`:''}</div>`}
       function showToast(message,type='success'){const region=root.querySelector('#toastRegion'),toast=document.createElement('div');toast.className='rf-toast '+type;toast.textContent=message;region.appendChild(toast);setTimeout(()=>{toast.style.opacity='0';toast.style.transform='translateY(8px)';setTimeout(()=>toast.remove(),220)},3200)}
       function trackProductEvent(eventType,jobId=activeJobId,metadata={}){if(!dataService)return;dataService.trackEvent(eventType,{jobId,sessionId:analyticsSessionId,metadata}).catch(error=>console.warn('Analytics event failed',error))}
+      let reliabilityBound=false;
+      function recordReliability(source,category,operation,severity='error',errorCode=null,durationMs=null,metadata={}){if(!dataService?.recordReliabilityEvent)return;try{void dataService.recordReliabilityEvent(source,category,operation,severity,errorCode,durationMs,metadata);}catch{/* Monitoring must never interrupt recruiter recovery paths. */}}
+      function bindReliabilityCapture(){
+        if(reliabilityBound)return;reliabilityBound=true;
+        window.addEventListener('error',()=>recordReliability('browser','page','window_error','error','runtime_error'));
+        window.addEventListener('unhandledrejection',()=>recordReliability('browser','page','unhandled_rejection','error','promise_rejection'));
+        window.addEventListener('ancalagon:auth-error',event=>recordReliability('auth','auth',event.detail?.operation||'auth_request','error',event.detail?.code||'auth_failed'));
+      }
       function usageDate(value){return value?personalDate(value):'No activity yet'}
       function usageLabel(value){return ({signed_in:'Workspace opened',screening_analysis_completed:'Screening / feedback AI completed',screening_analysis_failed:'Screening / feedback AI failed'})[value]||String(value||'').replaceAll('_',' ').replace(/\b\w/g,letter=>letter.toUpperCase())}
       function setAdminAccess(allowed){
@@ -301,13 +309,16 @@
         if(!url||!anonKey)throw new Error('Hybrid engine is not configured');if(!accessToken)throw new Error('Sign in again before using AI analysis');
         const requestBody={...payload,evaluation_context:payload.evaluation_context||evaluationContext(payload.candidate_ref?candidateForRef(payload.candidate_ref):null),workspace_id:auth.workspace.id};
         const execute=async()=>{
+          const started=performance.now();
           const controller=new AbortController(),abort=()=>controller.abort();
           if(signal?.aborted)controller.abort();else signal?.addEventListener('abort',abort,{once:true});
           const timer=setTimeout(abort,110000);
           try{
             const response=await fetch(url,{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken,'apikey':anonKey},body:JSON.stringify(requestBody)});
-            const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(body.error||`${errorLabel} failed (${response.status})`);return body;
-          }catch(error){if(controller.signal.aborted)throw new Error(signal?.aborted?'Analysis cancelled':'Analysis timed out. Try again.');throw error;}
+            const body=await response.json().catch(()=>({}));
+            const duration=performance.now()-started;if(duration>=20000)recordReliability('edge','performance','direct_ai_analysis','warn',null,duration,{analysis_type:requestBody.analysis_type||'patterns'});
+            if(!response.ok){const failure=Error(body.error||`${errorLabel} failed (${response.status})`);failure.code=body.code||`http_${response.status}`;throw failure;}return body;
+          }catch(error){const duration=performance.now()-started;recordReliability('edge','ai','direct_ai_analysis','error',error?.code||error?.name||'ai_failed',duration,{analysis_type:requestBody.analysis_type||'patterns'});if(controller.signal.aborted)throw new Error(signal?.aborted?'Analysis cancelled':'Analysis timed out. Try again.');throw error;}
           finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
         };
         // Cancelable background evaluations need their own AbortSignal. Ordinary
@@ -833,7 +844,7 @@ function renderJobs(){
         workspaceLoading=true;
         document.body.classList.add('rf-data-loading');
         root.setAttribute('aria-busy','true');
-        const workspaceRequest=++workspaceGeneration;dataService=window.AncalagonData.create(auth);workspaceLoadError='';home?.dispose();home=window.AncalagonHome.create({state:stateSnapshot,load:()=>dataService.loadHome?.()||null,visit:()=>dataService.visitHome?.(),save:location=>dataService.saveHome?.(location),reviews:()=>dataService.loadHomeReviews?.()||[],changed:()=>{if(root.querySelector('#page-home').classList.contains('active'))renderHome();}});
+        const workspaceRequest=++workspaceGeneration;dataService=window.AncalagonData.create(auth);bindReliabilityCapture();workspaceLoadError='';home?.dispose();home=window.AncalagonHome.create({state:stateSnapshot,load:()=>dataService.loadHome?.()||null,visit:()=>dataService.visitHome?.(),save:location=>dataService.saveHome?.(location),reviews:()=>dataService.loadHomeReviews?.()||[],changed:()=>{if(root.querySelector('#page-home').classList.contains('active'))renderHome();}});
         guidance?.dispose();const guidanceService=dataService;guidance=window.AncalagonGuidance.mount(root,{load:()=>guidanceService.loadGuidance?.()||null,save:(action,tip)=>guidanceService.saveGuidance(action,tip)});
         tutorial?.dispose();tutorial=window.AncalagonTutorialUI.mount(root.querySelector('#ancalagon-tutorial'),{
           load:()=>dataService.loadTutorial(),save:(progress,revision)=>dataService.saveTutorial(progress,revision),
@@ -843,8 +854,10 @@ function renderJobs(){
         loadAdminUsage();
         window.ancalagonFlush=async()=>{try{if(batch.hasUnsaved()||intake.hasUnsavedFile())throw Error('Wait for the resume uploads to finish or remove failed files from the upload queue.');await window.AncalagonWorkspace?.flushNotes();await dataService.flush(stateSnapshot());await home?.flush();await tutorial?.flush();await settings?.flush();}catch(error){setSyncStatus('error');showToast('Your latest changes have not saved. Retry before signing out.','error');throw error;}};
         jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;
+        const workspaceLoadStarted=performance.now();
         try{
           const [remote]=await Promise.all([dataService.load(),settings.load()]);if(workspaceRequest!==workspaceGeneration)return;
+          const workspaceLoadDuration=performance.now()-workspaceLoadStarted;if(workspaceLoadDuration>=5000)recordReliability('database','performance','workspace_load','warn',null,workspaceLoadDuration);
           if(remote.jobs.length){
             hydrateState({...remote,activeJobId:remote.jobs[0].id});
             hybridState.analyses=Object.fromEntries(remote.jobs.filter(job=>job.patternAnalysis).map(job=>[job.id,job.patternAnalysis]));
@@ -852,6 +865,7 @@ function renderJobs(){
           dataReady=true;
           renderInitialState();void home.load();void tutorial.load();void guidance.load();setSyncStatus('saved');candidateAutomation.resume(candidates);intake.resume();
         }catch(error){
+          recordReliability('database','supabase','workspace_load','error',error?.code||error?.name||'load_failed',performance.now()-workspaceLoadStarted);
           console.error('Workspace initialization failed',error);
           jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;
           dataReady=false;workspaceLoadError='Your jobs could not be loaded. Check your connection and try again.';renderInitialState();setSyncStatus('error');

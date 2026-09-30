@@ -4,6 +4,7 @@
   const iso = value => new Date(Number(value) || value || Date.now()).toISOString();
   const epoch = value => value ? new Date(value).getTime() : Date.now();
   const compact = value => value == null ? null : value;
+  const clock = () => globalThis.performance?.now?.() ?? Date.now();
 
   function createDataService(auth) {
     const client = auth.client;
@@ -11,6 +12,25 @@
     const userId = auth.session.user.id;
     let queued = Promise.resolve();
     let timer = null;
+    async function recordReliabilityEvent(source,category,operation,severity='error',errorCode=null,durationMs=null,metadata={}) {
+      try {
+        await client.rpc('record_reliability_event',{
+          p_workspace:workspaceId,p_source:source,p_category:category,p_operation:operation,p_severity:severity,
+          p_error_code:errorCode||null,p_duration_ms:Number.isFinite(durationMs)?Math.round(durationMs):null,p_metadata:metadata||{}
+        });
+      } catch { /* Monitoring is best effort and never blocks recruiter work. */ }
+    }
+    async function monitored(source,category,operation,action,{slowMs=5000,metadata={}}={}) {
+      const started=clock();
+      try { return await action(); }
+      catch(error) {
+        void recordReliabilityEvent(source,category,operation,'error',error?.code||error?.name||'operation_failed',clock()-started,metadata);
+        throw error;
+      } finally {
+        const duration=clock()-started;
+        if(duration>=slowMs)void recordReliabilityEvent(source,'performance',operation,'warn',null,duration,metadata);
+      }
+    }
     let pendingState = null;
     let lastFingerprint = '';
     let pendingWrites = 0, statusListener = null;
@@ -277,7 +297,7 @@
       const operation = queued.then(() => sync(next));
       queued = operation.catch(() => {});
       try { await operation; pendingWrites--; reportStatus(); }
-      catch (error) { pendingWrites--; statusListener?.('error'); throw error; }
+      catch (error) { pendingWrites--; statusListener?.('error');void recordReliabilityEvent('database','supabase','workspace_flush','error',error?.code||error?.name||'save_failed');throw error; }
     }
 
     function reconcileApprovals(state) {
@@ -340,8 +360,10 @@
       if(error)throw error;return data||[];
     }
     async function requestCandidateReassessment(candidateId) {
-      const {error}=await client.rpc('request_candidate_reassessment',{p_candidate:candidateId});
-      if(error)throw error;
+      return monitored('database','ai','request_candidate_reassessment',async()=>{
+        const {error}=await client.rpc('request_candidate_reassessment',{p_candidate:candidateId});
+        if(error)throw error;
+      },{metadata:{candidate_id:candidateId}});
     }
     async function loadAssessmentLessons(){
       const {data,error}=await client.from('assessment_lessons').select('id,job_id,kind,scope,role_key,text,active,revision,updated_at').eq('workspace_id',workspaceId).order('updated_at',{ascending:false}).limit(500);
@@ -431,11 +453,22 @@
       if (error) throw error;
       return data;
     }
+    async function loadSystemHealth() {
+      const {data,error}=await client.rpc('get_system_health');
+      if(error)throw error;return data;
+    }
 
     async function loadBetaSecurity() { const {data,error}=await client.rpc('get_beta_security');if(error)throw error;return data; }
     async function loadReminderRecipients() { const {data,error}=await client.rpc('get_onboarding_reminders');if(error)throw error;return data; }
     async function setReminderRecipient(userId,enabled) { const {error}=await client.rpc('set_onboarding_reminder_recipient',{p_user:userId,p_enabled:enabled});if(error)throw error; }
-    async function sendOnboardingReminder(userId) { const {data,error}=await client.functions.invoke('onboarding-reminders',{body:{user_id:userId}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Reminder could not be sent.');}if(data?.sent!==1)throw Error('Reminder could not be sent.');return data; }
+    async function sendOnboardingReminder(userId) {
+      return monitored('email','email','manual_onboarding_reminder',async()=>{
+        const {data,error}=await client.functions.invoke('onboarding-reminders',{body:{user_id:userId}});
+        if(error){let details;try{details=await error.context?.json();}catch{}const failure=Error(details?.error||'Reminder could not be sent.');failure.code=details?.code||error?.name||'email_failed';throw failure;}
+        if(data?.sent!==1){const failure=Error('Reminder could not be sent.');failure.code='email_not_sent';throw failure;}
+        return data;
+      },{slowMs:10000,metadata:{recipient_user_id:userId}});
+    }
     async function optOutOnboardingReminders() { const {error}=await client.rpc('opt_out_onboarding_reminders');if(error)throw error; }
     async function manageBetaAccess(email,approved) { const {error}=await client.rpc('manage_beta_access',{p_email:email,p_approved:approved});if(error)throw error; }
     async function pauseAI(paused) { const {error}=await client.rpc('set_ai_paused',{p_paused:paused});if(error)throw error; }
@@ -456,8 +489,10 @@
     }
 
     async function requestResumeIntake(candidateId,retry=false) {
-      const {error}=await client.rpc('request_resume_intake',{p_candidate:candidateId,p_retry:retry});
-      if(error)throw error;
+      return monitored('database','resume','request_resume_intake',async()=>{
+        const {error}=await client.rpc('request_resume_intake',{p_candidate:candidateId,p_retry:retry});
+        if(error)throw error;
+      },{metadata:{candidate_id:candidateId,retry:Boolean(retry)}});
     }
     async function loadResumeIntake(candidateId) {
       const {data,error}=await client.from('resume_intake_tasks').select('candidate_id,job_id,revision,status,result,error_code,updated_at')
@@ -481,6 +516,7 @@
       return (data||[]).sort((a,b)=>epoch(b.created_at)-epoch(a.created_at))[0]?.extracted_text||'';
     }
     async function uploadResume(candidate, file, extractedText) {
+      return monitored('storage','upload','resume_upload',async()=>{
       const extension=String(file.name||'').split('.').pop().toLowerCase();
       const mime={pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',txt:'text/plain'}[extension];
       if(!mime||!file.size||file.size>10485760||typeof extractedText!=='string'||extractedText.trim().length<40||extractedText.length>120000)throw Error('Choose a readable PDF, DOCX, or TXT resume up to 10 MB.');
@@ -505,6 +541,7 @@
         throw rowError;
       }
       return path;
+      },{slowMs:8000,metadata:{candidate_id:candidate.id,job_id:candidate.jobId,file_size:Number(file.size||0)}});
     }
 
     async function settingsRPC(name,args) {const {data,error}=await client.rpc(name,args);if(error)throw error;return data;}
@@ -529,7 +566,7 @@
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
+    return { loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };
