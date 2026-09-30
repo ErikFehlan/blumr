@@ -20,6 +20,7 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
     usageCalls++;if(failUsage){res.statusCode=503;res.end(JSON.stringify({message:'Temporary outage'}));return;}
     res.end(JSON.stringify({generated_at:'2026-09-16T12:00:00Z',tracking_started_at:'2026-09-16T11:00:00Z',totals:{accounts:2},users:[{email:'admin@example.test',jobs_created:2,candidates_added:3,ai_completed:7,resumes_analyzed:1,feedback_saved:4,outcomes_saved:1}],event_breakdown:{resume_analysis_completed:1,candidate_reassessment_completed:6}}));return;
    }
+   if(op==='health'){res.end(JSON.stringify({generated_at:'2026-09-30T14:00:00Z',database:{status:'healthy'},auth:{status:'healthy'},ai:{status:'healthy',latest_success:'2026-09-30T13:59:00Z'},resume:{status:'healthy',latest_success:'2026-09-30T13:58:00Z'},email:{status:'healthy',latest_status:'sent',latest_at:'2026-09-29T12:00:00Z'},assessment:{status:'healthy',latest_success:'2026-09-30T13:58:00Z'},monitoring:{errors_24h:1,slow_24h:2,recent_events:[{created_at:'2026-09-30T13:57:00Z',category:'page',operation:'window_error',severity:'error',error_code:'runtime_error',duration_ms:12}]}}));return;}
    if(op==='tools'){
     if(failTools){res.statusCode=503;res.end(JSON.stringify({message:'Try again'}));return;}
     if(holdTools){held=()=>res.end(JSON.stringify({html:resources.panel}));return;}
@@ -44,7 +45,7 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
    await page.route('**/assets/data.js*',route=>route.fulfill({contentType:'application/javascript',body:''}));
    await page.addInitScript(user=>{
     const rpc=async(op,input)=>{const response=await fetch('/rpc/'+op,{method:'POST',headers:{'X-Test-Account':user},body:JSON.stringify(input||{})});const result=await response.json();if(!response.ok)throw Object.assign(Error(result.message),{code:result.code});return result;};
-    window.AncalagonData={create:()=>({load:async()=>({jobs:[],candidates:[],feedback:[],interviewOutcomes:[]}),loadHome:async()=>null,visitHome:async()=>{},loadHomeReviews:async()=>[],loadJobReassessments:async()=>[],trackEvent:async()=>{},schedule:()=>{},flush:async()=>{},loadBetaSecurity:()=>rpc('security'),manageBetaAccess:(email,approved)=>rpc('access',{email,approved}),pauseAI:paused=>rpc('pause',{paused}),loadAdminAnalytics:()=>rpc('usage'),isAppAdmin:()=>rpc('is-admin'),loadAdminTools:()=>rpc('tools'),loadAdminStarterFile:(file,model,project)=>rpc('download',{file,model,project})})};
+    window.AncalagonData={create:()=>({load:async()=>({jobs:[],candidates:[],feedback:[],interviewOutcomes:[]}),loadHome:async()=>null,visitHome:async()=>{},loadHomeReviews:async()=>[],loadJobReassessments:async()=>[],trackEvent:async()=>{},schedule:()=>{},flush:async()=>{},loadBetaSecurity:()=>rpc('security'),manageBetaAccess:(email,approved)=>rpc('access',{email,approved}),pauseAI:paused=>rpc('pause',{paused}),loadAdminAnalytics:()=>rpc('usage'),loadSystemHealth:()=>rpc('health'),recordReliabilityEvent:async()=>{},isAppAdmin:()=>rpc('is-admin'),loadAdminTools:()=>rpc('tools'),loadAdminStarterFile:(file,model,project)=>rpc('download',{file,model,project})})};
     // Owning a workspace or setting user metadata never grants application-admin rights.
     window.ancalagonAuth={session:{user:{id:user,user_metadata:{role:'admin',admin:true}}},workspace:{id:user,role:'owner'}};
    },user);
@@ -74,6 +75,11 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
   await page.locator('#adminToolsNav').waitFor({state:'visible'});await page.locator('#adminToolsNav').click();
   await page.getByLabel('Admin areas').getByRole('button',{name:'Overview',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Advanced',exact:true}).getAttribute('aria-pressed'),'false');
+  await page.getByRole('button',{name:'System health',exact:true}).click();
+  await page.getByRole('heading',{name:'System health',exact:true}).waitFor();
+  assert.equal(await page.getByText('Supabase database',{exact:true}).isVisible(),true);
+  assert.match(await page.locator('#systemHealthPanel').textContent(),/Latest successful candidate assessment/);
+  assert.match(await page.locator('#systemHealthPanel').textContent(),/1 recorded errors · 2 slow operations/);
   await page.getByRole('button',{name:'Users & access',exact:true}).click();
   await page.locator('#betaAccessEmail').waitFor();assert.equal(await page.locator('.rf-globaljob').isVisible(),false);
   await page.locator('#betaAccessEmail').fill('tester@example.test');await page.getByRole('button',{name:'Approve beta access',exact:true}).click();
