@@ -17,7 +17,9 @@
       run(keyValue,operation){
         const key=typeof keyValue==='string'?keyValue:canonical(keyValue);
         if(inflight.has(key))return inflight.get(key);
-        const promise=Promise.resolve().then(operation);
+        let promise;
+        try{promise=Promise.resolve(operation());}
+        catch(error){promise=Promise.reject(error);}
         inflight.set(key,promise);
         const clear=()=>{if(inflight.get(key)===promise)inflight.delete(key);};
         promise.then(clear,clear);
