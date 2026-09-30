@@ -20,7 +20,7 @@ test('matching results appear automatically and original wording can be restored
  const app=sandbox.module.exports,job={id:'a',title:'QA',criteria:['-5+ years QA required']};
  const task={job_id:'a',revision:'v1',status:'ready',input:{title:job.title,criteria:job.criteria},result:{criteria:[{original:job.criteria[0],label:'5+ years of QA experience required',priority:'Required',question:'Describe your QA experience.'}]}};
  let click,updates=0,available=true;
- const button={disabled:false,addEventListener:(name,fn)=>{click=fn;}},wrap={innerHTML:'',querySelector:()=>button};
+ const button={disabled:false,addEventListener:(name,fn)=>{click=fn;}},wrap={innerHTML:'',querySelector:selector=>selector==='#toggleCriteriaOriginal'&&wrap.innerHTML.includes('toggleCriteriaOriginal')?button:null};
  app.init({root:{querySelector:()=>wrap},ready:()=>true,job:()=>job,fetch:async()=>available?task:null,toggle:async(id,revision,original)=>{assert.equal(id,'a');assert.equal(revision,'v1');assert.equal(original,true);return true;},updated:()=>updates++,toast:()=>{throw Error('Unexpected error');}});
  await app.refresh(job,true);
  assert.equal(app.label(job.criteria[0],job),'5+ years of QA experience required');
@@ -43,4 +43,20 @@ test('pending polling is faster, completed polling slows, and switching jobs nev
  clock=6000;await app.refresh(job);assert.equal(calls,3);
  job={...job,id:'two'};await app.refresh(job);assert.equal(calls,4);
  job={...job,title:'Changed'};await app.refresh(job);assert.equal(calls,5);
+});
+
+test('failed criteria can be retried without editing or losing the saved job input',async()=>{
+ const vm=require('node:vm'),fs=require('node:fs');
+ const sandbox={module:{exports:{}},setInterval:()=>1,document:{visibilityState:'visible',addEventListener(){}}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../assets/criteria-automation.js'),'utf8'),sandbox);
+ const app=sandbox.module.exports,job={id:'a',title:'QA',description:'Manual testing',criteria:['5+ years QA'],managerFeedback:'',knockouts:[]};
+ const task={job_id:'a',revision:'rev',status:'failed',error_code:'ai_unavailable',attempts:3,input:{title:job.title,description:job.description,criteria:job.criteria,manager_notes:'',knockouts:[]}};
+ let retryClick,retries=0,toasts=[];
+ const button={disabled:false,textContent:'Try again',addEventListener:(name,fn)=>{retryClick=fn;}};
+ const wrap={innerHTML:'',querySelector:selector=>selector==='#retryCriteriaTask'&&wrap.innerHTML.includes('retryCriteriaTask')?button:null};
+ app.init({root:{querySelector:()=>wrap},ready:()=>true,job:()=>job,fetch:async()=>task,retry:async(id,revision)=>{retries++;assert.equal(id,'a');assert.equal(revision,'rev');return true;},updated(){},toast:(m)=>toasts.push(m)});
+ await app.refresh(job,true);
+ assert.match(wrap.innerHTML,/Try again/);assert.match(wrap.innerHTML,/original criteria are still saved/i);
+ await retryClick();
+ assert.equal(retries,1);assert.equal(task.status,'queued');assert.equal(task.error_code,null);assert.equal(task.attempts,0);assert.ok(toasts.some(x=>/retry queued/i.test(x)));
 });
