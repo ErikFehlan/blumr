@@ -114,9 +114,9 @@ export async function handleAuthenticatedAnalysis(request: Request) {
     if(!admitted){admitted=true;started=recordUsage('started');}
   };
   const onUsage=(result:unknown)=>recordProviderUsage(workspaceId,operation,result,user.id);
-  let response = await handleAnalysis(analysisRequest(), {feedbackModel,beforeModel,onUsage});
+  let response = await handleAnalysis(analysisRequest(), {feedbackModel,beforeModel,onUsage,providerRequestId:`direct-${requestId}-primary`});
   const failure=response.ok?null:await response.clone().json().catch(()=>null);
-  if (feedbackModel && !response.ok && !['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large','usage_check_unavailable'].includes(failure?.code)) response = await handleAnalysis(analysisRequest(), {beforeModel,onUsage});
+  if (feedbackModel && !response.ok && !['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large','usage_check_unavailable'].includes(failure?.code)) response = await handleAnalysis(analysisRequest(), {beforeModel,onUsage,providerRequestId:`direct-${requestId}-fallback`});
 
   const telemetry = admitted ? started.then(() => recordUsage(response.ok ? "succeeded" : "failed")) : Promise.resolve();
   const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;
