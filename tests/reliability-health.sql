@@ -14,6 +14,7 @@ create table public.resume_intake_tasks(candidate_id uuid primary key,attempts i
 create table public.job_reassessment_tasks(candidate_id uuid primary key,attempts int not null default 0,lease_id uuid,lease_until timestamptz,status text not null default 'queued',updated_at timestamptz not null default now());
 create table public.job_criteria_tasks(job_id uuid primary key,attempts int not null default 0,lease_id uuid,lease_until timestamptz,status text not null default 'queued',updated_at timestamptz not null default now());
 create table public.ai_usage_events(id bigint generated always as identity primary key,status text not null,created_at timestamptz not null default now());
+create table public.ai_provider_usage(response_id text primary key,created_at timestamptz not null default now());
 create table public.onboarding_reminder_sends(user_id uuid not null,week_start date not null,status text not null,created_at timestamptz not null default now(),primary key(user_id,week_start));
 create table public.security_limits(id boolean primary key default true,ai_paused boolean not null default false);
 
