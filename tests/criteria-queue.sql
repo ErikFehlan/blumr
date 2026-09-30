@@ -33,18 +33,18 @@ update public.job_criteria_tasks set next_run_at=now()-interval '1 minute';selec
 update public.job_criteria_tasks set lease_until=now()-interval '1 second';select * from public.claim_job_criteria();
 update public.job_criteria_tasks set lease_until=now()-interval '1 second';select * from public.claim_job_criteria();
 update public.job_criteria_tasks set lease_until=now()-interval '1 second';select * from public.claim_job_criteria();
-do $ begin if (select status from public.job_criteria_tasks)<>'failed' then raise exception 'bounded retry failed'; end if; end $;
+do $$ begin if (select status from public.job_criteria_tasks)<>'failed' then raise exception 'bounded retry failed'; end if; end $$;
 set role authenticated;set test.workspace='00000000-0000-0000-0000-000000000001';set test.actor='00000000-0000-0000-0000-000000000010';
-do $begin
+do $$begin
  if not public.retry_job_criteria('00000000-0000-0000-0000-000000000003',(select revision from public.job_criteria_tasks where job_id='00000000-0000-0000-0000-000000000003')) then raise exception 'failed criteria did not requeue';end if;
  if (select status from public.job_criteria_tasks where job_id='00000000-0000-0000-0000-000000000003')<>'queued' then raise exception 'criteria retry not queued';end if;
  if (select attempts from public.job_criteria_tasks where job_id='00000000-0000-0000-0000-000000000003')<>0 then raise exception 'criteria attempts not reset';end if;
  if (select error_code from public.job_criteria_tasks where job_id='00000000-0000-0000-0000-000000000003') is not null then raise exception 'criteria retry error not cleared';end if;
-end$;
+end$$;
 set test.workspace='00000000-0000-0000-0000-000000000002';
-do $begin
+do $$begin
  begin perform public.retry_job_criteria('00000000-0000-0000-0000-000000000003',(select revision from public.job_criteria_tasks where job_id='00000000-0000-0000-0000-000000000003'));raise exception 'foreign criteria retry allowed';exception when insufficient_privilege then null;end;
-end$;
+end$$;
 reset role;
 delete from jobs;
 do $$ begin if exists(select 1 from public.job_criteria_tasks) then raise exception 'orphan task'; end if; end $$;
