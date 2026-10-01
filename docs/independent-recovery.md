@@ -4,7 +4,7 @@
 
 `independent-backup.yml` runs daily at 07:17 UTC and can be started manually. It uses the existing deployment credential to create logical roles, schema and data dumps, and separately downloads every Supabase Storage object. Each download is checked against its recorded byte length and SHA-256 checksum.
 
-All public application tables, Auth users/identities and Storage bucket/object metadata are inventoried in one database statement. Their row counts and content checksums must remain unchanged across the capture. A changing source fails the job instead of accepting an inconsistent backup. This does not promise an atomic point in time spanning the database and Storage.
+All public application tables, Auth users/identities and Storage bucket/object metadata are inventoried in one database statement. Their row counts and content checksums must remain unchanged across the capture. A changing source triggers up to three fresh attempts; other failures stop immediately instead of accepting an inconsistent backup. This does not promise an atomic point in time spanning the database and Storage.
 
 The archive uses AES-256-GCM; its random encryption key is wrapped with RSA-OAEP-SHA256 using the repository's public recovery key. The private recovery key is held separately by the owner. Credentials and plaintext dumps are excluded from uploaded artifacts and deleted from the private runner directory on exit.
 
@@ -34,4 +34,4 @@ Cloudflare runs `node scripts/build-public-site.mjs`. Production publication req
 
 Preview builds require the isolated staging public key. Authentication, AI defaults and the browser connection policy all use the staging project. Production account data is never copied to staging. Staging uses the same repository migrations and handlers, then verifies live permission/intake/review/provider paths and checks structural parity.
 
-Application validation is limited to 12 minutes; browser installation is limited to four minutes. Hosting checks wait up to 15 minutes. If a valid release takes longer, retry the hosting deployment after its required checks pass. A stalled run cannot silently publish production.
+Application validation is limited to 12 minutes; test packages must install within four minutes. Browser tests use a pinned Playwright image that already includes browsers and system libraries, avoiding the Ubuntu package mirror that stalled previous runs. Hosting checks wait up to 15 minutes. If a valid release takes longer, retry the hosting deployment after its required checks pass. A stalled run cannot silently publish production.

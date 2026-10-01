@@ -59,8 +59,8 @@ jobs:
           node scripts/usage-analytics-backend.mjs activate
       - name: Verify actual staging permissions, intake, review, and provider access
         run: |
+          node scripts/staging-parity.mjs
           node scripts/security-backend.mjs verify
           node scripts/security-live-smoke.mjs
           node scripts/core-live-smoke.mjs
           node scripts/usage-analytics-backend.mjs verify
-          node scripts/staging-parity.mjs

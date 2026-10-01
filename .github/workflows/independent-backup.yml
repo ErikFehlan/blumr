@@ -28,7 +28,7 @@ jobs:
           node-version: 22
       - uses: supabase/setup-cli@v1
         with:
-          version: 2.95.3
+          version: 2.119.0
       - name: Dump database, copy every Storage object, encrypt, and prove isolated recovery
         run: |
           for attempt in 1 2 3; do

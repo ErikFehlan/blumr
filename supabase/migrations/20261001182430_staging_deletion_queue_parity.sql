@@ -7,4 +7,7 @@ alter table public.account_deletions
  add column if not exists lease_until timestamptz,
  add column if not exists attempts integer not null default 0,
  add column if not exists last_attempt_at timestamptz;
+alter table public.account_deletions
+ alter column workspace_ids set not null,
+ alter column workspace_ids drop default;
 commit;
