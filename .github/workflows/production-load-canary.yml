@@ -9,6 +9,7 @@ on:
   workflow_call:
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: production-load-canary
   cancel-in-progress: false
