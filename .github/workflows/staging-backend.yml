@@ -2,8 +2,6 @@ name: Verify isolated staging backend
 on:
   workflow_call:
   workflow_dispatch:
-  push:
-    branches: [reliability/backups-and-release-gates]
 permissions:
   contents: read
 concurrency:

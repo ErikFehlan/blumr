@@ -29,12 +29,15 @@ let database,network;
 try{
  await mkdir(source,{mode:0o700});await mkdir(restore,{mode:0o700});await mkdir(output,{recursive:true});
  const before=await inventory();
+ console.log('Preparing read-only database dumps.');
  await command('supabase',['init','--workdir',source]);
  await command('supabase',['link','--project-ref',ref,'--workdir',source,'--yes']);
  for(const [file,flags] of [['roles.sql',['--role-only']],['schema.sql',[]],['data.sql',['--data-only','--use-copy','--exclude','storage.buckets_vectors,storage.vector_indexes']]]){
+  console.log('Capturing '+file+'.');
   await command('supabase',['db','dump','--linked','--workdir',source,'-f',join(source,file),...flags]);
  }
  const objects=await api('/database/query',{query:'select bucket_id,name,metadata,updated_at from storage.objects order by bucket_id,name'});
+ console.log('Copying stored document bytes.');
  const keys=await api('/api-keys?reveal=true');const service=keys.find(k=>k.name==='service_role')?.api_key;if(!service)throw Error('Storage backup credential unavailable');
  await mkdir(join(source,'objects'));const files=[];
  for(const [index,object] of objects.entries()){
@@ -57,6 +60,7 @@ try{
  console.log(`PASS: encrypted archive recovery and byte checks for ${files.length} objects.`);
  // Bootstrap an isolated local Supabase database, never restore into a remote project.
  await command('supabase',['init','--workdir',restore]);
+ console.log('Starting isolated recovery database.');
  let config=await readFile(join(restore,'supabase/config.toml'),'utf8');config=config.replace(/^project_id = .*/m,'project_id = "blumr-backup-drill"').replace(/^major_version = .*/m,'major_version = 17');await writeFile(join(restore,'supabase/config.toml'),config);
  await command('supabase',['start','--workdir',restore,'--exclude','realtime,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor'],{timeout:900000});
  database='supabase_db_blumr-backup-drill';

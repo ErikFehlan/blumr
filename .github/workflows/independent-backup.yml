@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [reliability/backups-and-release-gates]
+    paths: ['scripts/*backup*', '.github/workflows/independent-backup.yml']
 permissions:
   contents: read
 concurrency:
