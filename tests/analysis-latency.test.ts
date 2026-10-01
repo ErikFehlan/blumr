@@ -61,6 +61,8 @@ Deno.test('auth checks overlap, model waits for both, telemetry does not delay r
   globals.EdgeRuntime={waitUntil:p=>{background=p;}};
   globalThis.fetch=(url,init)=>{
     const u=String(url);
+    if(u.includes('/claim_direct_ai_request'))return Promise.resolve(json({state:'owner'}));
+    if(u.includes('/finish_direct_ai_request'))return Promise.resolve(json(true));
     if(u.includes('/reserve_ai_budget'))return Promise.resolve(json({allowed:true}));
     if(u.includes('workspace_members')){authCalls++;return new Promise(r=>{releaseMember=r;});}
     if(u.includes('/auth/v1/user')){authCalls++;return new Promise(r=>{releaseUser=r;});}
@@ -99,6 +101,8 @@ Deno.test('AI telemetry retries a stable operation identity using server credent
  let retried=false,modelOK=true;
  globalThis.fetch=async(url,init)=>{
   const u=String(url);
+    if(u.includes('/claim_direct_ai_request'))return Promise.resolve(json({state:'owner'}));
+    if(u.includes('/finish_direct_ai_request'))return Promise.resolve(json(true));
     if(u.includes('/reserve_ai_budget'))return Promise.resolve(json({allowed:true}));
   if(u.includes('workspace_members'))return json([{workspace_id:'workspace-a'}]);
   if(u.includes('/auth/v1/user'))return json({id:'test-user'});

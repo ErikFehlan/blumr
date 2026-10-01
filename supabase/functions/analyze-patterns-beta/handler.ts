@@ -1,4 +1,5 @@
 import {boundedJSON, reserveModelCall, recordProviderUsage, SecurityLimit, securityMessage} from '../_shared/security.ts';
+import {withDirectIdempotency} from '../_shared/direct-idempotency.ts';
 import { handleAnalysis } from "../analyze-patterns-v2/analysis.ts";
 
 const corsHeaders = {
@@ -77,7 +78,7 @@ export async function handleAuthenticatedAnalysis(request: Request) {
     : payload.analysis_type === "screening" || payload.analysis_type === "feedback"
       ? "screening_reassessment"
       : "pattern_analysis";
-  const requestId = crypto.randomUUID();
+  let requestId: string = crypto.randomUUID();
   const recordUsage = async (status: "started" | "succeeded" | "failed") => {
     const body = JSON.stringify({ workspace_id: workspaceId, user_id: user.id, operation, status, request_id: requestId });
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -108,6 +109,9 @@ export async function handleAuthenticatedAnalysis(request: Request) {
       if (typeof model === "string" && /^ft:gpt-4\.1-mini-2025-04-14:[a-zA-Z0-9:_-]+$/.test(model)) feedbackModel = model;
     } catch { /* Registry unavailable: keep the existing base model usable. */ }
   }
+  return withDirectIdempotency({workspace:workspaceId,actor:user.id,base:supabaseUrl,serviceKey,
+    payload:{version:1,payload,feedbackModel:feedbackModel||null},execute:async(claimId)=>{
+  requestId=claimId;
   const analysisRequest=()=>new Request(request.url,{method:'POST',body:JSON.stringify(payload)});
   const beforeModel=async(bytes:number,tokens:number)=>{
     await reserveModelCall(workspaceId,user.id,bytes,tokens);
@@ -123,4 +127,5 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   if (runtime) runtime.waitUntil(telemetry);
   else await telemetry;
   return response;
+  }});
 }

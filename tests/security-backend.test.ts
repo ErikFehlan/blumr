@@ -11,6 +11,8 @@ Deno.test('AI limits fail closed before provider work and ignore forged caller i
  const restore=configure(),original=globalThis.fetch;let budget:unknown={allowed:false,code:'usage_limit'},budgetStatus=200,providerCalls=0,reservations=0,custom=true;
  globalThis.fetch=async(url,init)=>{
   const u=String(url);
+    if(u.includes('/claim_direct_ai_request'))return Promise.resolve(json({state:'owner'}));
+    if(u.includes('/finish_direct_ai_request'))return Promise.resolve(json(true));
   if(u.includes('workspace_members'))return json([{workspace_id:'owned-workspace'}]);
   if(u.includes('/auth/v1/user'))return json({id:'verified-caller'});
   if(u.includes('ai_usage_events'))return json({});
