@@ -39,9 +39,6 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
   release-browser:
-    concurrency:
-      group: criteria-backend-deploy
-      cancel-in-progress: false
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' || github.event_name == 'push')

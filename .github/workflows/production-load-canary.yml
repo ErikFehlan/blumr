@@ -14,9 +14,6 @@ concurrency:
   cancel-in-progress: false
 jobs:
   canary:
-    concurrency:
-      group: criteria-backend-deploy
-      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment: criteria-backend
     timeout-minutes: 25
@@ -31,8 +28,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Wait for the matching release before using management capacity
+        id: release_wait
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: node scripts/wait-for-reliability-release.mjs
       - name: Create 50 isolated synthetic users
         id: setup
+        if: steps.release_wait.outputs.superseded != 'true'
         timeout-minutes: 10
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
