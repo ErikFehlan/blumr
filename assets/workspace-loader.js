@@ -15,7 +15,7 @@
     'assets/feedback.js?v=20260916-learning',
     'assets/idempotency.js?v=20260930-idempotency',
     'assets/pdf-text.js?v=20260915-intake',
-    'assets/resume-intake.js?v=20260929-reliability',
+    'assets/resume-intake.js?v=20261001-fast-rating',
     'assets/resume-remote.js?v=20260917-security',
     'assets/job-review.js?v=20260923-verification',
     'assets/candidate-automation.js?v=20260914-job-review',
