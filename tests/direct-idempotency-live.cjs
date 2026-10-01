@@ -4,8 +4,9 @@ const fs=require('node:fs/promises'),assert=require('node:assert/strict');
 (async()=>{
  const fixture=JSON.parse(await fs.readFile(process.env.LIVE_FIXTURE_FILE,'utf8'));
  assert.equal(fixture.base,'https://zqiqjzxcpznhzjengfff.supabase.co');
- assert.ok(/^[a-f0-9-]{36}$/.test(fixture.run));
- const owner=fixture.users[0];assert.ok(owner.email.endsWith('@example.invalid'));
+ assert.equal(fixture.app,'https://blumr.io/');
+ assert.ok(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(fixture.run));
+ const owner=fixture.users[0];assert.equal(owner.email,'blumr-live-'+fixture.run+'-0@example.invalid');
  const login=await fetch(fixture.base+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:fixture.anon,'Content-Type':'application/json'},body:JSON.stringify({email:owner.email,password:owner.password})});
  assert.ok(login.ok,'Second device login failed');const second=await login.json();
  const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME});

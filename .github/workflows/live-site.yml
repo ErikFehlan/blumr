@@ -83,6 +83,7 @@ jobs:
         timeout-minutes: 12
         run: node tests/live-site-browser.cjs
       - name: Verify direct analysis duplicates across devices
+        id: direct_check
         if: steps.release.outputs.ready == 'true' && steps.fixtures.outcome == 'success'
         timeout-minutes: 5
         run: node tests/direct-idempotency-live.cjs
@@ -107,11 +108,12 @@ jobs:
         env:
           READY: ${{ steps.release.outputs.ready }}
           JOURNEY: ${{ steps.journey.outcome }}
+          DIRECT: ${{ steps.direct_check.outcome }}
           CLEANUP: ${{ steps.cleanup.outcome }}
         run: |
           node --input-type=module <<'JS'
           import {appendFile,readFile} from 'node:fs/promises';
-          const passed=process.env.READY==='true'&&process.env.JOURNEY==='success'&&process.env.CLEANUP==='success';
+          const passed=process.env.READY==='true'&&process.env.JOURNEY==='success'&&process.env.DIRECT==='success'&&process.env.CLEANUP==='success';
           let results;try{results=JSON.parse(await readFile('test-results/live/results.json','utf8'));}catch{}
           const text=['## Live blumr.io checks',passed?'**Passed, including cleanup.**':'**Not verified.** See the failed or skipped steps.',
             ...(results?.checks||[]).map(r=>'- '+r.check+': '+r.status),
