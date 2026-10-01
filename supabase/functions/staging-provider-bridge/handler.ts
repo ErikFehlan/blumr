@@ -1,9 +1,9 @@
-// Temporary, service-role-only transfer to the owner's fixed staging project.
+// Temporary, privately authenticated transfer to the owner's fixed staging project.
 // The provider key is never returned to the caller or written to a log.
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 export async function handleBridge(request:Request){
- const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
- if(!service||request.headers.get('Authorization')!=='Bearer '+service)return json({error:'Unauthorized'},401);
+ const secret=Deno.env.get('STAGING_PROVIDER_BRIDGE_SECRET');
+ if(!secret||request.headers.get('x-worker-secret')!==secret)return json({error:'Unauthorized'},401);
  if(request.method!=='POST')return json({error:'Method not allowed'},405);
  if(Deno.env.get('SUPABASE_URL')!=='https://zqiqjzxcpznhzjengfff.supabase.co')return json({error:'Wrong source project'},403);
  try{

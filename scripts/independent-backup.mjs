@@ -73,7 +73,9 @@ try{
  const inspected=JSON.parse(await command('docker',['inspect',database]));const networks=Object.keys(inspected[0].NetworkSettings.Networks);
  for(const name of networks){await command('docker',['network','disconnect',name,database]);network=name;}
  console.log('Recovery database bootstrapped; outbound networks disconnected. Restoring database.');
- const psql=input=>command('docker',['exec','-i',database,'psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-At'],{input,databaseDiagnostics:true});
+ // The isolated bootstrap's postgres role cannot restore elevated custom role
+ // grants. Use its local administrative role; this never connects remotely.
+ const psql=input=>command('docker',['exec','-i',database,'psql','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1','-At'],{input,databaseDiagnostics:true});
  const roles=await readFile(join(restore,'roles.sql'),'utf8'),schema=await readFile(join(restore,'schema.sql'),'utf8'),data=await readFile(join(restore,'data.sql'),'utf8');
  await psql('begin;\n'+roles+'\n'+schema+'\nSET session_replication_role=replica;\n'+data+'\ncommit;\n');
  const actual=JSON.parse((await psql(inventorySQL)).trim().split('\n').at(-1));

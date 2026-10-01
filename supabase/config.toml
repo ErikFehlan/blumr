@@ -17,4 +17,5 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.staging-provider-bridge]
-verify_jwt = true
+# A private per-run worker credential is checked before parsing any request.
+verify_jwt = false
