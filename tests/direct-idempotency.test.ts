@@ -39,7 +39,7 @@ Deno.test('ledger outage, uncertainty and pending work never invoke the provider
   assert(calls===0,'claim failure reached provider');
  }finally{globalThis.fetch=original;}
 });
-Deno.test('known failure releases a claim but provider or completion ambiguity does not',async()=>{
+Deno.test('known failure is recorded while provider or completion ambiguity stays protected',async()=>{
  const original=globalThis.fetch;let finished=0,completionFails=false;
  globalThis.fetch=async(url)=>{
   if(String(url).includes('claim_direct'))return json({state:'owner'});
@@ -61,4 +61,11 @@ Deno.test('an interrupted provider response preserves its claim and returns a re
 Deno.test('an expired or cleaned claim stops a late worker before provider work',async()=>{
  const original=globalThis.fetch;let calls=0;globalThis.fetch=async(url)=>json(String(url).includes('claim_direct')?{state:'owner'}:false);
  try{const response=await withDirectIdempotency({workspace:'w',actor:'a',payload:{},base:'https://db.invalid',serviceKey:'private',execute:async(_id,mark)=>{await mark();calls++;return json({});}});assert(response.status===503&&calls===0,'late worker reached provider');}finally{globalThis.fetch=original;}
+});
+
+Deno.test('concurrent known failures replay one error without extra provider or budget calls',async()=>{
+ const original=globalThis.fetch;let owner='',saved:any=null,calls=0;
+ globalThis.fetch=async(url,init)=>{const p=JSON.parse(String(init?.body));if(String(url).includes('claim_direct')){if(saved)return json({state:'failed',status:saved.status,body:saved.body});if(!owner)owner=p.p_claim;return json({state:p.p_claim===owner?'owner':'processing'});}saved=p.p_body;return json(true);};
+ const options={workspace:'w',actor:'a',payload:{},base:'https://db.invalid',serviceKey:'private',wait:()=>new Promise<void>(r=>setTimeout(r,1)),execute:async()=>{calls++;await new Promise(r=>setTimeout(r,5));return json({error:'Temporary provider failure'},502);}};
+ try{const responses=await Promise.all([withDirectIdempotency(options),withDirectIdempotency(options)]);assert(calls===1,'Waiting duplicate restarted failed provider work');for(const r of responses)assert(r.status===502&&(await r.json()).error==='Temporary provider failure','Failure status/body changed on replay');}finally{globalThis.fetch=original;}
 });
