@@ -6,6 +6,7 @@ on:
       - scripts/production-load-canary.mjs
       - .github/workflows/production-load-canary.yml
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 concurrency:
