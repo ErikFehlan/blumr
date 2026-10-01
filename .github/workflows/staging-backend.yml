@@ -30,6 +30,7 @@ jobs:
           version: 2.95.3
       - name: Prepare the same application migrations in staging
         run: |
+          node scripts/staging-foundation.mjs
           node scripts/criteria-backend.mjs prepare
           node scripts/job-reassessment-backend.mjs prepare
           node scripts/workspace-home-backend.mjs

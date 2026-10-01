@@ -13,7 +13,7 @@ const query=`select 'column' as kind, table_name||'.'||column_name as name,
  union all select 'function',p.oid::regprocedure::text,pg_get_functiondef(p.oid) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
  where n.nspname='public' and p.prokind='f' and p.proname<>'rls_auto_enable'
  order by kind,name`;
-const normalize=value=>value.replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
+const normalize=value=>value.replaceAll('\r\n','\n').replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
 const [production,stage]=await Promise.all(['zqiqjzxcpznhzjengfff','momfzjmycveqginxmqib'].map(ref=>api(ref,'/database/query',{query})));
 const actual=new Map(stage.map(x=>[x.kind+':'+x.name,normalize(x.definition)]));
 const differences=production.filter(x=>actual.get(x.kind+':'+x.name)!==normalize(x.definition)).map(x=>x.kind+':'+x.name);

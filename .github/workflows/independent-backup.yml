@@ -1,0 +1,39 @@
+name: Verify and retain independent encrypted backup
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+  push:
+    branches: [reliability/backups-and-release-gates]
+permissions:
+  contents: read
+concurrency:
+  group: independent-encrypted-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 40
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.95.3
+      - name: Dump database, copy every Storage object, encrypt, and prove isolated recovery
+        run: node scripts/independent-backup.mjs
+      - name: Retain only verified encrypted archives and aggregate recovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-backup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/independent-backup/
+          retention-days: 90
+          if-no-files-found: error
