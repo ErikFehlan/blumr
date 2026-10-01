@@ -1,0 +1,66 @@
+name: Verify isolated staging backend
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: staging-backend
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 25
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.95.3
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify private configuration transfer permissions before use
+        run: deno test --allow-env tests/staging-provider-bridge.test.ts
+      - name: Configure provider access privately for the owned staging project
+        run: node scripts/staging-provider-setup.mjs
+      - name: Prepare the same application migrations in staging
+        run: |
+          node scripts/staging-foundation.mjs
+          node scripts/criteria-backend.mjs prepare
+          node scripts/job-reassessment-backend.mjs prepare
+          node scripts/workspace-home-backend.mjs
+          node scripts/core-backend.mjs
+          node scripts/account-controls-backend.mjs
+          node scripts/usage-analytics-backend.mjs
+          node scripts/learning-backend.mjs
+          node scripts/security-backend.mjs prepare
+      - name: Deploy the same authenticated handlers and worker configuration
+        run: |
+          supabase functions deploy analyze-patterns-v2 --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy analyze-patterns-beta --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy reassess-job --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy refine-job-criteria --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy account-controls --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy onboarding-reminders --project-ref "$SUPABASE_PROJECT_REF"
+          supabase secrets set ASSESSMENT_MODEL=gpt-5.6-sol FEEDBACK_MODEL=gpt-5.6-sol REASSESSMENT_MODEL=gpt-5.6-sol JOB_INTAKE_ENGINE=hybrid --project-ref "$SUPABASE_PROJECT_REF"
+          JOB_INTAKE_EXPECTED_MODE=hybrid node scripts/criteria-backend.mjs verify
+          node scripts/criteria-backend.mjs activate
+          node scripts/job-reassessment-backend.mjs activate
+          node scripts/usage-analytics-backend.mjs activate
+      - name: Verify actual staging permissions, intake, review, and provider access
+        run: |
+          node scripts/staging-parity.mjs
+          node scripts/security-backend.mjs verify
+          node scripts/security-live-smoke.mjs
+          node scripts/core-live-smoke.mjs
+          node scripts/usage-analytics-backend.mjs verify

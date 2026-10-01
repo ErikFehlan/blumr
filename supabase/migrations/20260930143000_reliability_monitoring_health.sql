@@ -44,7 +44,12 @@ grant execute on function public.is_app_admin() to authenticated;
 revoke all on function public.can_access_resume_path(text) from public,anon;
 grant execute on function public.can_access_resume_path(text) to authenticated;
 revoke all on function public.handle_new_user() from public,anon,authenticated;
-revoke all on function public.rls_auto_enable() from public,anon,authenticated;
+-- This Supabase platform helper is absent on some otherwise compatible projects.
+do $$ begin
+ if to_regprocedure('public.rls_auto_enable()') is not null then
+  revoke all on function public.rls_auto_enable() from public,anon,authenticated;
+ end if;
+end $$;
 
 -- Reliability #6: structured, low-volume operational events. The client cannot
 -- read or write this table directly; signed-in users can only submit validated

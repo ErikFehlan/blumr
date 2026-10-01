@@ -1,0 +1,46 @@
+name: Verify and retain independent encrypted backup
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+  push:
+    branches: [reliability/backups-and-release-gates]
+    paths: ['scripts/*backup*', '.github/workflows/independent-backup.yml']
+permissions:
+  contents: read
+concurrency:
+  group: independent-encrypted-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 40
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.119.0
+      - name: Dump database, copy every Storage object, encrypt, and prove isolated recovery
+        run: |
+          for attempt in 1 2 3; do
+            if node scripts/independent-backup.mjs; then exit 0; else status=$?; fi
+            if [ "$status" -ne 75 ]; then exit "$status"; fi
+            echo "Source changed during attempt $attempt; no archive was accepted. Retrying a fresh snapshot."
+          done
+          exit 1
+      - name: Retain only verified encrypted archives and aggregate recovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-backup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/independent-backup/
+          retention-days: 90
+          if-no-files-found: error

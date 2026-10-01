@@ -28,6 +28,9 @@ if(process.argv[2]==='prepare'){
  // SQL parameters prevent secret contents from being interpreted as SQL.
  await sql(`select vault.update_secret(id,$1) from vault.secrets where name='criteria_worker_secret'`,[secret]);
  await sql(`select vault.create_secret($1,'criteria_worker_secret') where not exists(select 1 from vault.secrets where name='criteria_worker_secret')`,[secret]);
+ const workerUrl=`https://${ref}.supabase.co/functions/v1/refine-job-criteria`;
+ await sql(`select vault.update_secret(id,$1) from vault.secrets where name='criteria_worker_url'`,[workerUrl]);
+ await sql(`select vault.create_secret($1,'criteria_worker_url') where not exists(select 1 from vault.secrets where name='criteria_worker_url')`,[workerUrl]);
  console.log('Queue installed; worker credential stored securely. Existing job content was not rewritten.');
 }else if(process.argv[2]==='verify'){
  const expected=process.env.JOB_INTAKE_EXPECTED_MODE||'';
