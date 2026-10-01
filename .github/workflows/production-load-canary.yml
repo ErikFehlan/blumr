@@ -14,6 +14,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   canary:
+    concurrency:
+      group: criteria-backend-deploy
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment: criteria-backend
     timeout-minutes: 25

@@ -10,6 +10,8 @@ This work extends the existing regression and fixture infrastructure. Production
 | 11: release safeguards | PR application/browser/backend/SQL checks, matching-commit public asset verification, live journeys and fixture cleanup; ancestor-only frontend rollback PR prepared and validated without executing old workflow code | Existing release workflows plus `prepare-rollback.yml` |
 | 12: regressions | Failure assertions on every PR; recovery and cross-device checks plus complete recruiter journey on main releases; load canary on changes to its scripts or manual invocation; only synthetic aggregate results exported | Existing CI extended rather than duplicated |
 
+Management-API-heavy production canaries, recovery drills, live release fixtures, and backend deployment share the same non-cancelling job lock. This prevents fixture setup/cleanup from exhausting management request capacity during a deployment and preserves cleanup when a newer run queues.
+
 A successful test step is not enough if cleanup fails. The live run summary requires recruiter journey, duplicate verification, scoped recovery, and cleanup all to succeed. Load-test cleanup validates identity markers and sole workspace membership before deleting generated storage paths and accounts. Closed jobs prevent the canary and recovery fixture from initiating model assessments.
 
 ## Recovery limits
