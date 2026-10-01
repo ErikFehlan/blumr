@@ -12,37 +12,37 @@
   const strings=(a,max,len)=>Array.isArray(a)&&a.length<=max&&a.every(s=>typeof s==='string'&&s.trim()&&s.length<=len);
   const preliminaryStopWords=new Set(('a an and are as at be been being by can candidate candidates company core could desired duties experience experienced for from have has having in into is it job knowledge looking may minimum must need needs of on or our preferred preferably qualification qualifications required requirement requirements responsibility responsibilities role should skill skills strong team the their this to using we with work working years year you your').split(' '));
   const preliminaryFamilies=[
-    ['dotnet',/(?:^|[^\\w])(?:\\.net|dotnet)(?:\\s+core|\\s+framework)?\\b|\\bc#(?=$|[\\s,.;/()])|\\bcsharp\\b/i],
-    ['aspnet',/\\basp\\.?net(?:\\s+core)?\\b/i],['playwright',/\\bplaywright\\b/i],['typescript',/\\btypescript\\b/i],['javascript',/\\bjavascript\\b/i],
-    ['selenium',/\\bselenium\\b/i],['java',/\\bjava\\b/i],['spring-webflux',/\\bspring\\s+webflux\\b/i],['spring-boot',/\\bspring\\s+boot\\b/i],['kafka',/\\b(?:apache\\s+)?kafka\\b/i],
-    ['azure-devops',/\\bazure devops\\b/i],['azure',/\\b(?:microsoft\\s+)?azure\\b/i],['aws',/\\b(?:aws|amazon web services)\\b/i],['gcp',/\\b(?:gcp|google cloud(?: platform)?)\\b/i],
-    ['react',/\\breact(?:\\.js|js)?\\b/i],['sql-server',/\\b(?:sql server|mssql|microsoft sql)\\b/i],['sql',/\\bsql\\b/i],['servicenow',/\\bservice\\s*now\\b/i],
-    ['sast',/\\b(?:sast|static application security)\\b/i],['dast',/\\b(?:dast|dynamic application security)\\b/i],['palo-alto',/\\bpalo alto\\b/i],['panorama',/\\bpanorama\\b/i],
-    ['kubernetes',/\\b(?:kubernetes|k8s)\\b/i],['docker',/\\bdocker\\b/i],['python',/\\bpython\\b/i],['node',/\\bnode(?:\\.js|js)\\b/i],['oauth',/\\boauth\\s*2?\\b/i],['jwt',/\\bjwt\\b/i],
-    ['github-actions',/\\bgithub actions\\b/i],['jenkins',/\\bjenkins\\b/i],['cicd',/\\b(?:ci\\/?cd|continuous integration|continuous delivery)\\b/i],['entity-framework',/\\bentity framework\\b/i]
+    ['dotnet',/(?:^|[^\w])(?:\.net|dotnet)(?:\s+core|\s+framework)?\b|\bc#(?=$|[\s,.;/()])|\bcsharp\b/i],
+    ['aspnet',/\basp\.?net(?:\s+core)?\b/i],['playwright',/\bplaywright\b/i],['typescript',/\btypescript\b/i],['javascript',/\bjavascript\b/i],
+    ['selenium',/\bselenium\b/i],['java',/\bjava\b/i],['spring-webflux',/\bspring\s+webflux\b/i],['spring-boot',/\bspring\s+boot\b/i],['kafka',/\b(?:apache\s+)?kafka\b/i],
+    ['azure-devops',/\bazure devops\b/i],['azure',/\b(?:microsoft\s+)?azure\b/i],['aws',/\b(?:aws|amazon web services)\b/i],['gcp',/\b(?:gcp|google cloud(?: platform)?)\b/i],
+    ['react',/\breact(?:\.js|js)?\b/i],['sql-server',/\b(?:sql server|mssql|microsoft sql)\b/i],['sql',/\bsql\b/i],['servicenow',/\bservice\s*now\b/i],
+    ['sast',/\b(?:sast|static application security)\b/i],['dast',/\b(?:dast|dynamic application security)\b/i],['palo-alto',/\bpalo alto\b/i],['panorama',/\bpanorama\b/i],
+    ['kubernetes',/\b(?:kubernetes|k8s)\b/i],['docker',/\bdocker\b/i],['python',/\bpython\b/i],['node',/\bnode(?:\.js|js)\b/i],['oauth',/\boauth\s*2?\b/i],['jwt',/\bjwt\b/i],
+    ['github-actions',/\bgithub actions\b/i],['jenkins',/\bjenkins\b/i],['cicd',/\b(?:ci\/?cd|continuous integration|continuous delivery)\b/i],['entity-framework',/\bentity framework\b/i]
   ].map(([id,rx])=>({id,rx}));
-  const preliminaryNormalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\\u00ad\\u200b\\ufeff]/g,'').replace(/[\\u2010-\\u2015]/g,'-').replace(/\\s+/g,' ').trim();
+  const preliminaryNormalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\u00ad\u200b\ufeff]/g,'').replace(/[\u2010-\u2015]/g,'-').replace(/\s+/g,' ').trim();
   function preliminaryJobSignature(job){
     const source=JSON.stringify({title:job?.title||'',description:job?.description||'',criteria:job?.criteria||[],knockouts:job?.knockouts||[],priorities:job?.hiringPriorities?.items||[]});
     let h=2166136261;for(let i=0;i<source.length;i++)h=Math.imul(h^source.charCodeAt(i),16777619);return 'prelim-v1-'+source.length+'-'+(h>>>0).toString(16);
   }
   function preliminaryRequirements(job){
     const rows=[],seen=new Set(),add=(text,kind,weight,type='')=>{
-      const clean=String(text||'').replace(/^\\s*(?:[-•▪●*]+\\s*)?/,'').replace(/^\\s*(?:Must Have|Preferred|Bonus)\\s*\\|\\s*/i,'').trim();if(clean.length<4)return;
+      const clean=String(text||'').replace(/^\s*(?:[-•▪●*]+\s*)?/,'').replace(/^\s*(?:Must Have|Preferred|Bonus)\s*\|\s*/i,'').trim();if(clean.length<4)return;
       const key=preliminaryNormalize(clean).replace(/[^a-z0-9+#.]+/g,' ').trim();if(!key||seen.has(key))return;seen.add(key);rows.push({text:clean,kind,weight,type});
     };
     const saved=job?.hiringPriorities;
     if(saved?.source_title===job?.title&&saved?.source_description===(job?.description||'')&&Array.isArray(saved.items))for(const p of saved.items)add(p.title||p.source_quote,'priority',p.requirement_type==='preferred'?.8:1.2,p.requirement_type||'');
     for(const text of job?.knockouts||[])add(text,'knockout',1.45,'required');
-    for(const text of job?.criteria||[])add(text,'criterion',/\\b(?:preferred|nice to have|bonus|plus)\\b/i.test(text)?.8:1,'');
+    for(const text of job?.criteria||[])add(text,'criterion',/\b(?:preferred|nice to have|bonus|plus)\b/i.test(text)?.8:1,'');
     if(!rows.length){
-      for(const text of String(job?.description||'').split(/\\n+|(?<=[.!?])\\s+/))if(/\\b(required|requires?|must|minimum|experience|proficien|expertise|knowledge|hands[- ]on|preferred)\\b/i.test(text))add(text,'description',1,'');
+      for(const text of String(job?.description||'').split(/\n+|(?<=[.!?])\s+/))if(/\b(required|requires?|must|minimum|experience|proficien|expertise|knowledge|hands[- ]on|preferred)\b/i.test(text))add(text,'description',1,'');
     }
     return rows.slice(0,12);
   }
-  function preliminaryYears(text){const m=String(text||'').match(/\\b(?:at least\\s+|minimum(?:\\s+of)?\\s+)?(\\d+(?:\\.\\d+)?)\\s*(?:\\+|plus)?\\s*(?:years?|yrs?)\\b/i);return m?Number(m[1]):null;}
+  function preliminaryYears(text){const m=String(text||'').match(/\b(?:at least\s+|minimum(?:\s+of)?\s+)?(\d+(?:\.\d+)?)\s*(?:\+|plus)?\s*(?:years?|yrs?)\b/i);return m?Number(m[1]):null;}
   function preliminaryTokens(text){return [...new Set(preliminaryNormalize(text).replace(/[^a-z0-9+#.]+/g,' ').split(' ').filter(t=>t.length>=3&&!preliminaryStopWords.has(t)&&!/^(?:must|required|preferred)$/.test(t)))].slice(0,12);}
-  function familyYears(resume,family){let max=null;for(const part of String(resume||'').split(/\\n+|(?<=[.!?;])\\s+/)){if(!family.rx.test(part))continue;const years=preliminaryYears(part);if(years!==null)max=max===null?years:Math.max(max,years);}return max;}
+  function familyYears(resume,family){let max=null;for(const part of String(resume||'').split(/\n+|(?<=[.!?;])\s+/)){if(!family.rx.test(part))continue;const years=preliminaryYears(part);if(years!==null)max=max===null?years:Math.max(max,years);}return max;}
   function evaluatePreliminaryRequirement(text,resume){
     const reqFamilies=preliminaryFamilies.filter(f=>f.rx.test(text)),threshold=preliminaryYears(text);
     if(reqFamilies.length){const found=reqFamilies.filter(f=>f.rx.test(resume));if(!found.length)return {status:'unknown',factor:.35};if(found.length<reqFamilies.length)return {status:'partial',factor:.7};if(threshold!==null){const evidenced=Math.max(...found.map(f=>familyYears(resume,f)??-1));return evidenced>=threshold?{status:'supported',factor:1}:{status:'partial',factor:.7};}return {status:'supported',factor:1};}
