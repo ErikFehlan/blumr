@@ -14,6 +14,9 @@ jobs:
   public-browser:
     if: github.event_name == 'push' && github.ref == 'refs/heads/test/live-site-ci'
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      options: --ipc=host
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +28,6 @@ jobs:
       - name: Install browser runtime
         run: |
           npm install --no-save --package-lock=false playwright@1.58.2
-          npx playwright install --with-deps chromium
       - name: Check fixture cleanup guards
         run: node --test tests/live-test-safety.test.js
       - name: Open the real custom domain
@@ -43,6 +45,9 @@ jobs:
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      options: --ipc=host
     environment: criteria-backend
     timeout-minutes: 25
     env:
@@ -65,7 +70,6 @@ jobs:
         if: steps.release.outputs.ready == 'true'
         run: |
           npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.8.0
-          npx playwright install --with-deps chromium
       - name: Test public HTTPS and startup
         if: steps.release.outputs.ready == 'true'
         run: node tests/live-site-probe.cjs

@@ -21,6 +21,9 @@ jobs:
   validate:
     timeout-minutes: 12
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      options: --ipc=host
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -67,7 +70,6 @@ jobs:
         timeout-minutes: 4
         run: |
           npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.8.0
-          npx playwright install --with-deps chromium
       - name: Test recruiter browser journey
         run: |
           node --test tests/interaction-browser.cjs

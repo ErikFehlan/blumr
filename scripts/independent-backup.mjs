@@ -19,7 +19,7 @@ async function command(binary,args,{cwd=work,input,timeout=600000,localDiagnosti
   child.on('error',reject);child.stdin.on('error',error=>{if(error.code!=='EPIPE')reject(error);});
   child.on('close',code=>{clearTimeout(timer);
    if(code!==0&&localDiagnostics)console.error(stderr.split('\n').filter(line=>!/password|secret|token|key|postgresql:\/\/|eyJ[A-Za-z0-9_-]+\./i.test(line)).slice(-35).join('\n'));
-   if(code!==0&&databaseDiagnostics){const category=['does not exist','already exists','permission denied','duplicate key','foreign key constraint','check constraint','syntax error','cannot change','invalid input'].find(x=>stderr.includes(x))||'unclassified';const objects=[...stderr.matchAll(/(?:relation|column|constraint|function|sequence|index|table|role) "([a-z_][a-z0-9_.]*)"/gi)].map(m=>m[1]);console.error('Isolated restore diagnostic: '+JSON.stringify({category,objects}));}
+   if(code!==0&&databaseDiagnostics){const category=['does not exist','already exists','permission denied','duplicate key','foreign key constraint','check constraint','syntax error','cannot change','invalid input','authentication failed','no password supplied','connection refused'].find(x=>stderr.includes(x))||'unclassified';const objects=[...stderr.matchAll(/(?:relation|column|constraint|function|sequence|index|table|role) "([a-z_][a-z0-9_.]*)"/gi)].map(m=>m[1]);console.error('Isolated restore diagnostic: '+JSON.stringify({category,objects}));}
    code===0?resolve(stdout):reject(Error(`${binary} ${args.slice(0,2).join(' ')} operation failed (exit ${code}); private output was withheld`));});
   child.stdin.end(input);
  });
@@ -52,7 +52,8 @@ try{
   const file='objects/'+index;await writeFile(join(source,file),bytes,{mode:0o600});
   files.push({...object,file,bytes:bytes.length,sha256:await digest(join(source,file))});
  }
- assert.deepEqual(await inventory(),before,'Source changed during backup; rerun instead of accepting inconsistent data');
+ try{assert.deepEqual(await inventory(),before);}
+ catch{throw Object.assign(Error('Source changed during backup; no archive accepted'),{backupRetryable:true});}
  await writeFile(join(source,'manifest.json'),JSON.stringify({version:1,project:ref,created_at:new Date().toISOString(),inventory:before,files}),{mode:0o600});
  // Exclude CLI credentials and local config from the archive.
  const archive=join(work,'backup.tar');await command('tar',['-cf',archive,'roles.sql','schema.sql','data.sql','manifest.json','objects'],{cwd:source});
@@ -75,7 +76,7 @@ try{
  console.log('Recovery database bootstrapped; outbound networks disconnected. Restoring database.');
  // The isolated bootstrap's postgres role cannot restore elevated custom role
  // grants. Use its local administrative role; this never connects remotely.
- const psql=input=>command('docker',['exec','-i',database,'psql','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1','-At'],{input,databaseDiagnostics:true});
+ const psql=input=>command('docker',['exec','-e','PGPASSWORD=postgres','-i',database,'psql','-h','127.0.0.1','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1','-At'],{input,databaseDiagnostics:true});
  const roles=await readFile(join(restore,'roles.sql'),'utf8'),schema=await readFile(join(restore,'schema.sql'),'utf8'),data=await readFile(join(restore,'data.sql'),'utf8');
  await psql('begin;\n'+roles+'\n'+schema+'\nSET session_replication_role=replica;\n'+data+'\ncommit;\n');
  const actual=JSON.parse((await psql(inventorySQL)).trim().split('\n').at(-1));
@@ -84,7 +85,9 @@ try{
  await writeFile(join(output,'verification.json'),JSON.stringify(evidence,null,2));console.log('PASS: full application database restored into an isolated local database with exact row checksums.');
 }catch(error){
  // Never publish an archive as verified when any dump, source, byte or restore check failed.
- await rm(output,{recursive:true,force:true});throw error;
+ await rm(output,{recursive:true,force:true});
+ if(error?.backupRetryable){console.error('Source changed during capture; retry a fresh read-only snapshot.');process.exitCode=75;}
+ else throw error;
 }finally{
  // Destroy the restored database without reconnecting outbound worker URLs.
  if(database)await command('docker',['rm','-f',database]).catch(()=>{});

@@ -32,8 +32,9 @@ jobs:
       - name: Dump database, copy every Storage object, encrypt, and prove isolated recovery
         run: |
           for attempt in 1 2 3; do
-            if node scripts/independent-backup.mjs; then exit 0; fi
-            echo "Read-only backup/recovery attempt $attempt failed; no archive was accepted."
+            if node scripts/independent-backup.mjs; then exit 0; else status=$?; fi
+            if [ "$status" -ne 75 ]; then exit "$status"; fi
+            echo "Source changed during attempt $attempt; no archive was accepted. Retrying a fresh snapshot."
           done
           exit 1
       - name: Retain only verified encrypted archives and aggregate recovery evidence
