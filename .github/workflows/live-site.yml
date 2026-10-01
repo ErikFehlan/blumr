@@ -82,6 +82,10 @@ jobs:
         if: steps.release.outputs.ready == 'true'
         timeout-minutes: 12
         run: node tests/live-site-browser.cjs
+      - name: Verify direct analysis duplicates across devices
+        if: steps.release.outputs.ready == 'true' && steps.fixtures.outcome == 'success'
+        timeout-minutes: 5
+        run: node tests/direct-idempotency-live.cjs
       - name: Remove temporary accounts and documents
         id: cleanup
         if: always() && steps.fixtures.outcome != 'skipped' && steps.fixtures.outcome != ''

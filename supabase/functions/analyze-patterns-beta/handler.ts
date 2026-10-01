@@ -110,17 +110,18 @@ export async function handleAuthenticatedAnalysis(request: Request) {
     } catch { /* Registry unavailable: keep the existing base model usable. */ }
   }
   return withDirectIdempotency({workspace:workspaceId,actor:user.id,base:supabaseUrl,serviceKey,
-    payload:{version:1,payload,feedbackModel:feedbackModel||null},execute:async(claimId)=>{
+    payload:{version:1,payload,feedbackModel:feedbackModel||null},execute:async(claimId,markStarted)=>{
   requestId=claimId;
   const analysisRequest=()=>new Request(request.url,{method:'POST',body:JSON.stringify(payload)});
   const beforeModel=async(bytes:number,tokens:number)=>{
+    await markStarted();
     await reserveModelCall(workspaceId,user.id,bytes,tokens);
     if(!admitted){admitted=true;started=recordUsage('started');}
   };
   const onUsage=(result:unknown)=>recordProviderUsage(workspaceId,operation,result,user.id);
-  let response = await handleAnalysis(analysisRequest(), {feedbackModel,beforeModel,onUsage,providerRequestId:`direct-${requestId}-primary`});
+  let response = await handleAnalysis(analysisRequest(), {feedbackModel,beforeModel,onUsage,retainAmbiguousFailures:true,providerRequestId:`direct-${requestId}-primary`});
   const failure=response.ok?null:await response.clone().json().catch(()=>null);
-  if (feedbackModel && !response.ok && !['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large','usage_check_unavailable'].includes(failure?.code)) response = await handleAnalysis(analysisRequest(), {beforeModel,onUsage,providerRequestId:`direct-${requestId}-fallback`});
+  if (feedbackModel && !response.ok && !['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large','usage_check_unavailable','provider_outcome_uncertain'].includes(failure?.code)) response = await handleAnalysis(analysisRequest(), {beforeModel,onUsage,retainAmbiguousFailures:true,providerRequestId:`direct-${requestId}-fallback`});
 
   const telemetry = admitted ? started.then(() => recordUsage(response.ok ? "succeeded" : "failed")) : Promise.resolve();
   const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;

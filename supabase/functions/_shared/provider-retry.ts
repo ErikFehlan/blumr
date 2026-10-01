@@ -5,6 +5,7 @@ type RetryOptions={
   fetcher?:Fetcher;
   wait?:(ms:number)=>Promise<void>;
   requestId?:string;
+  retryTransport?:boolean;
 };
 
 const retryableStatus=(status:number)=>status===408||status===409||status===429||status>=500;
@@ -37,10 +38,12 @@ export async function fetchWithRetry(input:RequestInfo|URL,init:RequestInit={},o
       const response=await fetcher(input,requestInit);
       const explicit=response.headers.get('x-should-retry');
       const shouldRetry=explicit==='true'||(explicit!=='false'&&retryableStatus(response.status));
+      if(options.retryTransport===false&&[408,504].includes(response.status))return response;
       if(!shouldRetry||attempt===maxRetries)return response;
       await wait(retryDelay(response,attempt));
     }catch(error){
       lastError=error;
+      if(options.retryTransport===false)throw error;
       if(attempt===maxRetries)throw error;
       await wait(retryDelay(undefined,attempt));
     }

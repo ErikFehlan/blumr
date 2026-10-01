@@ -120,7 +120,7 @@ const screeningSchema = {
   },
 };
 
-export async function handleAnalysis(request: Request, options: {feedbackModel?:string,modelOverride?:string,providerRequestId?:string,beforeModel?:(bytes:number,tokens:number)=>Promise<void>,onUsage?:(response:unknown)=>Promise<void>} = {}) {
+export async function handleAnalysis(request: Request, options: {feedbackModel?:string,modelOverride?:string,providerRequestId?:string,retainAmbiguousFailures?:boolean,beforeModel?:(bytes:number,tokens:number)=>Promise<void>,onUsage?:(response:unknown)=>Promise<void>} = {}) {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -223,7 +223,8 @@ ANALYSIS RULES
     // Reserve a conservative bound including schema/instructions and source expansion.
     await options.beforeModel?.(new TextEncoder().encode(modelInput).length+20000,outputLimit);
     const providerTimeout=isFeedback && options.feedbackModel ? 15000 : deepAssessment?90000:55000;
-    const response = await fetchWithRetry("https://api.openai.com/v1/responses", {
+    let response:Response;
+    try { response = await fetchWithRetry("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -246,8 +247,13 @@ ANALYSIS RULES
           },
         },
       }),
-    },{timeoutMs:providerTimeout,maxRetries:2,requestId:options.providerRequestId||crypto.randomUUID()});
+    },{timeoutMs:providerTimeout,maxRetries:2,retryTransport:!options.retainAmbiguousFailures,requestId:options.providerRequestId||crypto.randomUUID()});
+    }catch(error){
+      if(options.retainAmbiguousFailures)return json({code:'provider_outcome_uncertain',error:'The provider connection was interrupted. The earlier request must be checked before retrying.'},503);
+      throw error;
+    }
 
+    if(options.retainAmbiguousFailures&&[408,504].includes(response.status))return json({code:'provider_outcome_uncertain',error:'The provider timed out. Its outcome must be verified before retrying.'},503);
     const result = await response.json();
     await options.onUsage?.(result);
     if (!response.ok) {
@@ -284,6 +290,7 @@ ANALYSIS RULES
     return json({error:'Analysis unavailable'},502);
   } catch (error) {
     if(error instanceof SecurityLimit)return new Response(JSON.stringify({error:securityMessage(error.code),code:error.code}),{status:error.status,headers:{...corsHeaders,"Content-Type":"application/json","Retry-After":String(error.retryAfter)}});
+    if(options.retainAmbiguousFailures)return json({code:'provider_outcome_uncertain',error:'The provider response was interrupted. Its outcome must be checked before retrying.'},503);
     console.warn("Analysis request failed", error instanceof Error ? error.name : "unknown");
     return json({ error: "Analysis temporarily unavailable. Your saved evidence is unchanged." }, 503);
   }

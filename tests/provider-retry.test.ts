@@ -30,3 +30,7 @@ Deno.test('provider retries connection errors with a fresh attempt',async()=>{
   assert(response.ok&&calls===2,'connection failure did not recover');
   assert(retryableStatus(408)&&retryableStatus(409)&&retryableStatus(429)&&retryableStatus(500)&&!retryableStatus(422),'retry status policy changed');
 });
+
+Deno.test('direct paid calls never repeat an ambiguous transport failure or gateway timeout',async()=>{
+ for(const status of [null,408,504]){let calls=0;try{const response=await fetchWithRetry('https://provider.invalid',{},{retryTransport:false,wait:async()=>{},fetcher:async()=>{calls++;if(status===null)throw Error('connection reset');return new Response('timeout',{status});}});assert(response.status===status,'wrong gateway status');}catch{assert(status===null,'unexpected transport failure');}assert(calls===1,'ambiguous paid request was retried');}
+});

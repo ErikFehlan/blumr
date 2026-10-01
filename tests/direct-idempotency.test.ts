@@ -52,3 +52,13 @@ Deno.test('known failure releases a claim but provider or completion ambiguity d
   completionFails=true;assert((await withDirectIdempotency({...options,execute:async()=>json({ok:true})})).status===503,'unconfirmed result presented as durable');
  }finally{globalThis.fetch=original;}
 });
+
+Deno.test('an interrupted provider response preserves its claim and returns a recovery reference',async()=>{
+ const original=globalThis.fetch;let released=false;
+ globalThis.fetch=async(url)=>{if(String(url).includes('claim_direct'))return json({state:'owner'});if(String(url).includes('mark_direct'))return json(true);released=true;return json(true);};
+ try{const response=await withDirectIdempotency({workspace:'w',actor:'a',payload:{},base:'https://db.invalid',serviceKey:'private',execute:async(_id,mark)=>{await mark();return json({code:'provider_outcome_uncertain'},503);}});const body=await response.json();assert(response.status===503&&body.code==='analysis_outcome_uncertain'&&typeof body.request_id==='string'&&!released,'ambiguous response released ownership');}finally{globalThis.fetch=original;}
+});
+Deno.test('an expired or cleaned claim stops a late worker before provider work',async()=>{
+ const original=globalThis.fetch;let calls=0;globalThis.fetch=async(url)=>json(String(url).includes('claim_direct')?{state:'owner'}:false);
+ try{const response=await withDirectIdempotency({workspace:'w',actor:'a',payload:{},base:'https://db.invalid',serviceKey:'private',execute:async(_id,mark)=>{await mark();calls++;return json({});}});assert(response.status===503&&calls===0,'late worker reached provider');}finally{globalThis.fetch=original;}
+});

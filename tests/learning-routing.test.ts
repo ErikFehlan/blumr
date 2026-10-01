@@ -9,6 +9,7 @@ Deno.test('learning models are workspace scoped, feedback only, server selected,
  globalThis.fetch=async(url,init)=>{
   const u=String(url),body=init?.body?JSON.parse(String(init.body)):null;
     if(u.includes('/claim_direct_ai_request'))return Promise.resolve(json({state:'owner'}));
+    if(u.includes('/mark_direct_ai_started'))return Promise.resolve(json(true));
     if(u.includes('/finish_direct_ai_request'))return Promise.resolve(json(true));
   if(u.includes('/reserve_ai_budget'))return json({allowed:true});
   if(u.includes('workspace_members'))return json(allowed?[{workspace_id:'a'}]:[],allowed?200:403);
