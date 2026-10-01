@@ -15,3 +15,6 @@ verify_jwt = false
 
 [functions.onboarding-reminders]
 verify_jwt = false
+
+[functions.staging-provider-bridge]
+verify_jwt = true

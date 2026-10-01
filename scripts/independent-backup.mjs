@@ -11,12 +11,16 @@ if(ref!=='zqiqjzxcpznhzjengfff'||!token)throw Error('Independent backup requires
 const output=join(process.cwd(),'test-results','independent-backup');
 const work=await mkdtemp(join(tmpdir(),'blumr-private-backup-'));
 const source=join(work,'source'),restore=join(work,'restore');
-async function command(binary,args,{cwd=work,input,timeout=600000,localDiagnostics=false}={}){
+async function command(binary,args,{cwd=work,input,timeout=600000,localDiagnostics=false,databaseDiagnostics=false}={}){
  return new Promise((resolve,reject)=>{
   const child=spawn(binary,args,{cwd,env:process.env,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
-  child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>{if(localDiagnostics)stderr+=x;});
+  child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>{if(localDiagnostics||databaseDiagnostics)stderr+=x;});
   const timer=setTimeout(()=>child.kill('SIGKILL'),timeout);
-  child.on('error',reject);child.on('close',code=>{clearTimeout(timer);if(code!==0&&localDiagnostics)console.error(stderr.split('\n').filter(line=>!/password|secret|token|key|postgresql:\/\/|eyJ[A-Za-z0-9_-]+\./i.test(line)).slice(-35).join('\n'));code===0?resolve(stdout):reject(Error(`${binary} ${args.slice(0,2).join(' ')} operation failed (exit ${code}); private output was withheld`));});
+  child.on('error',reject);child.stdin.on('error',error=>{if(error.code!=='EPIPE')reject(error);});
+  child.on('close',code=>{clearTimeout(timer);
+   if(code!==0&&localDiagnostics)console.error(stderr.split('\n').filter(line=>!/password|secret|token|key|postgresql:\/\/|eyJ[A-Za-z0-9_-]+\./i.test(line)).slice(-35).join('\n'));
+   if(code!==0&&databaseDiagnostics){const category=['does not exist','already exists','permission denied','duplicate key','foreign key constraint','check constraint','syntax error','cannot change','invalid input'].find(x=>stderr.includes(x))||'unclassified';const objects=[...stderr.matchAll(/(?:relation|column|constraint|function|sequence|index|table|role) "([a-z_][a-z0-9_.]*)"/gi)].map(m=>m[1]);console.error('Isolated restore diagnostic: '+JSON.stringify({category,objects}));}
+   code===0?resolve(stdout):reject(Error(`${binary} ${args.slice(0,2).join(' ')} operation failed (exit ${code}); private output was withheld`));});
   child.stdin.end(input);
  });
 }
@@ -68,7 +72,8 @@ try{
  for(const name of containers)if(name!==database&&/^supabase_[a-z0-9_-]+_blumr-backup-drill$/.test(name))await command('docker',['stop',name]);
  const inspected=JSON.parse(await command('docker',['inspect',database]));const networks=Object.keys(inspected[0].NetworkSettings.Networks);
  for(const name of networks){await command('docker',['network','disconnect',name,database]);network=name;}
- const psql=input=>command('docker',['exec','-i',database,'psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-At'],{input});
+ console.log('Recovery database bootstrapped; outbound networks disconnected. Restoring database.');
+ const psql=input=>command('docker',['exec','-i',database,'psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-At'],{input,databaseDiagnostics:true});
  const roles=await readFile(join(restore,'roles.sql'),'utf8'),schema=await readFile(join(restore,'schema.sql'),'utf8'),data=await readFile(join(restore,'data.sql'),'utf8');
  await psql('begin;\n'+roles+'\n'+schema+'\nSET session_replication_role=replica;\n'+data+'\ncommit;\n');
  const actual=JSON.parse((await psql(inventorySQL)).trim().split('\n').at(-1));

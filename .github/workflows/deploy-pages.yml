@@ -105,7 +105,7 @@ jobs:
 
   prepare-home:
     if: github.ref == 'refs/heads/main'
-    needs: validate
+    needs: [validate, staging]
     runs-on: ubuntu-latest
     environment: criteria-backend
     timeout-minutes: 5
@@ -131,6 +131,8 @@ jobs:
   core-backend:
     needs: [validate, staging]
     uses: ./.github/workflows/core-backend.yml
+    with:
+      staging_verified: true
     secrets: inherit
 
   live-site:
