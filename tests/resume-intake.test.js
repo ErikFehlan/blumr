@@ -13,9 +13,9 @@ test('preliminary JD fit returns immediately from explicit resume evidence witho
 
 test('preliminary fit stays conservative when a skill is present but required tenure is not evidenced',()=>{
  const job={title:'Senior .NET Engineer',criteria:['Requires 5+ years of .NET development'],knockouts:[]};
- const quick=intake.preliminaryFit('Alex Carter\\nBuilt APIs with C# and .NET Core for enterprise systems.',job);
+ const quick=intake.preliminaryFit('Alex Carter\nBuilt APIs with C# and .NET Core for enterprise systems.',job);
  assert.equal(quick.partial,1);assert.equal(quick.supported,0);assert.equal(quick.score,7);
- const supported=intake.preliminaryFit('Alex Carter\\n7 years of .NET development building enterprise APIs.',job);
+ const supported=intake.preliminaryFit('Alex Carter\n7 years of .NET development building enterprise APIs.',job);
  assert.equal(supported.supported,1);assert.equal(supported.score,10);
 });
 function fixture(){
