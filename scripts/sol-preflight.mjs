@@ -1,9 +1,10 @@
+import {managementFetch} from './supabase-management.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
 const token=process.env.SUPABASE_ACCESS_TOKEN,ref=process.env.SUPABASE_PROJECT_REF;
 if(!token||!/^[a-z0-9]{20}$/.test(ref||''))throw Error('Use the existing backend deployment environment.');
 async function management(path,method='GET',body){
- const r=await fetch(`https://api.supabase.com/v1/projects/${ref}${path}`,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(20000)});
+ const r=await managementFetch(`https://api.supabase.com/v1/projects/${ref}${path}`,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(20000)});
  if(!r.ok)throw Error(`Sol validation setup failed (${r.status}).`);return r.json();
 }
 const keys=await management('/api-keys?reveal=true'),service=keys.find(k=>k.name==='service_role')?.api_key;

@@ -10,6 +10,8 @@ This work extends the existing regression and fixture infrastructure. Production
 | 11: release safeguards | PR application/browser/backend/SQL checks, matching-commit public asset verification, live journeys and fixture cleanup; ancestor-only frontend rollback PR prepared and validated without executing old workflow code | Existing release workflows plus `prepare-rollback.yml` |
 | 12: regressions | Failure assertions on every PR; recovery and cross-device checks plus complete recruiter journey on main releases; load canary on changes to its scripts or manual invocation; only synthetic aggregate results exported | Existing CI extended rather than duplicated |
 
+The main-push load canary waits for the matching release workflow to finish successfully before creating fixtures. This keeps the large fixture setup/cleanup sequence from competing with deployment. Supabase model-preflight management requests retry only explicit HTTP 429 responses within a bounded budget; transport failures and other statuses are not automatically repeated. Superseded main releases do not start a new canary.
+
 A successful test step is not enough if cleanup fails. The live run summary requires recruiter journey, duplicate verification, scoped recovery, and cleanup all to succeed. Load-test cleanup validates identity markers and sole workspace membership before deleting generated storage paths and accounts. Closed jobs prevent the canary and recovery fixture from initiating model assessments.
 
 ## Recovery limits
