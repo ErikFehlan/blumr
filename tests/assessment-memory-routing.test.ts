@@ -7,6 +7,9 @@ Deno.test('assessment memory is fetched with the caller JWT, rejects foreign job
  const json=(v:unknown,status=200)=>new Response(JSON.stringify(v),{status});
  globalThis.fetch=async(url,init)=>{
   const u=String(url),body=init?.body?JSON.parse(String(init.body)):null;
+    if(u.includes('/claim_direct_ai_request'))return Promise.resolve(json({state:'owner'}));
+    if(u.includes('/mark_direct_ai_started'))return Promise.resolve(json(true));
+    if(u.includes('/finish_direct_ai_request'))return Promise.resolve(json(true));
   if(u.includes('/workspace_members'))return json([{workspace_id:'w'}]);
   if(u.includes('/auth/v1/user'))return json({id:'actor'});
   if(u.includes('/jobs?'))return json(allowed?[{id:'10000000-0000-0000-0000-000000000001'}]:[]);

@@ -36,7 +36,7 @@
         reminderLoad:()=>dataService.loadReminderRecipients(),reminderSave:(id,enabled)=>dataService.setReminderRecipient(id,enabled),reminderSend:id=>dataService.sendOnboardingReminder(id),
         planLoad:()=>dataService.loadTeamPlans(),planSave:(id,plan,status,allowance,ends)=>dataService.setTeamPlan(id,plan,status,allowance,ends),
         ratesLoad:()=>dataService.loadModelRates(),ratesSave:(model,input,cached,output)=>dataService.saveModelRate(model,input,cached,output),
-        costLoad:()=>dataService.loadAICostReport(),healthLoad:()=>dataService.loadSystemHealth(),
+        costLoad:()=>dataService.loadAICostReport(),healthLoad:()=>dataService.loadSystemHealth(),recoveryLoad:()=>dataService.loadDirectAIRecovery?.()||[],recoveryRetry:(claim,note,verified)=>dataService.recoverDirectAIRequest(claim,note,verified),
         toast:showToast,saveFile:downloadBlob,supportLoad:()=>dataService.loadSupportRequests(true),supportReview:(id,status)=>dataService.reviewSupportRequest(id,status)
       });
       const candidateFilters=new Map();let candidateListJob=null,lastJobOptions=null;let jobListFilter='active';
@@ -317,7 +317,7 @@
             const response=await fetch(url,{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken,'apikey':anonKey},body:JSON.stringify(requestBody)});
             const body=await response.json().catch(()=>({}));
             const duration=performance.now()-started;if(duration>=20000)recordReliability('edge','performance','direct_ai_analysis','warn',null,duration,{analysis_type:requestBody.analysis_type||'patterns'});
-            if(!response.ok){const failure=Error(body.error||`${errorLabel} failed (${response.status})`);failure.code=body.code||`http_${response.status}`;throw failure;}return body;
+            if(!response.ok){const failure=Error((body.error||`${errorLabel} failed (${response.status})`)+(body.request_id?' Reference: '+body.request_id:''));failure.code=body.code||`http_${response.status}`;throw failure;}return body;
           }catch(error){const duration=performance.now()-started;recordReliability('edge','ai','direct_ai_analysis','error',error?.code||error?.name||'ai_failed',duration,{analysis_type:requestBody.analysis_type||'patterns'});if(controller.signal.aborted)throw new Error(signal?.aborted?'Analysis cancelled':'Analysis timed out. Try again.');throw error;}
           finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
         };

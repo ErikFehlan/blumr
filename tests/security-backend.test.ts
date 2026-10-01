@@ -11,6 +11,9 @@ Deno.test('AI limits fail closed before provider work and ignore forged caller i
  const restore=configure(),original=globalThis.fetch;let budget:unknown={allowed:false,code:'usage_limit'},budgetStatus=200,providerCalls=0,reservations=0,custom=true;
  globalThis.fetch=async(url,init)=>{
   const u=String(url);
+    if(u.includes('/claim_direct_ai_request'))return Promise.resolve(json({state:'owner'}));
+    if(u.includes('/mark_direct_ai_started'))return Promise.resolve(json(true));
+    if(u.includes('/finish_direct_ai_request'))return Promise.resolve(json(true));
   if(u.includes('workspace_members'))return json([{workspace_id:'owned-workspace'}]);
   if(u.includes('/auth/v1/user'))return json({id:'verified-caller'});
   if(u.includes('ai_usage_events'))return json({});
@@ -48,4 +51,21 @@ Deno.test('budget configuration is required; no missing-secret bypass',async()=>
  try{await reserveModelCall('workspace',null,100,100);throw Error('Missing secret bypassed limit');}
  catch(e){assert(e instanceof SecurityLimit&&e.status===503,'unexpected missing config result');}
  finally{if(old)Deno.env.set('SUPABASE_SERVICE_ROLE_KEY',old);}
+});
+Deno.test('an interrupted authenticated provider call is retained and never falls back or restarts',async()=>{
+ const restore=configure(),original=globalThis.fetch;let providers=0,finished=0,marked=0;
+ globalThis.fetch=async(url)=>{
+  const u=String(url);
+  if(u.includes('workspace_members'))return json([{workspace_id:'owned-workspace'}]);
+  if(u.includes('/auth/v1/user'))return json({id:'verified-caller'});
+  if(u.includes('get_feedback_learning_model'))return json('ft:gpt-4.1-mini-2025-04-14:test:feedback:model');
+  if(u.includes('claim_direct_ai_request'))return json({state:'owner'});
+  if(u.includes('mark_direct_ai_started')){marked++;return json(true);}
+  if(u.includes('finish_direct_ai_request')){finished++;return json(true);}
+  if(u.includes('reserve_ai_budget'))return json({allowed:true});
+  if(u.includes('ai_usage_events'))return json({});
+  providers++;throw Error('Provider connection reset after submission');
+ };
+ try{const response=await handleAuthenticatedAnalysis(request()),body=await response.json();assert(response.status===503&&body.code==='analysis_outcome_uncertain'&&body.request_id,'Recovery reference missing');assert(marked===1&&providers===1&&finished===0,'Ambiguous provider work was retried, fell back or released');}
+ finally{globalThis.fetch=original;restore();}
 });
