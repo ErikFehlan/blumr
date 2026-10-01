@@ -49,6 +49,8 @@ const dir=path.resolve(__dirname,'..');
   await page.waitForFunction(()=>window.testSaved.candidates[0]?.resumeIntake?.phase==='processing');
   assert.equal(await page.evaluate(()=>window.testSaved.candidates.length),1,'candidate created without form submission');
   await page.locator('#page-detail.active').waitFor();
+  assert.match(await page.locator('#workspaceIntake').textContent(),/Preliminary JD Fit: 10\.0\/10/,'quick rating should appear while deep AI is still held');
+  assert.match(await page.locator('#workspaceIntake').textContent(),/Preliminary only/,'quick rating must remain separate from reviewed scores');
   await page.locator('#workspaceSubmission > summary').click();
   await page.locator('#submissionDraft').fill('Unsaved recruiter summary');
   assert.equal(await page.locator('#detailManagerScore').textContent(),'—','placeholder is not a rating');

@@ -4,6 +4,20 @@ const text='Alex Carter\nQA Analyst\nOwned manual regression testing for billing
 const result={name:'Alex Carter',role:'QA Analyst',score:8,manager_score:8.7,primary_signal:'Manual regression ownership supports this QA search.',jd_reason:'Resume supports manual testing.',manager_reason:'Hands-on ownership matches the approved preference.',resume_evidence:[{claim:'Manual regression ownership',quote:'Owned manual regression testing for billing systems'}],concerns:['Confirm scope of automation work.'],tags:['QA'],screening_questions:['What testing did you personally own?']};
 const clone=x=>JSON.parse(JSON.stringify(x));
 const until=async fn=>{for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,2));}throw Error('Timed out');};
+
+test('preliminary JD fit returns immediately from explicit resume evidence without applying saved scores',()=>{
+ const job={id:'a',title:'QA Analyst',description:'Manual regression testing',criteria:['Must Have | manual testing'],knockouts:[],weights:[]};
+ const quick=intake.preliminaryFit(text,job);
+ assert.equal(quick.score,10);assert.equal(quick.considered,1);assert.equal(quick.supported,1);assert.equal(quick.partial,0);assert.match(quick.job_signature,/^prelim-v1-/);
+});
+
+test('preliminary fit stays conservative when a skill is present but required tenure is not evidenced',()=>{
+ const job={title:'Senior .NET Engineer',criteria:['Requires 5+ years of .NET development'],knockouts:[]};
+ const quick=intake.preliminaryFit('Alex Carter\nBuilt APIs with C# and .NET Core for enterprise systems.',job);
+ assert.equal(quick.partial,1);assert.equal(quick.supported,0);assert.equal(quick.score,7);
+ const supported=intake.preliminaryFit('Alex Carter\n7 years of .NET development building enterprise APIs.',job);
+ assert.equal(supported.supported,1);assert.equal(supported.score,10);
+});
 function fixture(){
  const candidates=[],jobs=[{id:'a',title:'QA',status:'active'},{id:'b',title:'Other',status:'active'}],docs=new Map(),calls=[],saved=[];let current='a',failSave=false,failUpload=false,uploadFailure=null,uploadCalls=0,analyze=async()=>clone(result);
  const api={job:id=>jobs.find(j=>j.id===(id||current)),workspace:()=> 'workspace',candidates:()=>candidates,extract:async()=>text,
