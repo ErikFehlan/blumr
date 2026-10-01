@@ -12,3 +12,7 @@ build/
 # Private learning exports and model run manifests (never commit these)
 .learning/
 learning-data/
+
+# Private backup working files and Supabase CLI credentials
+.backup/
+supabase/.temp/

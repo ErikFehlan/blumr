@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   validate:
+    timeout-minutes: 12
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -63,6 +64,7 @@ jobs:
       - name: Run application tests
         run: node --test tests/*.test.js
       - name: Install browser test runtime
+        timeout-minutes: 4
         run: |
           npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.8.0
           npx playwright install --with-deps chromium
@@ -121,20 +123,25 @@ jobs:
       - name: Prepare personal Home, tutorial progress, and admin tools before publishing
         run: node scripts/workspace-home-backend.mjs
 
-  core-backend:
+  staging:
     needs: validate
+    uses: ./.github/workflows/staging-backend.yml
+    secrets: inherit
+
+  core-backend:
+    needs: [validate, staging]
     uses: ./.github/workflows/core-backend.yml
     secrets: inherit
 
   live-site:
     if: github.ref == 'refs/heads/main'
-    needs: [validate, prepare-home, core-backend]
+    needs: [validate, prepare-home, staging, core-backend]
     uses: ./.github/workflows/live-site.yml
     secrets: inherit
 
   deploy:
     if: github.ref == 'refs/heads/main'
-    needs: [validate, prepare-home, core-backend]
+    needs: [validate, prepare-home, staging, core-backend]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
