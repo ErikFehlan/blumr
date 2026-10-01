@@ -10,6 +10,50 @@
     return error;
   }
   const strings=(a,max,len)=>Array.isArray(a)&&a.length<=max&&a.every(s=>typeof s==='string'&&s.trim()&&s.length<=len);
+  const preliminaryStopWords=new Set(('a an and are as at be been being by can candidate candidates company core could desired duties experience experienced for from have has having in into is it job knowledge looking may minimum must need needs of on or our preferred preferably qualification qualifications required requirement requirements responsibility responsibilities role should skill skills strong team the their this to using we with work working years year you your').split(' '));
+  const preliminaryFamilies=[
+    ['dotnet',/(?:^|[^\\w])(?:\\.net|dotnet)(?:\\s+core|\\s+framework)?\\b|\\bc#(?=$|[\\s,.;/()])|\\bcsharp\\b/i],
+    ['aspnet',/\\basp\\.?net(?:\\s+core)?\\b/i],['playwright',/\\bplaywright\\b/i],['typescript',/\\btypescript\\b/i],['javascript',/\\bjavascript\\b/i],
+    ['selenium',/\\bselenium\\b/i],['java',/\\bjava\\b/i],['spring-webflux',/\\bspring\\s+webflux\\b/i],['spring-boot',/\\bspring\\s+boot\\b/i],['kafka',/\\b(?:apache\\s+)?kafka\\b/i],
+    ['azure-devops',/\\bazure devops\\b/i],['azure',/\\b(?:microsoft\\s+)?azure\\b/i],['aws',/\\b(?:aws|amazon web services)\\b/i],['gcp',/\\b(?:gcp|google cloud(?: platform)?)\\b/i],
+    ['react',/\\breact(?:\\.js|js)?\\b/i],['sql-server',/\\b(?:sql server|mssql|microsoft sql)\\b/i],['sql',/\\bsql\\b/i],['servicenow',/\\bservice\\s*now\\b/i],
+    ['sast',/\\b(?:sast|static application security)\\b/i],['dast',/\\b(?:dast|dynamic application security)\\b/i],['palo-alto',/\\bpalo alto\\b/i],['panorama',/\\bpanorama\\b/i],
+    ['kubernetes',/\\b(?:kubernetes|k8s)\\b/i],['docker',/\\bdocker\\b/i],['python',/\\bpython\\b/i],['node',/\\bnode(?:\\.js|js)\\b/i],['oauth',/\\boauth\\s*2?\\b/i],['jwt',/\\bjwt\\b/i],
+    ['github-actions',/\\bgithub actions\\b/i],['jenkins',/\\bjenkins\\b/i],['cicd',/\\b(?:ci\\/?cd|continuous integration|continuous delivery)\\b/i],['entity-framework',/\\bentity framework\\b/i]
+  ].map(([id,rx])=>({id,rx}));
+  const preliminaryNormalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[\\u00ad\\u200b\\ufeff]/g,'').replace(/[\\u2010-\\u2015]/g,'-').replace(/\\s+/g,' ').trim();
+  function preliminaryJobSignature(job){
+    const source=JSON.stringify({title:job?.title||'',description:job?.description||'',criteria:job?.criteria||[],knockouts:job?.knockouts||[],priorities:job?.hiringPriorities?.items||[]});
+    let h=2166136261;for(let i=0;i<source.length;i++)h=Math.imul(h^source.charCodeAt(i),16777619);return 'prelim-v1-'+source.length+'-'+(h>>>0).toString(16);
+  }
+  function preliminaryRequirements(job){
+    const rows=[],seen=new Set(),add=(text,kind,weight,type='')=>{
+      const clean=String(text||'').replace(/^\\s*(?:[-•▪●*]+\\s*)?/,'').replace(/^\\s*(?:Must Have|Preferred|Bonus)\\s*\\|\\s*/i,'').trim();if(clean.length<4)return;
+      const key=preliminaryNormalize(clean).replace(/[^a-z0-9+#.]+/g,' ').trim();if(!key||seen.has(key))return;seen.add(key);rows.push({text:clean,kind,weight,type});
+    };
+    const saved=job?.hiringPriorities;
+    if(saved?.source_title===job?.title&&saved?.source_description===(job?.description||'')&&Array.isArray(saved.items))for(const p of saved.items)add(p.title||p.source_quote,'priority',p.requirement_type==='preferred'?.8:1.2,p.requirement_type||'');
+    for(const text of job?.knockouts||[])add(text,'knockout',1.45,'required');
+    for(const text of job?.criteria||[])add(text,'criterion',/\\b(?:preferred|nice to have|bonus|plus)\\b/i.test(text)?.8:1,'');
+    if(!rows.length){
+      for(const text of String(job?.description||'').split(/\\n+|(?<=[.!?])\\s+/))if(/\\b(required|requires?|must|minimum|experience|proficien|expertise|knowledge|hands[- ]on|preferred)\\b/i.test(text))add(text,'description',1,'');
+    }
+    return rows.slice(0,12);
+  }
+  function preliminaryYears(text){const m=String(text||'').match(/\\b(?:at least\\s+|minimum(?:\\s+of)?\\s+)?(\\d+(?:\\.\\d+)?)\\s*(?:\\+|plus)?\\s*(?:years?|yrs?)\\b/i);return m?Number(m[1]):null;}
+  function preliminaryTokens(text){return [...new Set(preliminaryNormalize(text).replace(/[^a-z0-9+#.]+/g,' ').split(' ').filter(t=>t.length>=3&&!preliminaryStopWords.has(t)&&!/^(?:must|required|preferred)$/.test(t)))].slice(0,12);}
+  function familyYears(resume,family){let max=null;for(const part of String(resume||'').split(/\\n+|(?<=[.!?;])\\s+/)){if(!family.rx.test(part))continue;const years=preliminaryYears(part);if(years!==null)max=max===null?years:Math.max(max,years);}return max;}
+  function evaluatePreliminaryRequirement(text,resume){
+    const reqFamilies=preliminaryFamilies.filter(f=>f.rx.test(text)),threshold=preliminaryYears(text);
+    if(reqFamilies.length){const found=reqFamilies.filter(f=>f.rx.test(resume));if(!found.length)return {status:'unknown',factor:.35};if(found.length<reqFamilies.length)return {status:'partial',factor:.7};if(threshold!==null){const evidenced=Math.max(...found.map(f=>familyYears(resume,f)??-1));return evidenced>=threshold?{status:'supported',factor:1}:{status:'partial',factor:.7};}return {status:'supported',factor:1};}
+    const tokens=preliminaryTokens(text);if(tokens.length<2)return {status:'unknown',factor:.35};const normalized=preliminaryNormalize(resume),hits=tokens.filter(t=>normalized.includes(t)).length,ratio=hits/tokens.length;if(hits>=2&&ratio>=.67)return {status:'supported',factor:1};if(hits>=1&&ratio>=.35)return {status:'partial',factor:.7};return {status:'unknown',factor:.35};
+  }
+  function preliminaryFit(text,job){
+    const requirements=preliminaryRequirements(job),resume=String(text||'');
+    if(!requirements.length)return {version:1,score:null,considered:0,supported:0,partial:0,unknown:0,requirements:[],job_signature:preliminaryJobSignature(job),generatedAt:Date.now()};
+    let weighted=0,total=0,supported=0,partial=0,unknown=0;const evaluated=requirements.map(row=>{const finding=evaluatePreliminaryRequirement(row.text,resume);total+=row.weight;weighted+=row.weight*finding.factor;if(finding.status==='supported')supported++;else if(finding.status==='partial')partial++;else unknown++;return {text:row.text,kind:row.kind,status:finding.status};});
+    return {version:1,score:Math.round((weighted/total)*100)/10,considered:evaluated.length,supported,partial,unknown,requirements:evaluated,job_signature:preliminaryJobSignature(job),generatedAt:Date.now()};
+  }
   // Keep content identity normalization unchanged: existing uploaded resumes use it.
   // This separate index ignores only typography and maps matches back to the actual
   // source. Never remove words, negation, numbers, or join noncontiguous passages.
@@ -115,22 +159,30 @@
         const text=typeof extracted==='string'?extracted:extracted.text;
         if(!text.trim()||text.trim().length<40)throw Error('No usable resume text was found. Try a text-based PDF, DOCX, or TXT file.');
         if(text.length>120000)throw Error('This resume is too long to assess in full. Upload a shorter resume.');
+        const preliminary=preliminaryFit(text,job);
         const check=()=>{if(workspace!==api.workspace()||!api.job(jobId)||api.job(jobId).status==='closed')throw Error('The selected job was closed or removed. Reopen it before retrying.');};
         check();const key=await identity(workspace,jobId,text),keys=[key];
         // Recognize files uploaded before the PDF word-boundary fix as the same candidate.
         if(typeof extracted?.legacyText==='string'&&extracted.legacyText!==text)keys.push(await identity(workspace,jobId,extracted.legacyText));
         check();
         const existing=api.candidates().find(c=>c.jobId===jobId&&keys.some(k=>c.id===k.id||c.resumeIntake?.hash===k.hash));
-        if(existing){options.candidate?.(existing,true);if(!existing.resumeIntake?.stored&&existing.resumeIntake){files.set(existing.id,{file,text});await storeDocument(existing);enqueue(existing);}else if(existing.resumeIntake?.phase==='error')await retry(existing);if(!options.silent)api.toast('This resume is already attached to '+existing.short+'.');if(options.open!==false)api.open(existing,true);return existing;}
+        if(existing){
+          options.candidate?.(existing,true);
+          if(existing.resumeIntake&&pending(existing)&&(!existing.resumeIntake.preliminary||existing.resumeIntake.preliminary.job_signature!==preliminary.job_signature)){existing.resumeIntake.preliminary=preliminary;changed(existing);try{await api.persist();}catch{}}
+          if(!existing.resumeIntake?.stored&&existing.resumeIntake){files.set(existing.id,{file,text});await storeDocument(existing);enqueue(existing);}else if(existing.resumeIntake?.phase==='error')await retry(existing);
+          if(!options.silent)api.toast('This resume is already attached to '+existing.short+'.');if(options.open!==false)api.open(existing,true);return existing;
+        }
         const now=Date.now();
-        candidate=api.add({id:key.id,jobId,name:file.name.replace(/\.[^.]+$/,'').slice(0,160),role:'Resume awaiting analysis',score:0,jdScore:0,resumeJDScore:0,managerScore:0,originalManagerScore:0,rec:'Screen First',signal:'Preparing a screening brief.',strengths:[],concerns:[],tags:[],screeningQuestions:[],stage:'Sourced',createdAt:now,updatedAt:now,resumeIntake:{backend:useRemote()?'durable-v1':undefined,hash:key.hash,fileName:file.name,phase:'uploading',updatedAt:now}});
+        candidate=api.add({id:key.id,jobId,name:file.name.replace(/\.[^.]+$/,'').slice(0,160),role:'Resume awaiting analysis',score:0,jdScore:0,resumeJDScore:0,managerScore:0,originalManagerScore:0,rec:'Screen First',signal:Number.isFinite(preliminary.score)?'Preliminary JD fit available while the full assessment is verified.':'Preparing a screening brief.',strengths:[],concerns:[],tags:[],screeningQuestions:[],stage:'Sourced',createdAt:now,updatedAt:now,resumeIntake:{backend:useRemote()?'durable-v1':undefined,hash:key.hash,fileName:file.name,phase:'uploading',preliminary,updatedAt:now}});
         options.candidate?.(candidate,false);options.progress?.('saving');files.set(candidate.id,{file,text});changed(candidate);
         await api.persist();
+        if(Number.isFinite(preliminary.score))api.track?.('resume_preliminary_scored');
+        if(options.open!==false)api.open(candidate);
         check();
         await storeDocument(candidate);
         check();if(!valid(candidate))throw Error('This candidate was removed during upload.');
-        if(!options.silent)api.toast('Candidate created. Preparing the screening brief.');
-        if(options.open!==false)api.open(candidate);enqueue(candidate);return candidate;
+        if(!options.silent)api.toast(Number.isFinite(preliminary.score)?'Candidate created. Preliminary JD Fit '+preliminary.score.toFixed(1)+'/10 is ready; the full assessment is still running.':'Candidate created. Preparing the screening brief.');
+        enqueue(candidate);return candidate;
       }catch(e){
         if(candidate&&valid(candidate)){set(candidate,'error',e.message||'Resume intake could not finish.');try{await api.persist();}catch{}}
         if(options.silent)throw e;api.toast(e.message||'Resume intake could not finish.','error');
@@ -277,7 +329,11 @@
       let html='<span class="rf-kicker">Resume screening brief</span>';
       if(needsReview&&api.job(c.jobId)?.status==='closed')html+='<h3>Search closed · assessment paused</h3><p class="rf-sub">Reopen this search from Jobs to resume assessment work. Existing candidate records are retained.</p>';
       else if(state.phase==='error')html+='<h3>Resume intake needs attention</h3><p>'+escape(state.error)+'</p><button class="rf-btn" type="button" data-intake-retry>Try again</button>';
-      else if(state.phase!=='ready')html+='<h3>Preparing your screening brief…</h3><p class="rf-sub">You can keep working. Once your resume is saved, processing continues even if you close this tab. Scores appear after review.</p>';
+      else if(state.phase!=='ready'){
+        const quick=state.preliminary?.job_signature===preliminaryJobSignature(api.job(c.jobId))?state.preliminary:null;
+        if(Number.isFinite(quick?.score))html+='<div class="rf-cardhead"><h3>Preliminary JD Fit: '+quick.score.toFixed(1)+'/10</h3><span class="rf-pill rf-blue">Fast scan</span></div><p class="rf-sub">'+quick.supported+' supported · '+quick.partial+' partial · '+quick.unknown+' not yet evidenced across '+quick.considered+' core requirements. The full assessment is verifying evidence and Manager Fit now.</p><p class="rf-evidence-caution">Preliminary only — it does not affect rankings or saved scores.</p>';
+        else html+='<h3>Preparing your screening brief…</h3><p class="rf-sub">You can keep working. Once your resume is saved, processing continues even if you close this tab. Scores appear after review.</p>';
+      }
       else{
         html+='<div class="rf-cardhead"><h3>'+(wrap.id==='workspaceIntake'?'Resume assessment':escape(c.short))+'</h3><div class="rf-actions"><button class="rf-btn" type="button" data-view-resume>View resume</button><span class="rf-pill '+(needsReview?'rf-amber':'rf-green')+'">'+(needsReview?'Ready for your review':'Reviewed')+'</span></div></div><p>'+escape(prose.brief(brief.primary_signal,35))+'</p>';
         if(needsReview)html+='<p><strong>Proposed JD Fit: '+brief.score.toFixed(1)+'/10 · Manager Fit: '+brief.manager_score.toFixed(1)+'/10</strong></p>';
@@ -301,7 +357,7 @@
       const wrap=api.root?.querySelector('#resumeIntakeStatus');if(!wrap)return;
       const list=api.candidates().filter(c=>c.jobId===api.job()?.id&&pending(c));
       wrap.hidden=!list.length;
-      wrap.innerHTML=list.map(c=>'<button type="button" class="rf-intake-status" data-intake-open="'+escape(c.id)+'"><strong>'+escape(c.short)+'</strong><span>'+({uploading:'Saving resume…',queued:'Queued for assessment',processing:'Preparing screening brief…',ready:'Ready for your review',error:'Needs attention'}[c.resumeIntake.phase]||'Preparing…')+'</span></button>').join('');
+      wrap.innerHTML=list.map(c=>{const quick=c.resumeIntake.preliminary?.job_signature===preliminaryJobSignature(api.job(c.jobId))?c.resumeIntake.preliminary:null;const label=Number.isFinite(quick?.score)&&!['ready','error'].includes(c.resumeIntake.phase)?'Preliminary JD Fit '+quick.score.toFixed(1)+' · full assessment running':({uploading:'Saving resume…',queued:'Queued for assessment',processing:'Preparing screening brief…',ready:'Ready for your review',error:'Needs attention'}[c.resumeIntake.phase]||'Preparing…');return '<button type="button" class="rf-intake-status" data-intake-open="'+escape(c.id)+'"><strong>'+escape(c.short)+'</strong><span>'+escape(label)+'</span></button>';}).join('');
       wrap.querySelectorAll('[data-intake-open]').forEach(b=>b.addEventListener('click',()=>api.open(api.candidates().find(c=>c.id===b.dataset.intakeOpen),true)));
     }
     function resume(){
@@ -320,5 +376,5 @@
     function releaseFile(id){files.delete(id);}
     return {upload,retry,approve,resume,render,renderCandidate,openResume,hasUnsavedFile,releaseFile};
   }
-  const api={create,validate,identity,pending,normalize,sourceQuote,evidenceForPoint,pointText,fileReadError,retryableNetworkError,retryTransient};if(typeof module!=='undefined')module.exports=api;global.AncalagonIntake=api;
+  const api={create,validate,identity,pending,normalize,sourceQuote,evidenceForPoint,pointText,fileReadError,retryableNetworkError,retryTransient,preliminaryFit,preliminaryJobSignature};if(typeof module!=='undefined')module.exports=api;global.AncalagonIntake=api;
 })(typeof window==='undefined'?globalThis:window);
