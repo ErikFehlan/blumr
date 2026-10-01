@@ -47,7 +47,7 @@ const started=performance.now();
 await request('/storage/v1/object/resumes',owner.access,'DELETE',{prefixes:[path]});
 await request('/rest/v1/jobs?id=eq.'+job.id,owner.access,'DELETE');
 for(const table of tables)assert.deepEqual(await request('/rest/v1/'+table+'?'+(table==='jobs'?'id':'job_id')+'=eq.'+job.id),[],'Loss was not confirmed');
-const missing=await fetch(base+'/storage/v1/object/authenticated/resumes/'+path,{headers:{apikey:state.anon,Authorization:'Bearer '+owner.access},signal:AbortSignal.timeout(20000)});assert.ok(!missing.ok,'Resume survived simulated loss');
+const remainingFiles=await request('/storage/v1/object/list/resumes',service,'POST',{prefix:owner.workspace+'/'+job.id+'/'+candidate.id,limit:100});assert.deepEqual(remainingFiles,[],'Storage still lists the deleted resume');
 // Restore parents before children and the actual file before its metadata.
 await request('/rest/v1/jobs',owner.access,'POST',saved.rows.jobs);
 await request('/rest/v1/candidates',owner.access,'POST',saved.rows.candidates);

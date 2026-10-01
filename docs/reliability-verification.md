@@ -14,6 +14,8 @@ A successful test step is not enough if cleanup fails. The live run summary requ
 
 ## Recovery limits
 
+Storage deletion is verified through the privileged object listing before restoration. A recently downloaded file may still be served from a cache; a download response alone is not authoritative deletion evidence. Recreating the object without upsert must also succeed.
+
 The scoped recovery drill is **not** a full-project backup restore. It does not prove recovery of Auth users, all customer workspaces, platform configuration, deployed functions, cron, or a historical Supabase physical/PITR backup. The management backup inventory is checked read-only and reported separately; unavailable inventory is not a passing restore result.
 
 Supabase database backups contain Storage metadata but do not back up the resume object bytes. An ongoing off-site, encrypted resume-file backup and retention policy still need a configured destination and credentials. The synthetic archive is a test artifact retained seven days; it is not a customer backup system.
