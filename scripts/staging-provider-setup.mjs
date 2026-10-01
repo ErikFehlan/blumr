@@ -2,12 +2,12 @@ import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 const token=process.env.SUPABASE_ACCESS_TOKEN,stage=process.env.SUPABASE_PROJECT_REF,source='zqiqjzxcpznhzjengfff';
 if(stage!=='momfzjmycveqginxmqib'||!token)throw Error('Provider setup is restricted to the owned staging project');
-async function api(ref,path,method='GET',body){const r=await fetch(`https://api.supabase.com/v1/projects/${ref}${path}`,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('Provider setup evidence unavailable ('+r.status+')');return r.json().catch(()=>null);}
+async function api(ref,path,method='GET',body){const r=await fetch(`https://api.supabase.com/v1/projects/${ref}${path}`,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('Provider setup evidence unavailable ('+r.status+') for '+method+' '+path);return r.json().catch(()=>null);}
 const cli=args=>new Promise((resolve,reject)=>{const p=spawn('supabase',args,{stdio:['ignore','ignore','ignore']});p.on('error',reject);p.on('close',code=>code===0?resolve():reject(Error('Private provider setup CLI operation failed')));});
 const name='STAGING_PROVIDER_BRIDGE_SECRET';
 async function cleanupBridge(){
  try{const functions=await api(source,'/functions');if(functions.some(f=>f.slug==='staging-provider-bridge'))await cli(['functions','delete','staging-provider-bridge','--project-ref',source,'--yes']);}
- finally{await api(source,'/secrets','DELETE',[name]);}
+ finally{const secrets=await api(source,'/secrets');if(secrets.some(s=>s.name===name))await api(source,'/secrets','DELETE',[name]);}
 }
 // Recover interrupted previous setup runs before checking or transferring a key.
 await cleanupBridge();
