@@ -7,8 +7,12 @@ const fs=require('node:fs/promises'),assert=require('node:assert/strict');
  assert.equal(fixture.app,'https://blumr.io/');
  assert.ok(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(fixture.run));
  const owner=fixture.users[0];assert.equal(owner.email,'blumr-live-'+fixture.run+'-0@example.invalid');
- const login=await fetch(fixture.base+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:fixture.anon,'Content-Type':'application/json'},body:JSON.stringify({email:owner.email,password:owner.password})});
- assert.ok(login.ok,'Second device login failed');const second=await login.json();
+ const sessions=[];
+ for(let device=0;device<2;device++){
+  const login=await fetch(fixture.base+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:fixture.anon,'Content-Type':'application/json'},body:JSON.stringify({email:owner.email,password:owner.password})});
+  assert.ok(login.ok,'Device login failed');sessions.push(await login.json());
+ }
+ const [first,second]=sessions;
  const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME});
  try{
   const contexts=await Promise.all([browser.newContext(),browser.newContext()]);
@@ -21,13 +25,13 @@ const fs=require('node:fs/promises'),assert=require('node:assert/strict');
    catch(error){if(args.abort&&error.name==='AbortError')return {aborted:true};throw error;}
    finally{clearTimeout(timer);}
   },{base:fixture.base,anon:fixture.anon,token,body,route,abort});
-  const same=await Promise.all([call(pages[0],owner.access,payload),call(pages[1],second.access_token,payload,'analyze-patterns-v2')]);
-  same.forEach(r=>assert.equal(r.status,200,'Concurrent live analysis failed'));
+  const same=await Promise.all([call(pages[0],first.access_token,payload),call(pages[1],second.access_token,payload,'analyze-patterns-v2')]);
+  same.forEach((r,i)=>assert.equal(r.status,200,'Concurrent live analysis failed on device '+i+': '+JSON.stringify(r.body)));
   assert.deepEqual(same[0].body,same[1].body,'Devices received different analyses');
   const replay=await call(pages[1],second.access_token,payload);assert.deepEqual(replay.body,same[0].body,'Retry regenerated a completed result');
   console.log('PASS: two independent signed-in browser sessions and both edge routes share one result; response retry replays it.');
   const interrupted={...payload,feedback:{text:payload.feedback.text+' Ask for a concrete release checklist example.'}};
-  const lost=await call(pages[0],owner.access,interrupted,'analyze-patterns-beta',true);
+  const lost=await call(pages[0],first.access_token,interrupted,'analyze-patterns-beta',true);
   assert.ok(lost.aborted||lost.status===200,'Interrupted submission failed before it could run');
   await pages[0].close();
   const recovered=await call(pages[1],second.access_token,interrupted);
