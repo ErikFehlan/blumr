@@ -8,6 +8,7 @@ create function public.is_app_admin() returns boolean language sql stable as $$s
 create table public.reliability_events(workspace_id uuid,actor_id uuid,source text,category text,operation text,severity text,metadata jsonb);
 \ir ../supabase/migrations/20261001124322_direct_ai_idempotency.sql
 \ir ../supabase/migrations/20261001132742_direct_ai_recovery_retention.sql
+\ir ../supabase/migrations/20261001135848_direct_ai_failure_replay.sql
 insert into auth.users values('00000000-0000-0000-0000-000000000001');
 insert into public.workspaces values('00000000-0000-0000-0000-000000000002');
 set role service_role;
@@ -56,3 +57,15 @@ begin
  if public.mark_direct_ai_started(w,a,key,owner) then raise exception 'Cleaned claim reached provider';end if;
 end $$;
 reset role;
+
+do $$
+declare w uuid:='00000000-0000-0000-0000-000000000002';a uuid:='00000000-0000-0000-0000-000000000001';owner uuid:=gen_random_uuid();other uuid:=gen_random_uuid();key text:=repeat('c',64);r jsonb;
+begin
+ perform public.claim_direct_ai_request(w,a,key,owner);
+ perform public.finish_direct_ai_request(w,a,key,owner,'{"__blumr_failure":true,"status":429,"body":{"error":"Temporary limit"}}');
+ r:=public.claim_direct_ai_request(w,a,key,other);
+ if r->>'state'<>'failed' or r->>'status'<>'429' or r->'body'->>'error'<>'Temporary limit' then raise exception 'Failure replay missing';end if;
+ if (select expires_at>now()+interval '11 seconds' from public.direct_ai_requests where claim_id=owner) then raise exception 'Error cache too long';end if;
+ update public.direct_ai_requests set expires_at=now()-interval '1 second' where claim_id=owner;
+ if public.claim_direct_ai_request(w,a,key,other)->>'state'<>'owner' then raise exception 'Explicit retry not available after failed result expires';end if;
+end $$;
