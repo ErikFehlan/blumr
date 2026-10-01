@@ -77,6 +77,13 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
         run: node scripts/live-site-fixtures.mjs create
+      - name: Rehearse scoped database and resume-file recovery
+        id: recovery
+        if: steps.release.outputs.ready == 'true' && steps.fixtures.outcome == 'success'
+        timeout-minutes: 4
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/reliability-recovery-drill.mjs
       - name: Verify direct analysis duplicates across devices
         id: direct_check
         if: steps.release.outputs.ready == 'true' && steps.fixtures.outcome == 'success'
@@ -100,7 +107,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: live-blumr-results
-          path: test-results/live/
+          path: |
+            test-results/live/
+            test-results/recovery/
           retention-days: 7
           if-no-files-found: ignore
       - name: Write the run summary
@@ -109,14 +118,16 @@ jobs:
           READY: ${{ steps.release.outputs.ready }}
           JOURNEY: ${{ steps.journey.outcome }}
           DIRECT: ${{ steps.direct_check.outcome }}
+          RECOVERY: ${{ steps.recovery.outcome }}
           CLEANUP: ${{ steps.cleanup.outcome }}
         run: |
           node --input-type=module <<'JS'
           import {appendFile,readFile} from 'node:fs/promises';
-          const passed=process.env.READY==='true'&&process.env.JOURNEY==='success'&&process.env.DIRECT==='success'&&process.env.CLEANUP==='success';
+          const passed=process.env.READY==='true'&&process.env.JOURNEY==='success'&&process.env.DIRECT==='success'&&process.env.RECOVERY==='success'&&process.env.CLEANUP==='success';
           let results;try{results=JSON.parse(await readFile('test-results/live/results.json','utf8'));}catch{}
           const text=['## Live blumr.io checks',passed?'**Passed, including cleanup.**':'**Not verified.** See the failed or skipped steps.',
             ...(results?.checks||[]).map(r=>'- '+r.check+': '+r.status),
+            '','Scoped recovery drill: '+(process.env.RECOVERY||'not started')+'; full-project backup restore remains unverified.',
             '','Temporary account cleanup: '+(process.env.CLEANUP||'not started'),
             'Screenshots and results are in the live-blumr-results artifact.','',
             'Not covered: inbox delivery of confirmation/password-reset emails, handwriting, heavily degraded scans, or every browser/device.',

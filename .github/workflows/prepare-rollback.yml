@@ -1,0 +1,53 @@
+name: Prepare reviewed frontend rollback
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Full SHA of a previously verified main commit
+        required: true
+        type: string
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: prepare-frontend-rollback
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate target and restore public files
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          [[ "$TARGET_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          git merge-base --is-ancestor "$TARGET_SHA" HEAD
+          git switch -c "rollback/frontend-${GITHUB_RUN_ID}"
+          git restore --source="$TARGET_SHA" -- index.html about.html how-it-works.html why-blumr-works.html assets
+          git diff --check
+          node --test tests/*.test.js
+      - name: Open rollback pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          if git diff --quiet; then echo 'Public files already match target'; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html about.html how-it-works.html why-blumr-works.html assets
+          git commit -m "Restore public application files from $TARGET_SHA"
+          git push origin "rollback/frontend-${GITHUB_RUN_ID}"
+          cat > /tmp/rollback-body.md <<BODY
+          Restores public application files from verified commit $TARGET_SHA.
+
+          Database migrations, authentication configuration, and deployed functions remain at their current versions. Verify API compatibility and let the normal browser and backend CI pass before merging. A merged rollback must pass the matching-commit live release checks.
+          BODY
+          gh pr create --base main --head "rollback/frontend-${GITHUB_RUN_ID}" --title 'Restore previous frontend release' --body-file /tmp/rollback-body.md

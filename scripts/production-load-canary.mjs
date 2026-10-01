@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {readFile,writeFile,mkdir,rm} from 'node:fs/promises';
 import {dirname} from 'node:path';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),resume=require('../tests/fixtures/pdf-resume.cjs')();
 import {PROJECT_REF} from './live-test-safety.mjs';
 
 const operation=process.argv[2],file=process.env.CANARY_STATE_FILE;
@@ -89,15 +91,34 @@ if(operation==='create'){
   const ai=process.env.CANARY_AI==='1'?await Promise.all(users.slice(0,5).map(u=>call('/functions/v1/analyze-patterns-v2',u.access,'POST',{
    workspace_id:u.workspace,analysis_type:'screening',job:{title:'Synthetic load canary',description:'Evaluate manual testing experience.'},screening:{notes:'Synthetic candidate has manual regression testing experience; automation ownership is unverified.'}
   },90000))):[];
+  const writes=await Promise.all(users.map(async u=>{
+   const requests=[];
+   const job=await call('/rest/v1/jobs',u.access,'POST',{workspace_id:u.workspace,title:'Synthetic load '+state.run,status:'closed'});requests.push(job);
+   if(job.status!==201)return requests;
+   const candidate=await call('/rest/v1/candidates',u.access,'POST',{workspace_id:u.workspace,job_id:job.data[0].id,name:'Synthetic load candidate'});requests.push(candidate);
+   if(candidate.status!==201)return requests;
+   const path=u.workspace+'/'+job.data[0].id+'/'+candidate.data[0].id+'/'+randomUUID()+'.pdf';
+   const start=performance.now();
+   const uploaded=await fetch(base+'/storage/v1/object/resumes/'+path,{method:'POST',headers:{apikey:state.anon,Authorization:'Bearer '+u.access,'Content-Type':'application/pdf'},body:resume,signal:AbortSignal.timeout(20000)});
+   requests.push({status:uploaded.status,ms:Math.round(performance.now()-start)});
+   if(!uploaded.ok)return requests;
+   const saved=await call('/rest/v1/candidate_documents',u.access,'POST',{workspace_id:u.workspace,job_id:job.data[0].id,candidate_id:candidate.data[0].id,storage_path:path,file_name:'Synthetic-load.pdf',mime_type:'application/pdf',file_size:resume.length,extracted_text:'Synthetic load fixture; no assessment requested.'});requests.push(saved);
+   const found=await call('/rest/v1/candidate_documents?select=storage_path&candidate_id=eq.'+candidate.data[0].id,u.access);requests.push(found);
+   assert.equal(found.status,200);assert.equal(found.data.length,1);assert.equal(found.data[0].storage_path,path,'Save did not persist');
+   const read=await fetch(base+'/storage/v1/object/authenticated/resumes/'+path,{headers:{apikey:state.anon,Authorization:'Bearer '+u.access},signal:AbortSignal.timeout(20000)});
+   assert.equal(read.status,200);assert.deepEqual(Buffer.from(await read.arrayBuffer()),resume,'Uploaded resume bytes changed');
+   return requests;
+  })).then(groups=>groups.flat());
+  const writeFailures=writes.filter(r=>r.status<200||r.status>=300);
   const aiFailures=ai.filter(r=>r.status!==200);
   const cross=await call('/rest/v1/workspaces?select=id&id=eq.'+state.users[0].workspace,state.users[count-1].access);
   assert.equal(cross.status,200);assert.deepEqual(cross.data,[],'Cross-workspace leak: stop immediately');
-  const metric={users:count,read_requests:reads.length,read_failures:failures.length,read_statuses:[...new Set(failures.map(r=>r.status))],read_p50_ms:percentile(reads.map(r=>r.ms),.5),read_p95_ms:percentile(reads.map(r=>r.ms),.95),read_p99_ms:percentile(reads.map(r=>r.ms),.99),ai_requests:ai.length,ai_failures:aiFailures.length,ai_statuses:[...new Set(aiFailures.map(r=>r.status))],ai_p95_ms:ai.length?percentile(ai.map(r=>r.ms),.95):null,elapsed_ms:Math.round(performance.now()-started)};
+  const metric={users:count,write_requests:writes.length,write_failures:writeFailures.length,write_p95_ms:percentile(writes.map(r=>r.ms),.95),read_requests:reads.length,read_failures:failures.length,read_statuses:[...new Set(failures.map(r=>r.status))],read_p50_ms:percentile(reads.map(r=>r.ms),.5),read_p95_ms:percentile(reads.map(r=>r.ms),.95),read_p99_ms:percentile(reads.map(r=>r.ms),.99),ai_requests:ai.length,ai_failures:aiFailures.length,ai_statuses:[...new Set(aiFailures.map(r=>r.status))],ai_p95_ms:ai.length?percentile(ai.map(r=>r.ms),.95):null,elapsed_ms:Math.round(performance.now()-started)};
   measurements.push(metric);console.log('CANARY_METRIC '+JSON.stringify(metric));
-  if(failures.length||aiFailures.length)break;
+  if(failures.length||writeFailures.length||aiFailures.length||metric.read_p95_ms>5000||metric.write_p95_ms>10000)break;
  }
- await mkdir('test-results/load',{recursive:true});await writeFile('test-results/load/results.json',JSON.stringify({date:new Date().toISOString(),scope:process.env.CANARY_AI==='1'?'production synthetic read burst and opt-in AI checks':'production synthetic read burst; no AI calls or resume uploads',measurements},null,2));
- if(measurements.at(-1).users!==50||measurements.some(m=>m.read_failures||m.ai_failures))process.exitCode=1;
+ await mkdir('test-results/load',{recursive:true});await writeFile('test-results/load/results.json',JSON.stringify({date:new Date().toISOString(),scope:process.env.CANARY_AI==='1'?'production synthetic read burst and opt-in AI checks':'production synthetic reads, saves and PDF uploads/downloads; no AI calls',measurements},null,2));
+ if(measurements.at(-1).users!==50||measurements.some(m=>m.read_failures||m.write_failures||m.ai_failures||m.read_p95_ms>5000||m.write_p95_ms>10000))process.exitCode=1;
 }else{
  let failed=0;
  for(const [index,u] of state.users.entries()){
@@ -110,7 +131,9 @@ if(operation==='create'){
      const members=await call('/rest/v1/workspace_members?select=user_id&workspace_id=eq.'+w.id,service);assert.equal(members.status,200);
      assert.ok(members.data.every(m=>m.user_id===found[0].id),'Unexpected member; refusing cleanup');
      const files=await management("select name from storage.objects where bucket_id='resumes' and name like $1",[w.id+'/%']);
-     assert.equal(files.length,0,'Unexpected stored file; refusing cleanup');
+     assert.ok(files.every(f=>f.name.startsWith(w.id+'/')&&!f.name.includes('..')&&new RegExp('^'+w.id+'/[0-9a-f-]{36}/[0-9a-f-]{36}/[0-9a-f-]{36}\\.pdf$').test(f.name)), 'Unexpected storage path');
+     if(files.length){const deleted=await call('/storage/v1/object/resumes',service,'DELETE',{prefixes:files.map(f=>f.name)});assert.ok(deleted.status>=200&&deleted.status<300,'Storage cleanup failed');}
+     assert.equal((await management("select name from storage.objects where bucket_id='resumes' and name like $1",[w.id+'/%'])).length,0,'Stored files remain');
      const removed=await call('/rest/v1/workspaces?id=eq.'+w.id,service,'DELETE');assert.ok(removed.status>=200&&removed.status<300,'Fixture workspace cleanup failed');
     }
     const deleted=await call('/auth/v1/admin/users/'+found[0].id,service,'DELETE');assert.ok(deleted.status>=200&&deleted.status<300);
