@@ -30,7 +30,12 @@ jobs:
         with:
           version: 2.95.3
       - name: Dump database, copy every Storage object, encrypt, and prove isolated recovery
-        run: node scripts/independent-backup.mjs
+        run: |
+          for attempt in 1 2 3; do
+            if node scripts/independent-backup.mjs; then exit 0; fi
+            echo "Read-only backup/recovery attempt $attempt failed; no archive was accepted."
+          done
+          exit 1
       - name: Retain only verified encrypted archives and aggregate recovery evidence
         uses: actions/upload-artifact@v4
         with:

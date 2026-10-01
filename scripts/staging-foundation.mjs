@@ -1,7 +1,7 @@
 import {readFile} from 'node:fs/promises';
 const token=process.env.SUPABASE_ACCESS_TOKEN,ref=process.env.SUPABASE_PROJECT_REF;
 if(ref!=='momfzjmycveqginxmqib'||!token)throw Error('Foundation refresh is restricted to staging');
-for(const file of ['20260914120000_immediate_criteria.sql','20260914160000_job_reassessments.sql']){
+for(const file of ['20261001182430_staging_deletion_queue_parity.sql','20260914120000_immediate_criteria.sql','20260914160000_job_reassessments.sql']){
  let query=await readFile('supabase/migrations/'+file,'utf8');
  if(file.includes('job_reassessments')){
   const start=query.indexOf('create function public.wake_job_reassessments('),end=query.indexOf('\ncreate function public.enqueue_job_reassessments(',start);

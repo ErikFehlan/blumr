@@ -11,12 +11,12 @@ if(ref!=='zqiqjzxcpznhzjengfff'||!token)throw Error('Independent backup requires
 const output=join(process.cwd(),'test-results','independent-backup');
 const work=await mkdtemp(join(tmpdir(),'blumr-private-backup-'));
 const source=join(work,'source'),restore=join(work,'restore');
-async function command(binary,args,{cwd=work,input,timeout=600000}={}){
+async function command(binary,args,{cwd=work,input,timeout=600000,localDiagnostics=false}={}){
  return new Promise((resolve,reject)=>{
-  const child=spawn(binary,args,{cwd,env:process.env,stdio:['pipe','pipe','pipe']});let stdout='';
-  child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',()=>{});
+  const child=spawn(binary,args,{cwd,env:process.env,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
+  child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>{if(localDiagnostics)stderr+=x;});
   const timer=setTimeout(()=>child.kill('SIGKILL'),timeout);
-  child.on('error',reject);child.on('close',code=>{clearTimeout(timer);code===0?resolve(stdout):reject(Error(`${binary} operation failed (exit ${code}); private output was withheld`));});
+  child.on('error',reject);child.on('close',code=>{clearTimeout(timer);if(code!==0&&localDiagnostics)console.error(stderr.split('\n').filter(line=>!/password|secret|token|key|postgresql:\/\/|eyJ[A-Za-z0-9_-]+\./i.test(line)).slice(-35).join('\n'));code===0?resolve(stdout):reject(Error(`${binary} ${args.slice(0,2).join(' ')} operation failed (exit ${code}); private output was withheld`));});
   child.stdin.end(input);
  });
 }
@@ -62,9 +62,10 @@ try{
  await command('supabase',['init','--workdir',restore]);
  console.log('Starting isolated recovery database.');
  let config=await readFile(join(restore,'supabase/config.toml'),'utf8');config=config.replace(/^project_id = .*/m,'project_id = "blumr-backup-drill"').replace(/^major_version = .*/m,'major_version = 17');await writeFile(join(restore,'supabase/config.toml'),config);
- await command('supabase',['start','--workdir',restore,'--exclude','realtime,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor'],{timeout:900000});
+ await command('supabase',['start','--workdir',restore,'--ignore-health-check','--exclude','realtime,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor'],{timeout:900000,localDiagnostics:true});
  database='supabase_db_blumr-backup-drill';
- for(const name of ['supabase_auth_blumr-backup-drill','supabase_storage_blumr-backup-drill'])await command('docker',['stop',name]);
+ const containers=(await command('docker',['ps','--filter','name=blumr-backup-drill','--format','{{.Names}}'])).trim().split('\n');
+ for(const name of containers)if(name!==database&&/^supabase_[a-z0-9_-]+_blumr-backup-drill$/.test(name))await command('docker',['stop',name]);
  const inspected=JSON.parse(await command('docker',['inspect',database]));const networks=Object.keys(inspected[0].NetworkSettings.Networks);
  for(const name of networks){await command('docker',['network','disconnect',name,database]);network=name;}
  const psql=input=>command('docker',['exec','-i',database,'psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-At'],{input});
