@@ -25,7 +25,7 @@
      host.replaceChildren();
      const tabs=document.createElement('nav');tabs.className='rf-admin-tabs';tabs.setAttribute('aria-label','Admin areas');host.append(tabs);
      const areas={};
-     for(const [key,label] of [['overview','Overview'],['health','System health'],['users','Users & access'],['emails','Emails'],['usage','Usage & costs'],['advanced','Advanced']]){
+     for(const [key,label] of [['overview','Overview'],['health','System'],['users','Users'],['emails','Communications'],['usage','Usage'],['rewards','Rewards'],['advanced','Technical setup']]){
       const button=document.createElement('button');button.type='button';button.className='rf-admin-tab';button.textContent=label;button.dataset.adminArea=key;button.setAttribute('aria-pressed',key==='overview'?'true':'false');tabs.append(button);
       const area=document.createElement('div');area.className='rf-admin-area';area.dataset.adminPanel=key;area.hidden=key!=='overview';host.append(area);areas[key]=area;
      }
@@ -37,9 +37,10 @@
       const card=document.createElement('button');card.type='button';card.className='rf-admin-summary-card';card.dataset.adminJump=key==='support'?'users':key;card.innerHTML=`<strong data-admin-count="${key}">—</strong><span>${label}</span>`;card.addEventListener('click',()=>showArea(card.dataset.adminJump));summary.append(card);
      }
      areas.overview.append(summary);
-     const intro=document.createElement('p');intro.className='rf-sub';intro.textContent='Choose an area above to review system health, manage people and reminders, inspect usage, or open technical setup.';areas.overview.append(intro);
+     const intro=document.createElement('p');intro.className='rf-sub';intro.textContent='Review users, communications, usage, system health, and rewards. Technical configuration is available separately.';areas.overview.append(intro);
      if(healthLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='systemHealthPanel';areas.health.append(panel);void loadHealth(request);}
-     areas.advanced.append(technical);
+     const setup=document.createElement('details');setup.innerHTML='<summary>Advanced configuration and downloads</summary>';setup.append(technical);areas.advanced.append(setup);
+     const rewards=document.createElement('section');rewards.className='rf-card';rewards.id='adminRewardsPanel';rewards.innerHTML='<div class="rf-cardhead"><h3>Referral rewards</h3><span class="rf-pill rf-gray">Coming soon</span></div><p>Referral tracking and free-month credits are not active yet. The draft below is ready to review; it cannot be sent from this screen.</p>';areas.rewards.append(rewards);
      if(securityLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='betaSecurityPanel';areas.users.append(panel);void loadSecurity(request);}
      if(reminderLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='onboardingRemindersPanel';areas.emails.append(panel);void loadReminders(request);}
      if(planLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminPlansPanel';areas.usage.append(panel);void loadPlans(request);}
@@ -141,7 +142,7 @@
     const detail=document.createElement('p');detail.className='rf-sub';detail.textContent='Draft only. Referral tracking and free-month credits must be built before this offer can be sent.';
     const subject=document.createElement('p');subject.textContent='Subject: Share blumr with five recruiters, get a free month';
     const body=document.createElement('p');body.textContent='Know five recruiters who would benefit from blumr? Invite them to try it. When five new recruiters join through your referral link and each completes their first assessment, you’ll earn one month of blumr usage free. We’ll send you a link and the full terms when the referral program opens.';
-    draft.append(heading,detail,subject,body);panel.append(draft);
+    draft.append(heading,detail,subject,body);host.querySelector('#adminRewardsPanel')?.append(draft);
    }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='Onboarding recipients could not be loaded.';}
   }
   async function loadSecurity(request=version){
