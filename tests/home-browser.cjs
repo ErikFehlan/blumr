@@ -45,7 +45,8 @@ const candidate=(id,jobId,name)=>({id,jobId,name,short:name,role:'QA Analyst',st
   // Navigation is never a mandatory wizard and creating a job focuses the actual form.
   await page.locator('#workspaceHome [data-home-action="new"]').first().click();
   assert.equal(await page.evaluate(()=>document.activeElement.id),'jobTitle');
-  await page.locator('#jobTitle').fill('My first search');await page.locator('#jobDescription').fill('Manual testing and release verification');await page.locator('#jobForm button[type=submit]').click();
+  await page.locator('#jobTitle').fill('My first search');await page.locator('#jobDescription').fill('Manual testing and release verification');await require('./fixtures/job-wizard.cjs')(page);
+await page.locator('#jobForm button[type=submit]').click();
   await page.locator('#page-candidates.active').waitFor();await page.evaluate(()=>window.ancalagonFlush());
   assert.equal(await page.evaluate(()=>document.activeElement.id),'resumeUpload');assert.match(await page.locator('#searchFlow').textContent(),/Upload resumes/);assert.equal(accounts.new.state.jobs.length,1);assert.equal(accounts.new.home.last_page,'candidates');
   await context.close();
