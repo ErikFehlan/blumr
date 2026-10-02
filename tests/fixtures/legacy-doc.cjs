@@ -118,12 +118,12 @@ var PIECE_A = [0x48,0x65,0x6C,0x6C,0x6F,0x2C,0x20, 0x93,
 var PIECE_B = [0x13, 0x50,0x41,0x47,0x45, 0x14, 0x31, 0x15,
                0x54,0x61,0x62, 0x07, 0x45,0x6E,0x64, 0x0D];
 // Piece C (uncompressed UTF-16LE), 12 chars: "Unicode: " + é + π + \n
-var PIECE_C_TEXT = 'Unicode: éπ\r';
+var PIECE_C_TEXT = 'Unicode: éπ Legacy DOC resume text is readable.\r';
 
 var WD_OFF_A = 0x400, WD_OFF_B = 0x420, WD_OFF_C = 0x440;
 
 // What docToText() should return for this fixture.
-var EXPECTED = 'Hello, “World”\n' + '1Tab\tEnd\n' + 'Unicode: éπ\n';
+var EXPECTED = 'Hello, “World”\n' + '1Tab\tEnd\n' + 'Unicode: éπ Legacy DOC resume text is readable.\n';
 
 function writeWordDocument(file, dv) {
   var b = sectorBase(SID_WD);
@@ -136,7 +136,7 @@ function writeWordDocument(file, dv) {
   // --- FIB variable parts (counts that put fcClx at the canonical 0x1A2) ---
   dv.setUint16(b + 0x20, 0x000E, true); // csw
   dv.setUint16(b + 0x3E, 0x0016, true); // cslw
-  dv.setUint32(b + 0x4C, 43, true);     // ccpText = fibRgLw[3]
+  dv.setUint32(b + 0x4C, PIECE_A.length + PIECE_B.length + PIECE_C_TEXT.length, true);     // ccpText = fibRgLw[3]
   dv.setUint16(b + 0x98, 0x005D, true); // cbRgFcLcb
   dv.setUint32(b + 0x1A2, 0, true);     // fcClx
   dv.setUint32(b + 0x1A6, 50, true);    // lcbClx
@@ -158,7 +158,7 @@ function buildClx() {
   clx[5] = 0x02; dv.setUint32(6, 40, true);
   var p = 10;
   // CPs: 0, 15, 31, 43
-  [0, 15, 31, 43].forEach(function (cp, idx) { dv.setUint32(p + idx * 4, cp, true); });
+  [0, PIECE_A.length, PIECE_A.length + PIECE_B.length, PIECE_A.length + PIECE_B.length + PIECE_C_TEXT.length].forEach(function (cp, idx) { dv.setUint32(p + idx * 4, cp, true); });
   var pcd = p + 16;
   // PCD.fc (FcCompressed): bit 30 = fCompressed; compressed fc = byteOffset*2.
   dv.setUint32(pcd + 0 * 8 + 2, (WD_OFF_A * 2) | 0x40000000, true); // A compressed
