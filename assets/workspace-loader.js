@@ -2,6 +2,8 @@
   'use strict';
 
   const sources = [
+    'assets/job-intake-code.js?v=20261002-guided-experience',
+    'assets/job-wizard.js?v=20261002-guided-experience',
     'assets/hiring-priorities.js?v=20260924-priorities',
     'assets/data.js?v=20261001-duplicate-recovery',
     'assets/select.js?v=20260910-dark-dropdowns',
@@ -15,24 +17,24 @@
     'assets/feedback.js?v=20260916-learning',
     'assets/idempotency.js?v=20260930-idempotency',
     'assets/pdf-text.js?v=20260915-intake',
-    'assets/resume-intake.js?v=20261002-product-polish',
+    'assets/resume-intake.js?v=20261002-guided-experience',
     'assets/resume-remote.js?v=20260917-security',
     'assets/job-review.js?v=20260923-verification',
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
-    'assets/candidate-workspace.js?v=20261002-product-polish',
-    'assets/criteria-automation.js?v=20260929-ai-recovery',
-    'assets/home.js?v=20261002-product-polish',
+    'assets/candidate-workspace.js?v=20261002-guided-experience',
+    'assets/criteria-automation.js?v=20261002-guided-experience',
+    'assets/home.js?v=20261002-guided-experience',
     'assets/focus-ui.js?v=20260918-blumr',
     'assets/recruiter-workflow.js?v=20260915-phase2',
     'assets/tutorial.js?v=20260915-tutorial',
     'assets/tutorial-ui.js?v=20260915-settings',
-    'assets/admin-tools.js?v=20261001-duplicate-recovery',
+    'assets/admin-tools.js?v=20261002-guided-experience',
     'assets/settings.js?v=20260915-settings',
-    'assets/settings-ui.js?v=20260928-team-plans',
+    'assets/settings-ui.js?v=20261002-guided-experience',
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
-    'assets/app.js?v=20261002-product-polish'
+    'assets/app.js?v=20261002-guided-experience'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
