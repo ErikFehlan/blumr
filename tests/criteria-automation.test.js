@@ -52,11 +52,11 @@ test('failed criteria can be retried without editing or losing the saved job inp
  const app=sandbox.module.exports,job={id:'a',title:'QA',description:'Manual testing',criteria:['5+ years QA'],managerFeedback:'',knockouts:[]};
  const task={job_id:'a',revision:'rev',status:'failed',error_code:'ai_unavailable',attempts:3,input:{title:job.title,description:job.description,criteria:job.criteria,manager_notes:'',knockouts:[]}};
  let retryClick,retries=0,toasts=[];
- const button={disabled:false,textContent:'Try again',addEventListener:(name,fn)=>{retryClick=fn;}};
+ const button={disabled:false,textContent:'Retry criteria',addEventListener:(name,fn)=>{retryClick=fn;}};
  const wrap={innerHTML:'',querySelector:selector=>selector==='#retryCriteriaTask'&&wrap.innerHTML.includes('retryCriteriaTask')?button:null};
  app.init({root:{querySelector:()=>wrap},ready:()=>true,job:()=>job,fetch:async()=>task,retry:async(id,revision)=>{retries++;assert.equal(id,'a');assert.equal(revision,'rev');return true;},updated(){},toast:(m)=>toasts.push(m)});
  await app.refresh(job,true);
- assert.match(wrap.innerHTML,/Try again/);assert.match(wrap.innerHTML,/original criteria are still saved/i);
+ assert.match(wrap.innerHTML,/Retry criteria/);assert.match(wrap.innerHTML,/original criteria are still saved/i);
  await retryClick();
  assert.equal(retries,1);assert.equal(task.status,'queued');assert.equal(task.error_code,null);assert.equal(task.attempts,0);assert.ok(toasts.some(x=>/retry queued/i.test(x)));
 });

@@ -148,10 +148,12 @@
     function set(c,phase,error=''){Object.assign(c.resumeIntake,{phase,error,updatedAt:Date.now()});changed(c);}
     async function upload(file,options={}){
       const job=api.job(options.jobId),workspace=options.workspaceId||api.workspace();
-      const fail=message=>{if(options.silent)throw Error(message);api.toast(message,'error');};
+      const fail=message=>{uploadProblem(message);if(options.silent)throw Error(message);api.toast(message,'error');};
       if(extracting){fail('The current resume is still being read.');return;}
       if(workspace!==api.workspace()||!job||job.status==='closed'){fail('Choose an open job before adding a resume.');return;}
-      if(!file||! /\.(pdf|docx|txt)$/i.test(file.name)||file.size>10*1024*1024){fail('Choose a PDF, DOCX, or TXT resume up to 10 MB.');return;}
+      if(!file||! /\.(pdf|docx|txt)$/i.test(file.name)){fail('This file type cannot be read. Choose a PDF, DOCX, or TXT resume.');return;}
+      if(file.size>10*1024*1024){fail('This file is larger than 10 MB. Upload a smaller copy of the resume.');return;}
+      uploadProblem('');
       const jobId=job.id;extracting=true;options.progress?.('reading');status('Reading '+file.name+'…');
       let candidate;
       try{
@@ -185,8 +187,16 @@
         enqueue(candidate);return candidate;
       }catch(e){
         if(candidate&&valid(candidate)){set(candidate,'error',e.message||'Resume intake could not finish.');try{await api.persist();}catch{}}
-        if(options.silent)throw e;api.toast(e.message||'Resume intake could not finish.','error');
+        uploadProblem((candidate?.resumeIntake?.stored?'Your resume is saved. ':'')+(e.message||'The resume could not be uploaded. Select it again to retry.'));if(options.silent)throw e;api.toast(e.message||'Resume intake could not finish.','error');
       }finally{extracting=false;status('Upload a resume to create a candidate and prepare a screening brief automatically.');}
+    }
+    function uploadProblem(message){
+      const note=api.root?.querySelector('#resumeUploadNote');if(!note)return;
+      let panel=api.root.querySelector('#resumeUploadRecovery');
+      if(!panel){panel=document.createElement('div');panel.id='resumeUploadRecovery';panel.className='rf-recovery';panel.setAttribute('role','alert');note.after(panel);}
+      panel.hidden=!message;panel.replaceChildren();if(!message)return;
+      const title=document.createElement('strong');title.textContent='The upload needs another try';
+      const copy=document.createElement('p');copy.textContent=message;const action=document.createElement('button');action.type='button';action.className='rf-btn';action.textContent='Choose a resume';action.addEventListener('click',()=>api.root.querySelector('#resumeUpload').click());panel.append(title,copy,action);
     }
     function status(message){const el=api.root?.querySelector('#resumeUploadNote');if(el)el.textContent=message;}
     async function storeDocument(c){
@@ -345,8 +355,11 @@
       if(stale)queueMicrotask(()=>enqueue(c));
       let html='<span class="rf-kicker">Resume screening brief</span>';
       if(needsReview&&api.job(c.jobId)?.status==='closed')html+='<h3>Search closed · assessment paused</h3><p class="rf-sub">Reopen this search from Jobs to resume assessment work. Existing candidate records are retained.</p>';
-      else if(state.phase==='error')html+='<h3>Resume intake needs attention</h3><p>'+escape(state.error)+'</p><button class="rf-btn" type="button" data-intake-retry>Try again</button>';
+      else if(state.phase==='error')html+='<div class="rf-recovery"><h3>Resume intake needs attention</h3><p>'+escape(state.error)+'</p><p class="rf-sub">'+(state.stored?'Your saved resume is retained. No proposed scores have been approved.':'The source upload is incomplete. Retry with the same resume to continue this candidate.')+'</p><button class="rf-btn primary" type="button" data-intake-retry>Retry assessment</button></div>';
       else if(state.phase!=='ready'){
+        const stage=state.phase==='uploading'?0:state.phase==='queued'?1:2;
+        html+='<ol class="rf-processing-steps" aria-label="Assessment progress">'+['Saving resume','Waiting for assessment','Evaluating experience and priorities','Ready for your review'].map((label,i)=>'<li '+(i===stage?'aria-current="step"':'')+' data-progress="'+(i<stage?'complete':i===stage?'active':'waiting')+'"><span>'+(i<stage?'✓':i+1)+'</span>'+label+'</li>').join('')+'</ol>';
+
         const quick=state.preliminary?.job_signature===preliminaryJobSignature(api.job(c.jobId))?state.preliminary:null;
         if(Number.isFinite(quick?.score))html+='<div class="rf-cardhead"><h3>Preliminary JD Fit: '+quick.score.toFixed(1)+'/10</h3><span class="rf-pill rf-blue">Fast scan</span></div><p class="rf-sub">'+quick.supported+' supported · '+quick.partial+' partial · '+quick.unknown+' not yet evidenced across '+quick.considered+' core requirements. The full assessment is verifying evidence and Manager Fit now.</p><p class="rf-evidence-caution">Preliminary only — it does not affect rankings or saved scores.</p>';
         else html+='<h3>Preparing your screening brief…</h3><p class="rf-sub">You can keep working. Once your resume is saved, processing continues even if you close this tab. Scores appear after review.</p>';

@@ -18,7 +18,8 @@ assert.equal(await page.evaluate(()=>window.testSaved?.candidates?.length||0),0)
 await page.locator('#page-learn details').nth(1).locator('summary').click();
 await page.locator('#ancalagon-tutorial [data-action="new-job"]').first().click();
 await page.locator('#page-jobs.active').waitFor();
-await page.locator('#jobTitle').fill('Reliability test');await page.locator('#jobDescription').fill('Build and maintain Kubernetes infrastructure');await page.locator('#jobForm button[type=submit]').click();
+await page.locator('#jobTitle').fill('Reliability test');await page.locator('#jobDescription').fill('Build and maintain Kubernetes infrastructure');await require('./fixtures/job-wizard.cjs')(page);
+await page.locator('#jobForm button[type=submit]').click();
 await page.locator('#page-candidates.active').waitFor();assert.equal(await page.evaluate(()=>window.testSaved.jobs[0].title),'Reliability test');
 await page.locator('#manualCandidateEntry > summary').click();await page.locator('#candidateName').fill('Test Candidate');await page.locator('#candidateRole').fill('Engineer');await page.locator('#candidateScore').fill('8.5');await page.locator('#candidateSignal').fill('Infrastructure engineer');await page.locator('#candidateStrengths').fill('Built production Kubernetes clusters');await page.locator('#candidateForm button[type=submit]').click();
 await page.locator('#page-detail.active').waitFor();assert.equal(await page.locator('#detailName').textContent(),'Test Candidate');assert.equal(await page.evaluate(()=>window.testSaved.candidates.length),1);await page.locator('#feedbackNav > summary').click();await page.locator('.rf-nav [data-page="feedback"]').click();
@@ -102,6 +103,7 @@ assert.ok(heldAssessment,'automatic screening request started');
 await page.locator('.rf-nav [data-page="jobs"]').click();await page.locator('#newJobBtn').click();
 await page.locator('#jobTitle').fill('Separate job');
 await page.locator('#jobDescription').fill('Finance operations');
+await require('./fixtures/job-wizard.cjs')(page);
 await page.locator('#jobForm button[type=submit]').click();
 await page.locator('#page-candidates.active').waitFor();
 assert.equal(heldAssessment.payload.job.title,'Reliability test');

@@ -52,3 +52,38 @@
 @media(prefers-reduced-motion:reduce){#rf-app[data-theme] .rf-resume-panel,#rf-app[data-theme] .rf-resume-backdrop{animation:none}#rf-app[data-theme] .rf-resume-document{scroll-behavior:auto}#rf-app[data-theme] .rf-assessment-point{transition:none}}
 #rf-app[data-reduce-motion="true"] :is(.rf-resume-panel,.rf-resume-backdrop){animation:none}
 #rf-app[data-reduce-motion="true"] .rf-resume-document{scroll-behavior:auto}
+#rf-app[data-theme] .rf-job-steps,#rf-app[data-theme] .rf-activation ol{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));list-style:none;margin:0 0 24px;padding:0;gap:12px}
+#rf-app[data-theme] .rf-job-steps li,#rf-app[data-theme] .rf-activation li{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ui-muted);padding:10px;border-bottom:2px solid var(--ui-panel-line)}
+#rf-app[data-theme] :is(.rf-job-steps,.rf-activation) [aria-current="step"]{color:var(--ui-accent);border-color:var(--ui-accent);font-weight:650}
+#rf-app[data-theme] [data-job-step]{display:grid;gap:18px}
+#rf-app[data-theme] [data-job-step][hidden]{display:none}
+#rf-app[data-theme] [data-job-step] h4{font-size:20px;margin:0}
+#rf-app[data-theme] .rf-wizard-actions{display:flex;gap:12px;justify-content:flex-end;border-top:1px solid var(--ui-panel-line);padding-top:20px}
+#rf-app[data-theme] .rf-draft-priority{border:1px solid var(--ui-panel-line);border-radius:12px;padding:16px;margin-bottom:12px}
+#rf-app[data-theme] .rf-draft-priority label{display:block;margin:8px 0}
+#rf-app[data-theme] .rf-draft-priority input[type="checkbox"]{width:auto;margin-right:6px}
+#rf-app[data-theme] .rf-draft-priority input:not([type="checkbox"]){width:100%}
+#rf-app[data-theme] .rf-preserve-lines{white-space:pre-wrap}
+#rf-app[data-theme] #jobReviewDraft dl{display:grid;grid-template-columns:1fr auto;gap:12px;padding:16px;border-radius:12px;background:var(--ui-soft)}
+#rf-app[data-theme] #jobReviewDraft dd{margin:0;font-weight:650}
+#rf-app[data-theme] #jobSaveStatus[data-state="error"]{padding:14px;background:var(--ui-error-bg);color:var(--rf-red);border-radius:10px}
+#rf-app[data-theme] .rf-activation{padding:20px;margin-bottom:24px;border:1px solid var(--ui-panel-line);border-radius:14px;background:var(--ui-panel)}
+#rf-app[data-theme] .rf-activation>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#rf-app[data-theme] .rf-activation h2{font-size:18px;margin:0}
+#rf-app[data-theme] .rf-activation ol{grid-template-columns:repeat(3,minmax(0,1fr));margin:12px 0}
+@media(max-width:650px){#rf-app[data-theme] .rf-job-steps{grid-template-columns:repeat(2,minmax(0,1fr))}#rf-app[data-theme] .rf-activation ol{grid-template-columns:1fr}#rf-app[data-theme] .rf-activation>div{align-items:flex-start;flex-direction:column}}
+#rf-app[data-theme] .rf-processing-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;list-style:none;padding:16px;margin:16px 0;background:var(--ui-soft);border-radius:12px}
+#rf-app[data-theme] .rf-processing-steps li{font-size:14px;line-height:1.5;color:var(--ui-muted)}
+#rf-app[data-theme] .rf-processing-steps span{display:block;margin-bottom:6px;font-weight:650}
+#rf-app[data-theme] .rf-processing-steps [data-progress="active"]{color:var(--ui-accent);font-weight:650}
+#rf-app[data-theme] .rf-recovery{padding:18px;background:var(--ui-warn-bg);border:1px solid var(--rf-amber);border-radius:12px;margin:12px 0}
+#rf-app[data-theme] .rf-recovery[hidden]{display:none}
+#rf-app[data-theme] .rf-recovery p{font-size:14px;line-height:1.6}
+@media(max-width:650px){#rf-app[data-theme] .rf-processing-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#rf-app[data-theme] .rf-plan-summary{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px;background:var(--ui-soft);border-radius:12px;margin:16px 0}
+#rf-app[data-theme] .rf-plan-summary h4{font-size:22px;margin:6px 0}
+#rf-app[data-theme] .rf-plan-summary strong{font-size:24px}
+#rf-app[data-theme] .rf-plan-summary p{font-size:14px;margin:6px 0}
+#rf-app[data-theme] #teamPlan progress{width:100%;height:10px;accent-color:var(--ui-accent)}
+#rf-app[data-theme] #teamPlan details{margin-bottom:20px}
+@media(max-width:600px){#rf-app[data-theme] .rf-plan-summary{align-items:flex-start;flex-direction:column}}

@@ -34,6 +34,8 @@ jobs:
       - name: Validate JavaScript
         run: |
           node --check assets/startup.js
+          node --check assets/job-wizard.js
+          node --check assets/job-intake-code.js
           node --check assets/app.js
           node --check assets/search-flow.js
           node --check assets/guidance.js
@@ -84,6 +86,7 @@ jobs:
           node tests/resume-intake-browser.cjs
           node tests/streamline-browser.cjs
           node tests/home-browser.cjs
+          node tests/guided-experience-browser.cjs
           CAPTURE_UI=test-results/focus node tests/focus-browser.cjs
           node tests/core-browser.cjs
           CAPTURE_UI=test-results/recruiter node tests/recruiter-browser.cjs
