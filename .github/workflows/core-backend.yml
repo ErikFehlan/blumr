@@ -101,6 +101,7 @@ jobs:
           node scripts/usage-analytics-backend.mjs
           node scripts/learning-backend.mjs
           node scripts/security-backend.mjs prepare
+          node scripts/email-branding.mjs
       - name: Deploy authenticated analysis and durable worker
         run: |
           supabase functions deploy analyze-patterns-v2 --project-ref "$SUPABASE_PROJECT_REF"
