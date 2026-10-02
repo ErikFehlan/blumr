@@ -11,3 +11,10 @@ test('candidate uploader advertises legacy DOC support',()=>{
  const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
  assert.match(html,/accept="\.pdf,\.doc,\.docx,\.txt"/);assert.match(html,/PDF, DOC, DOCX, or TXT/);
 });
+
+
+test('resume storage accepts legacy DOC MIME type end to end',()=>{
+ const data=fs.readFileSync(path.join(__dirname,'..','assets','data.js'),'utf8');
+ assert.match(data,/doc:'application\\/msword'/);
+ assert.match(data,/PDF, DOC, DOCX, or TXT resume up to 10 MB/);
+});
