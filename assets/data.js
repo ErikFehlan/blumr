@@ -520,8 +520,8 @@
     async function uploadResume(candidate, file, extractedText) {
       return monitored('storage','upload','resume_upload',async()=>{
       const extension=String(file.name||'').split('.').pop().toLowerCase();
-      const mime={pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',txt:'text/plain'}[extension];
-      if(!mime||!file.size||file.size>10485760||typeof extractedText!=='string'||extractedText.trim().length<40||extractedText.length>120000)throw Error('Choose a readable PDF, DOCX, or TXT resume up to 10 MB.');
+      const mime={pdf:'application/pdf',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',txt:'text/plain'}[extension];
+      if(!mime||!file.size||file.size>10485760||typeof extractedText!=='string'||extractedText.trim().length<40||extractedText.length>120000)throw Error('Choose a readable PDF, DOC, DOCX, or TXT resume up to 10 MB.');
       const fingerprint=candidate.resumeIntake?.hash;
       const name=/^[a-f0-9]{64}$/.test(fingerprint||'')?'source-'+fingerprint+'.'+extension:crypto.randomUUID()+'.'+extension;
       const path=`${workspaceId}/${candidate.jobId}/${candidate.id}/${name}`;
