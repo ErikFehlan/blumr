@@ -17,7 +17,7 @@
     'assets/feedback.js?v=20260916-learning',
     'assets/idempotency.js?v=20260930-idempotency',
     'assets/pdf-text.js?v=20260915-intake',
-    'assets/resume-intake.js?v=20261002-legacy-doc',
+    'assets/resume-intake.js?v=20261002-legacy-doc-text-first',
     'assets/resume-remote.js?v=20260917-security',
     'assets/job-review.js?v=20260923-verification',
     'assets/candidate-automation.js?v=20260914-job-review',
@@ -34,7 +34,7 @@
     'assets/settings-ui.js?v=20261002-guided-experience',
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
-    'assets/app.js?v=20261002-legacy-doc'
+    'assets/app.js?v=20261002-legacy-doc-text-first'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
