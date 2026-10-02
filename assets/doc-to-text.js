@@ -86,6 +86,10 @@
   // main body consecutively in the same piece table. `body` === docToText().
   // The object also carries `.html` (see below).
   docToText.sections = parse;
+  // Resume intake only needs readable text. This path intentionally skips
+  // optional formatting/model structures so producer-specific metadata cannot
+  // make an otherwise readable legacy Word document fail.
+  docToText.plain = parsePlainBody;
 
   // docToText.html(input) -> { body, footnotes, ... } where each is styled HTML
   // for that story: text runs wrapped in <span> with the run's character
@@ -108,6 +112,53 @@
     try { var cfb = parseCfb(toUint8(input)); return cfb ? carveImages(cfb) : null; }
     catch (e) { return null; }
   };
+
+  function parsePlainBody(input) {
+    try {
+      var bytes = toUint8(input);
+      if (!bytes || bytes.length < 512) return null;
+      var cfb = parseCfb(bytes);
+      if (!cfb) return null;
+      var wordEntry = cfb.byName['WordDocument'];
+      if (!wordEntry) return null;
+      var wd = cfb.getStream(wordEntry);
+      if (!wd || wd.length < 0x20) return null;
+      var dv = new DataView(wd.buffer, wd.byteOffset, wd.byteLength);
+      if (dv.getUint16(0, true) !== 0xA5EC || dv.getUint16(2, true) < 0x00C1) return null;
+      var flags = dv.getUint16(10, true);
+      if ((flags & 0x0100) || (flags & 0x8000)) return null;
+
+      var pos = 0x20;
+      if (pos + 2 > wd.length) return null;
+      var csw = dv.getUint16(pos, true); pos += 2 + csw * 2;
+      if (pos + 2 > wd.length) return null;
+      var cslw = dv.getUint16(pos, true); pos += 2;
+      var fibRgLwStart = pos; pos += cslw * 4;
+      if (pos + 2 > wd.length || fibRgLwStart + 16 > wd.length) return null;
+      pos += 2; // cbRgFcLcb
+      var fibRgFcLcbStart = pos;
+      var ccpText = dv.getUint32(fibRgLwStart + 3 * 4, true);
+
+      var clxPair = fibRgFcLcbStart + 33 * 8;
+      if (clxPair + 8 > wd.length) return null;
+      var fcClx = dv.getUint32(clxPair, true);
+      var lcbClx = dv.getUint32(clxPair + 4, true);
+      if (!lcbClx) return null;
+
+      var table = cfb.byName[(flags & 0x0200) ? '1Table' : '0Table'];
+      if (!table) table = cfb.byName[(flags & 0x0200) ? '0Table' : '1Table'];
+      if (!table) return null;
+      var tableBytes = cfb.getStream(table);
+      if (fcClx >= tableBytes.length) return null;
+      if (fcClx + lcbClx > tableBytes.length) lcbClx = tableBytes.length - fcClx;
+      var pieces = parsePieceTable(tableBytes, fcClx, lcbClx);
+      if (!pieces) return null;
+
+      return extractRange(wd, pieces, 0, ccpText, null, null, null, null);
+    } catch (e) {
+      return null;
+    }
+  }
 
   function matchSig(b, i, sig) {
     if (i + sig.length > b.length) return false;
