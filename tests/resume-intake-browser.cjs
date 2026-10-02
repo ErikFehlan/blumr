@@ -24,9 +24,13 @@ const dir=path.resolve(__dirname,'..');
   });
   const resume='Alex Carter\nQA Analyst\nOwned manual regression testing for billing systems and documented defects.';
   const result={name:'Alex Carter',role:'QA Analyst',score:8,manager_score:8.7,primary_signal:'Manual regression ownership is relevant to this search.',jd_reason:'Resume supports required manual testing.',manager_reason:'Hands-on ownership matches the approved preference.',strengths:['Manual regression ownership'],concerns:['Confirm automation scope.'],tags:['QA'],screening_questions:['What testing did you personally own?','How did you prioritize regression coverage?','Which defects did your testing uncover?'],resume_evidence:[{claim:'Manual regression ownership',quote:'Owned manual regression testing for billing systems'}]};
-  let calls=0,release,wordCalls=0;let hold=true;
+  let calls=0,release,wordCalls=0,legacyCalls=0;let hold=true;
   await page.route('**/functions/v1/**',async route=>{
    const payload=route.request().postDataJSON();
+   if(payload.analysis_type==='resume'&&payload.resume_text.includes('Hello, “World”')){
+    legacyCalls++;assert.ok(payload.resume_text.includes('Unicode: éπ'),'legacy Word Unicode text lost');
+    await route.fulfill({json:{...result,name:'Candidate',role:'Role not stated',score:3.5,manager_score:3,primary_signal:'Legacy Word file was read successfully.',jd_reason:'The legacy Word document was extracted and is ready for evidence review.',manager_reason:'This synthetic fixture contains no manager-specific evidence.',concerns:['Confirm relevant QA experience.'],tags:[],screening_questions:['What relevant QA experience do you have?'],resume_evidence:[{claim:'Legacy Word text extracted',quote:'Hello, “World”'}]}});return;
+   }
    if(payload.analysis_type==='resume'&&payload.resume_text.includes('Jamie Rivera')){
     wordCalls++;
     assert.ok(payload.resume_text.includes('business\u2011aligned'),'Word nonbreaking hyphen lost');
@@ -138,6 +142,15 @@ const dir=path.resolve(__dirname,'..');
   assert.match(await page.locator('#activeResumeEvidence').textContent(),/risk •documentation/,'display the actual Word source');
   await page.locator('#resumeEvidencePanel .rf-resume-close').click();
   assert.equal(await page.evaluate(()=>window.testSaved.candidates.find(c=>c.name==='Jamie Rivera').managerScore),0,'retry bypassed assessment review');
+  // Legacy Word 97–2003 .doc files are parsed locally and follow the same intake path.
+  const legacy=require('./fixtures/legacy-doc.cjs');
+  await page.locator('.rf-nav [data-page="candidates"]').click();
+  assert.match(await page.locator('#resumeDropZone').textContent(),/PDF, DOC, DOCX, or TXT/);
+  assert.equal(await page.locator('#resumeUpload').getAttribute('accept'),'.pdf,.doc,.docx,.txt');
+  await page.locator('#resumeUpload').setInputFiles({name:'Legacy.doc',mimeType:'application/msword',buffer:Buffer.from(legacy.buildDoc())});
+  await page.waitForFunction(()=>window.testSaved.candidates.some(c=>c.resumeIntake?.fileName==='Legacy.doc'&&c.resumeIntake?.phase==='ready'));
+  assert.equal(legacyCalls,1,'legacy Word assessment did not run exactly once');
+  assert.equal(await page.evaluate(()=>window.testSaved.candidates.some(c=>c.resumeIntake?.fileName==='Legacy.doc')),true);
   await page.setViewportSize({width:390,height:844});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
   assert.deepEqual(errors,[]);

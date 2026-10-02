@@ -127,3 +127,9 @@ test('corrected PDF extraction recognizes a previously saved resume without a du
  const found=await f.flow.upload({name:'Resume.pdf',size:200});
  assert.equal(found,c);assert.equal(f.candidates.length,1);assert.equal(f.calls.length,0);assert.equal(f.docs.get(c.id),legacy);
 });
+
+
+test('legacy .doc resumes pass file validation and enter the normal intake flow',async()=>{
+ const f=fixture();const c=await f.flow.upload({...f.file,name:'Alex.doc'});await until(()=>c.resumeIntake.phase==='ready');
+ assert.equal(f.candidates.length,1);assert.equal(f.calls.length,1);assert.equal(c.resumeIntake.fileName,'Alex.doc');
+});

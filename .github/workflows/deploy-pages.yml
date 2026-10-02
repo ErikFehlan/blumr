@@ -57,6 +57,7 @@ jobs:
           node --check assets/context.js
           node --check assets/feedback.js
           node --check assets/job-review.js
+          node --check assets/doc-to-text.js
           node --check assets/resume-intake.js
           node --check assets/resume-remote.js
           node --check assets/recruiter-workflow.js

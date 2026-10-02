@@ -6,6 +6,7 @@
   function fileReadError(error,type){
     if(type==='pdf'&&(error?.name==='PasswordException'||/password required|no password given/i.test(error?.message||'')))
       return new Error('This PDF is password protected. Upload an unlocked copy.');
+    if(type==='doc')return new Error('This older Word .doc file could not be read. Save it as DOCX or PDF and try again.');
     if(type==='docx')return new Error('This Word file could not be read. Save it again as a DOCX or upload a PDF.');
     return error;
   }
@@ -151,7 +152,7 @@
       const fail=message=>{uploadProblem(message);if(options.silent)throw Error(message);api.toast(message,'error');};
       if(extracting){fail('The current resume is still being read.');return;}
       if(workspace!==api.workspace()||!job||job.status==='closed'){fail('Choose an open job before adding a resume.');return;}
-      if(!file||! /\.(pdf|docx|txt)$/i.test(file.name)){fail('This file type cannot be read. Choose a PDF, DOCX, or TXT resume.');return;}
+      if(!file||! /\.(pdf|doc|docx|txt)$/i.test(file.name)){fail('This file type cannot be read. Choose a PDF, DOC, DOCX, or TXT resume.');return;}
       if(file.size>10*1024*1024){fail('This file is larger than 10 MB. Upload a smaller copy of the resume.');return;}
       uploadProblem('');
       const jobId=job.id;extracting=true;options.progress?.('reading');status('Reading '+file.name+'…');
@@ -159,7 +160,7 @@
       try{
         const extracted=await api.extract(file,status);
         const text=typeof extracted==='string'?extracted:extracted.text;
-        if(!text.trim()||text.trim().length<40)throw Error('No usable resume text was found. Try a text-based PDF, DOCX, or TXT file.');
+        if(!text.trim()||text.trim().length<40)throw Error('No usable resume text was found. Try a text-based PDF, DOC, DOCX, or TXT file.');
         if(text.length>120000)throw Error('This resume is too long to assess in full. Upload a shorter resume.');
         const preliminary=preliminaryFit(text,job);
         const check=()=>{if(workspace!==api.workspace()||!api.job(jobId)||api.job(jobId).status==='closed')throw Error('The selected job was closed or removed. Reopen it before retrying.');};
