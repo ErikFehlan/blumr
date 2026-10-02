@@ -544,8 +544,8 @@
         window.AncalagonRecruiter.renderBatch(root.querySelector('#resumeBatch'),batch.view(),activeJobId,candidates);
         const host=root.querySelector('#resumeIntakeStatus'),q=window.AncalagonRecruiter.queue(candidates,activeJob(),c=>jobReview.canReview(c)||candidateAutomation.canReview(c));
         host.hidden=!q.ready.length&&!q.working.length&&!q.attention.length;
-        const action=q.ready[0]||q.attention[0];
-        const html='<div class="rf-queue-summary"><div><strong>'+q.ready.length+' ready to review</strong><span>'+q.working.length+' preparing'+(q.attention.length?' · '+q.attention.length+' need attention':'')+'</span></div>'+(action?'<button type="button" class="rf-btn primary" data-queue-open="'+escapeHTML(action.id)+'">'+(q.ready.length?'Review next':'Resolve issue')+'</button>':'')+'</div>';
+        const action=q.attention[0]||q.ready[0];
+        const html='<div class="rf-queue-summary"><div><strong>'+q.ready.length+' ready to review</strong><span>'+q.working.length+' preparing'+(q.attention.length?' · '+q.attention.length+' need attention':'')+'</span></div>'+(action?'<button type="button" class="rf-btn primary" data-queue-open="'+escapeHTML(action.id)+'">'+(q.attention.length?'Resolve issue':'Review assessment')+'</button>':'')+'</div>';
         if(host.dataset.markup!==html){host.innerHTML=html;host.dataset.markup=html;}
       }
       root.querySelector('#resumeIntakeStatus').addEventListener('click',event=>{const b=event.target.closest('[data-queue-open]');if(b)openDetail(b.dataset.queueOpen);});
@@ -835,6 +835,7 @@ function renderJobs(){
         if(action==='new'){showPage('jobs');openJobForm();return;}
         if(action==='continue'){const last=home.view().last;if(last)homeOpen(last.job.id,last.candidate?.id,last.page);else showPage('job-picker');return;}
         if(action==='note'){homeOpen(job,candidate);root.querySelector('#workspaceNote')?.focus();return;}
+        if(action==='submittal'){homeOpen(job,candidate);const section=root.querySelector('#workspaceSubmission');if(section){section.open=true;section.scrollIntoView({block:'start'});}return;}
         if(action==='job'||action==='candidate')homeOpen(job,candidate);
         if(action==='upload'){homeOpen(job,null,'candidates');openAddCandidate();}
       });
