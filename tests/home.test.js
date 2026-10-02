@@ -41,3 +41,18 @@ test('Home data reads and writes are scoped to both the user and workspace, and 
  assert.equal(calls[1].payload.user_id,'me');assert.equal(calls[1].payload.workspace_id,'my-workspace');assert.equal(calls[1].options.ignoreDuplicates,true);
  assert.match(calls[2].versionGuard,/last_opened_at.lte.2026-09-14/);assert.equal(calls[3].columns,'candidate_id,job_id,status');for(const call of calls.slice(3)){assert.deepEqual(call.filters,[['workspace_id','my-workspace'],['status',['ready','queued','processing','failed']]]);}assert.equal(calls[4].table,'resume_intake_tasks');
 });
+test('attention queue prioritizes recovery, review, screened submittals and empty active jobs without duplicating candidates',()=>{
+ const data={jobs:[{id:'j',title:'QA'},{id:'empty',title:'New search'},{id:'closed',status:'closed',title:'Closed'}],candidates:[
+  {id:'review',jobId:'j',short:'Review',resumeIntake:{phase:'ready'}},
+  {id:'failed',jobId:'j',short:'Failed',resumeIntake:{phase:'error'}},
+  {id:'send',jobId:'j',short:'Send',stage:'Screened',aiReview:{}},
+  {id:'submitted',jobId:'j',short:'Already sent',stage:'Submitted',aiReview:{}},
+  {id:'old',jobId:'closed',short:'Closed candidate',resumeIntake:{phase:'error'}}]};
+ const view=model(data,null,false),host={innerHTML:''};require('../assets/home.js').render(host,view);
+ const html=host.innerHTML;
+ assert.ok(html.indexOf('Resolve issue')<html.indexOf('Review assessment'));
+ assert.ok(html.indexOf('Review assessment')<html.indexOf('Prepare submittal'));
+ assert.ok(html.indexOf('Prepare submittal')<html.indexOf('Add candidates'));
+ assert.doesNotMatch(html,/Already sent|Closed candidate/);
+ assert.equal((html.match(/class="rf-btn primary"/g)||[]).length,1);
+});

@@ -31,7 +31,7 @@
   const reviewed=c=>c.resumeIntake?.reviewedAt||c.aiReview;
   const candidateCounts=new Map(active.map(j=>[j.id,0]));
   for(const c of candidates)candidateCounts.set(c.jobId,candidateCounts.get(c.jobId)+1);
-  return {firstVisit,last,recent,ready,working,attention,candidateCounts,setupJob:recent[0]||null,setupCandidate:ready[0]||candidates.find(c=>!reviewed(c))||candidates[0]||null,
+  return {firstVisit,last,recent,ready,working,attention,submittals:candidates.filter(c=>c.stage==='Screened'&&reviewed(c)),candidateCounts,setupJob:recent[0]||null,setupCandidate:ready[0]||candidates.find(c=>!reviewed(c))||candidates[0]||null,
    steps:[state.jobs.length>0,state.candidates.length>0,state.candidates.some(reviewed),(state.feedback||[]).length>0||state.candidates.some(c=>c.screeningInsight?.notes)]};
  }
  function create(api,{delay=250,timeout=6000}={}){
@@ -94,11 +94,16 @@
    const count=m.candidateCounts.get(j.id)||0,progress=status(j);
    return `<li><button type="button" class="rf-home-job" data-home-action="job" data-job="${esc(j.id)}"><span class="rf-home-job-copy"><strong>${esc(j.title)}</strong><small>${count} candidate${count===1?'':'s'}</small></span><span class="rf-home-job-status" data-tone="${progress.tone}">${progress.label}</span><span class="rf-home-job-arrow" aria-hidden="true">→</span></button></li>`;
   }).join('');
+  const busyIds=new Set([...m.attention,...m.ready,...m.working].map(c=>c.id));
+  const submittals= m.recent.flatMap(j=>(m.submittals||[]).filter(c=>c.jobId===j.id&&!busyIds.has(c.id)));
+  const priority=[...m.attention.map(c=>({c,label:'Resolve issue',reason:'Assessment needs another try',tone:'attention',action:'candidate'})),...m.ready.map(c=>({c,label:'Review assessment',reason:'Assessment ready for your approval',tone:'ready',action:'candidate'})),...submittals.map(c=>({c,label:'Prepare submittal',reason:'Screened candidate with a reviewed assessment',tone:'ready',action:'submittal'})),...m.recent.filter(j=>!m.candidateCounts.get(j.id)).map(j=>({c:{id:'',jobId:j.id,short:j.title},label:'Add candidates',reason:'No candidates added yet',tone:'active',action:'upload'}))];
+  const priorityHTML=priority.length?`<section class="rf-priority-queue" aria-labelledby="homePriorityTitle"><div class="rf-home-list-heading"><h2 id="homePriorityTitle">Needs your attention <span>${priority.length}</span></h2><span class="rf-sub">${m.working.length?m.working.length+' preparing in the background':'Ready for your next action'}</span></div><ol>${priority.slice(0,4).map((item,i)=>`<li data-tone="${item.tone}"><span class="rf-priority-order" aria-hidden="true">${i+1}</span><div><strong>${esc(item.c.short||item.c.name)}</strong><p>${esc(m.recent.find(j=>j.id===item.c.jobId)?.title||'')} · ${item.reason}</p></div>${action(item.label,item.action,item.c.jobId,item.c.id,i===0)}</li>`).join('')}</ol>${priority.length>4?`<p class="rf-sub">${priority.length-4} more awaiting action across your active jobs.</p>`:''}</section>`:'';
   host.innerHTML=`<div class="rf-home-heading"><div><span class="rf-home-eyebrow">${name?'Welcome'+(first?'':' back')+', '+esc(name):'Your workspace'}</span><h1 tabindex="-1">${heading}</h1></div></div>
    ${m.problem?`<div class="rf-home-notice" role="status">${esc(m.problem)} ${action('Retry sync','retry')}</div>`:''}
-   ${workflow?`<section id="homeSearchFlow" class="rf-search-flow" aria-label="Next step for your search">${workflow}</section>`:''}
+   ${priorityHTML}
+   ${workflow?`<section id="homeSearchFlow" class="rf-search-flow" aria-label="Next step for your search">${priority.length?workflow.replace(/class="rf-btn primary"/g,'class="rf-btn"'):workflow}</section>`:''}
    <div class="rf-home-panels">
-    <section class="rf-home-new" aria-labelledby="homeNewJobTitle"><div><span class="rf-home-new-icon" aria-hidden="true">+</span><h2 id="homeNewJobTitle">New job</h2><p>Add a job description to start a new search.</p></div>${action('Create job →','new','','',!workflow)}</section>
+    <section class="rf-home-new" aria-labelledby="homeNewJobTitle"><div><span class="rf-home-new-icon" aria-hidden="true">+</span><h2 id="homeNewJobTitle">New job</h2><p>Add a job description to start a new search.</p></div>${action('Create job →','new','','',!workflow&&!priority.length)}</section>
    <section class="rf-home-jobs" aria-label="Active jobs"><div class="rf-home-list-heading"><h2>${featuredJobId?'Other active jobs':'Active jobs'}${otherJobs.length?` <span>${otherJobs.length}</span>`:''}</h2>${m.steps[0]?action('All jobs →','jobs','','',false,true):''}</div>
     ${jobRows?`<ul class="rf-home-job-list">${jobRows}</ul>`:`<p class="rf-home-empty">${featuredJobId?'No other active jobs yet.':m.steps[0]?'No active jobs. Find completed searches in All jobs.':'Your jobs will appear here once you create a search.'}</p>`}
     ${otherJobs.length>5?`<p class="rf-home-list-note">Showing 5 of ${otherJobs.length} active jobs.</p>`:''}
