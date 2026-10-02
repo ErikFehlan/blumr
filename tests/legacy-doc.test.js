@@ -15,6 +15,6 @@ test('candidate uploader advertises legacy DOC support',()=>{
 
 test('resume storage accepts legacy DOC MIME type end to end',()=>{
  const data=fs.readFileSync(path.join(__dirname,'..','assets','data.js'),'utf8');
- assert.match(data,/doc:'application\\/msword'/);
+ assert.ok(data.includes("doc:'application/msword'"));
  assert.match(data,/PDF, DOC, DOCX, or TXT resume up to 10 MB/);
 });
