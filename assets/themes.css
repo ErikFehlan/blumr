@@ -36,8 +36,8 @@
   --ui-accent:#a8d18b; --ui-on-accent:#203416;
 }
 :is(#rf-app[data-theme="light"], .rf-theme-preview[data-palette="light"]) {
-  color-scheme:light; --ui-bg:#bce0df; --ui-panel:#f0f9f7; --ui-rail:#aed4d1;
-  --ui-soft:#acd3ce; --ui-line:#6f9e96; --ui-text:#183c36; --ui-muted:#355b53;
+  color-scheme:light; --ui-bg:#f5f8f7; --ui-panel:#ffffff; --ui-rail:#edf5f2;
+  --ui-soft:#e4f1eb; --ui-line:#91afa4; --ui-text:#183c36; --ui-muted:#355b53;
   --ui-accent:#245e50; --ui-on-accent:#ffffff;
 }
 :is(#rf-app[data-theme="paper"], .rf-theme-preview[data-palette="paper"]) {
