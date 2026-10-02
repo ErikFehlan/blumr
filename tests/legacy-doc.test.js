@@ -3,7 +3,7 @@ const docToText=require('../assets/doc-to-text.js');
 const {buildDoc,EXPECTED}=require('./fixtures/legacy-doc.cjs');
 
 test('legacy Word 97-2003 parser extracts body text locally',()=>{
- const bytes=buildDoc();assert.equal(docToText(bytes),EXPECTED);assert.equal(docToText(bytes.buffer),EXPECTED);
+ const bytes=buildDoc();assert.equal(docToText(bytes),EXPECTED);assert.equal(docToText(bytes.buffer),EXPECTED);assert.equal(docToText.plain(bytes),EXPECTED);assert.equal(docToText.plain(bytes.buffer),EXPECTED);
  assert.equal(docToText(new Uint8Array([1,2,3,4])),null);
 });
 
