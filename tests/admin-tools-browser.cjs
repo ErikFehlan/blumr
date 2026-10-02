@@ -76,8 +76,8 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
   assert.equal(usageCalls,beforeFocus+2,'Manual refresh requests not recorded');
   await page.locator('#adminToolsNav').waitFor({state:'visible'});await page.locator('#adminToolsNav').click();
   await page.getByLabel('Admin areas').getByRole('button',{name:'Overview',exact:true}).waitFor();
-  assert.equal(await page.getByRole('button',{name:'Advanced',exact:true}).getAttribute('aria-pressed'),'false');
-  await page.getByRole('button',{name:'System health',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'Technical setup',exact:true}).getAttribute('aria-pressed'),'false');
+  await page.getByRole('button',{name:'System',exact:true}).click();
   await page.getByRole('heading',{name:'System health',exact:true}).waitFor();
   assert.equal(await page.getByText('Supabase database',{exact:true}).isVisible(),true);
   assert.match(await page.locator('#systemHealthPanel').textContent(),/Latest successful candidate assessment/);
@@ -87,14 +87,14 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
   await page.getByLabel('Recovery verification note').fill('Provider logs confirm the synthetic request stopped.');assert.equal(await retry.isEnabled(),false);
   await page.getByLabel('Provider request is no longer running').check();assert.equal(await retry.isEnabled(),true);
   await retry.click();await page.getByText('No stalled direct analyses need recovery.',{exact:true}).waitFor();assert.equal(recovered,true);
-  await page.getByRole('button',{name:'Users & access',exact:true}).click();
+  await page.getByRole('button',{name:'Users',exact:true}).click();
   await page.locator('#betaAccessEmail').waitFor();assert.equal(await page.locator('.rf-globaljob').isVisible(),false);
   await page.locator('#betaAccessEmail').fill('tester@example.test');await page.getByRole('button',{name:'Approve beta access',exact:true}).click();
   await page.getByText('tester@example.test · Approved to register').waitFor();assert.equal(betaAccounts[0].approved,true);
   await page.getByRole('button',{name:'Revoke access',exact:true}).click();await page.getByText('tester@example.test · Access revoked').waitFor();assert.equal(betaAccounts[0].approved,false);
   await page.getByRole('button',{name:'Pause AI processing',exact:true}).click();await page.getByRole('button',{name:'Resume AI processing',exact:true}).waitFor();assert.equal(aiPaused,true);
   await page.locator('[data-goto="backend"]').first().click();assert.equal(await page.locator('#page-backend #downloadServer').count(),0);
-  await page.locator('#adminToolsNav').click();await page.getByRole('button',{name:'Advanced',exact:true}).click();await page.locator('#downloadServer').waitFor();await page.locator('#backendProject').fill('example-project');await page.locator('#backendModel').fill('example-model');
+  await page.locator('#adminToolsNav').click();await page.getByRole('button',{name:'Technical setup',exact:true}).click();await page.getByText('Advanced configuration and downloads',{exact:true}).click();await page.locator('#downloadServer').waitFor();await page.locator('#backendProject').fill('example-project');await page.locator('#backendModel').fill('example-model');
   for(const id of ['downloadServer','downloadSchema','downloadPrompt','downloadPackage','downloadEnv']){
    const [file]=await Promise.all([page.waitForEvent('download'),page.locator('#'+id).click()]);
    const contents=fs.readFileSync(await file.path(),'utf8');assert.ok(contents.length>30);
@@ -111,7 +111,7 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
   revoked=false;await page.reload();await page.locator('#adminToolsNav').waitFor({state:'visible'});
   failTools=true;await page.locator('#adminToolsNav').click();await page.getByRole('button',{name:'Retry',exact:true}).waitFor();
   assert.equal(await page.locator('#patternFunctionUrl').count(),0);
-  failTools=false;await page.getByRole('button',{name:'Retry',exact:true}).click();await page.getByRole('button',{name:'Advanced',exact:true}).waitFor();await page.getByRole('button',{name:'Advanced',exact:true}).click();await page.locator('#downloadServer').waitFor();
+  failTools=false;await page.getByRole('button',{name:'Retry',exact:true}).click();await page.getByRole('button',{name:'Technical setup',exact:true}).waitFor();await page.getByRole('button',{name:'Technical setup',exact:true}).click();await page.getByText('Advanced configuration and downloads',{exact:true}).click();await page.locator('#downloadServer').waitFor();
   revoked=true;await page.locator('#saveHybridSettings').click();await page.locator('#page-backend.active').waitFor();assert.equal(await page.locator('#adminToolsNav').isVisible(),false);
   revoked=false;await page.reload();await page.locator('#adminToolsNav').waitFor({state:'visible'});
   holdTools=true;await page.locator('#adminToolsNav').click();
