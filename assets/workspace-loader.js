@@ -5,7 +5,7 @@
     'assets/job-intake-code.js?v=20261002-guided-experience',
     'assets/job-wizard.js?v=20261002-guided-experience',
     'assets/hiring-priorities.js?v=20260924-priorities',
-    'assets/data.js?v=20261001-duplicate-recovery',
+    'assets/data.js?v=20261002-legacy-doc-storage',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20260917-concise',
     'assets/evidence.js?v=20260911-quick-feedback',
