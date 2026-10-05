@@ -1,7 +1,7 @@
 // Disposable staging identities. Private state is never included in artifacts.
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
-import {readFile,writeFile,mkdir,rm} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,rm,rename} from 'node:fs/promises';
 import {dirname} from 'node:path';
 import {managementFetch} from './supabase-management.mjs';
 export const STAGING='momfzjmycveqginxmqib';
@@ -19,7 +19,14 @@ export async function fixtures(){
  const mask=value=>{if(process.env.GITHUB_ACTIONS)console.log('::add-mask::'+value);};mask(service);mask(anon);
  let state;try{state=JSON.parse(await readFile(file,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
  if(state)assert.equal(state.project,STAGING);
- async function save(){await mkdir(dirname(file),{recursive:true});await writeFile(file,JSON.stringify(state),{mode:0o600});}
+ let pendingSave=Promise.resolve();
+ function save(){
+  // Concurrent uploads record ownership before sending bytes. Serialize atomic
+  // replacements so cancellation always leaves one complete cleanup manifest.
+  const snapshot=JSON.stringify(state);
+  const saved=pendingSave.then(async()=>{await mkdir(dirname(file),{recursive:true});await writeFile(file+'.next',snapshot,{mode:0o600});await rename(file+'.next',file);});
+  pendingSave=saved.catch(()=>{});return saved;
+ }
  async function request(path,access,method='GET',body,expected=true){
   const r=await fetch(base+path,{method,headers:{apikey:access===service?service:anon,Authorization:'Bearer '+(access||anon),'Content-Type':'application/json',Prefer:'return=representation'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(path.startsWith('/functions/')?110000:25000)});
   const data=await r.json().catch(()=>null);
