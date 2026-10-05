@@ -32,6 +32,11 @@ capacity, result replay, and expired direct ownership. The multi-connection test
 launches 24 calls for one workspace and 36 mixed-workspace calls against real
 Postgres; it does not call an AI provider. Both PR and release checks run it.
 
+Staging parity compares the four changed routines against this commit's migration
+source, including body, signature, defaults, language, return type, execution mode,
+search path, and role permissions. Other production structure must still match.
+This allows intentional staging-first changes without ignoring function drift.
+
 ### Boundaries and remaining work
 
 These are **admission reservations**, not a guarantee about physically running
