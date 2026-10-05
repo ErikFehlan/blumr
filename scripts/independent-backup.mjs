@@ -58,7 +58,7 @@ try{
  }
  try{assert.deepEqual(await inventory(),before);assert.deepEqual((await api('/database/query',{query:backupSecuritySQL}))[0].security,securityBefore);}
  catch{throw Object.assign(Error('Source changed during backup; no archive accepted'),{backupRetryable:true});}
- await writeFile(join(source,'manifest.json'),JSON.stringify({version:1,project:ref,created_at:new Date(capturedAt).toISOString(),inventory:before,security:securityBefore,files}),{mode:0o600});
+ await writeFile(join(source,'manifest.json'),JSON.stringify({version:2,project:ref,created_at:new Date(capturedAt).toISOString(),inventory:before,security:securityBefore,files}),{mode:0o600});
  await writeFile(join(source,'restore-prelude.sql'),await readFile('scripts/backup-restore-prelude.sql','utf8'),{mode:0o600});
  // Exclude CLI credentials and local config from the archive.
  const archive=join(work,'backup.tar');await command('tar',['-cf',archive,'roles.sql','restore-prelude.sql','schema.sql','data.sql','manifest.json','objects'],{cwd:source});
