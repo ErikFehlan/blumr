@@ -6,10 +6,10 @@ test('offline recovery accepts the version-2 permission prelude and verifies doc
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'blumr-recovery-test-'));
  try{
   await fs.mkdir(dir+'/source/objects',{recursive:true});
-  for(const name of ['roles.sql','restore-prelude.sql','schema.sql','data.sql'])await fs.writeFile(dir+'/source/'+name,'-- Synthetic fixture\n');
+  for(const name of ['roles.sql','restore-prelude.sql','managed-schema.sql','schema.sql','data.sql'])await fs.writeFile(dir+'/source/'+name,'-- Synthetic fixture\n');
   await fs.writeFile(dir+'/source/objects/0','Synthetic resume');
   await fs.writeFile(dir+'/source/manifest.json',JSON.stringify({version:2,project:'zqiqjzxcpznhzjengfff',files:[{file:'objects/0',sha256:await digest(dir+'/source/objects/0')}]}));
-  await run('tar',['-cf',dir+'/backup.tar','roles.sql','restore-prelude.sql','schema.sql','data.sql','manifest.json','objects'],{cwd:dir+'/source'});
+  await run('tar',['-cf',dir+'/backup.tar','roles.sql','restore-prelude.sql','managed-schema.sql','schema.sql','data.sql','manifest.json','objects'],{cwd:dir+'/source'});
   const {publicKey,privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});
   await fs.writeFile(dir+'/key.pem',privateKey.export({type:'pkcs8',format:'pem'}),{mode:0o600});
   await seal(dir+'/backup.tar',dir+'/backup.tar.enc',publicKey);

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {isDeepStrictEqual} from 'node:util';
 import {seal,unseal,digest} from './backup-crypto.mjs';
 import {inventorySQL} from './backup-inventory.mjs';
-import {backupSecuritySQL} from './backup-security.mjs';
+import {backupSecuritySQL,backupManagedSchemaSQL} from './backup-security.mjs';
 const runStarted=Date.now();let capturedAt,recoveryStarted;
 const ref=process.env.SUPABASE_PROJECT_REF,token=process.env.SUPABASE_ACCESS_TOKEN;
 if(ref!=='zqiqjzxcpznhzjengfff'||!token)throw Error('Independent backup requires the configured production project');
@@ -37,6 +37,8 @@ try{
  await mkdir(source,{mode:0o700});await mkdir(restore,{mode:0o700});await mkdir(output,{recursive:true});
  capturedAt=Date.now();const before=await inventory();
  const securityBefore=(await api('/database/query',{query:backupSecuritySQL}))[0].security;
+ const managed=(await api('/database/query',{query:backupManagedSchemaSQL}))[0].sql;
+ await writeFile(join(source,'managed-schema.sql'),'SET search_path=public,pg_catalog;\n'+managed,{mode:0o600});
  console.log('Preparing read-only database dumps.');
  await command('supabase',['init','--workdir',source]);
  await command('supabase',['link','--project-ref',ref,'--workdir',source,'--yes']);
@@ -61,7 +63,7 @@ try{
  await writeFile(join(source,'manifest.json'),JSON.stringify({version:2,project:ref,created_at:new Date(capturedAt).toISOString(),inventory:before,security:securityBefore,files}),{mode:0o600});
  await writeFile(join(source,'restore-prelude.sql'),await readFile('scripts/backup-restore-prelude.sql','utf8'),{mode:0o600});
  // Exclude CLI credentials and local config from the archive.
- const archive=join(work,'backup.tar');await command('tar',['-cf',archive,'roles.sql','restore-prelude.sql','schema.sql','data.sql','manifest.json','objects'],{cwd:source});
+ const archive=join(work,'backup.tar');await command('tar',['-cf',archive,'roles.sql','restore-prelude.sql','schema.sql','data.sql','managed-schema.sql','manifest.json','objects'],{cwd:source});
  const encrypted=join(output,'backup.tar.enc');const publicKey=await readFile(join(process.cwd(),'scripts/backup-public-key.pem'),'utf8');
  const sealed=await seal(archive,encrypted,publicKey);recoveryStarted=Date.now();const decoded=join(work,'decoded.tar');await unseal(encrypted,decoded,sealed);sealed.key.fill(0);
  assert.equal(await digest(archive),await digest(decoded),'Encrypted archive failed recovery');
@@ -83,8 +85,8 @@ try{
  // grants. Use its local administrative role; this never connects remotely.
  const psql=input=>command('docker',['exec','-e','PGPASSWORD=postgres','-i',database,'psql','-h','127.0.0.1','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1','-At'],{input,databaseDiagnostics:true});
  const roles=await readFile(join(restore,'roles.sql'),'utf8'),schema=await readFile(join(restore,'schema.sql'),'utf8'),data=await readFile(join(restore,'data.sql'),'utf8');
- const prelude=await readFile(join(restore,'restore-prelude.sql'),'utf8');
- await psql('begin;\n'+roles+'\n'+prelude+'\n'+schema+'\nSET session_replication_role=replica;\n'+data+'\ncommit;\n');
+ const prelude=await readFile(join(restore,'restore-prelude.sql'),'utf8'),managedSchema=await readFile(join(restore,'managed-schema.sql'),'utf8');
+ await psql('begin;\n'+roles+'\n'+prelude+'\n'+schema+'\nSET session_replication_role=replica;\n'+data+'\n'+managedSchema+'\ncommit;\n');
  const actual=JSON.parse((await psql(inventorySQL)).trim().split('\n').at(-1));
  assert.deepEqual(actual,before,'Restored database row counts or contents differ from the source snapshot');
  const securityAfter=JSON.parse((await psql(backupSecuritySQL)).trim().split('\n').at(-1));
