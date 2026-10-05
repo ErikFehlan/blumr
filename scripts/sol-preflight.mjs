@@ -2,6 +2,9 @@ import {managementFetch} from './supabase-management.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes} from 'node:crypto';
 const token=process.env.SUPABASE_ACCESS_TOKEN,ref=process.env.SUPABASE_PROJECT_REF;
+// The synthetic candidate explicitly did not author automated tests. Accept
+// equivalent negative wording without accepting an unrelated "excludes" claim.
+const automationLimitation=/not |never|lack|no |without|excludes (?:writing|maintaining|writing or maintaining) automated tests/i;
 if(!token||!/^[a-z0-9]{20}$/.test(ref||''))throw Error('Use the existing backend deployment environment.');
 async function management(path,method='GET',body){
  const r=await managementFetch(`https://api.supabase.com/v1/projects/${ref}${path}`,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(20000)});
@@ -39,11 +42,11 @@ try{
    if(caseName==='feedback'){
     assert.ok(out.summary&&Object.hasOwn(out,'clarification_question'));
     assert.ok(!Object.hasOwn(out,'manager_score'),'Feedback produced an unreviewed score');
-    assert.match(out.summary,/manual/i);assert.match(out.summary,/never|not |no |lack|without/i,'The explicit automation limitation was lost');
+    assert.match(out.summary,/manual/i);assert.match(out.summary,automationLimitation,'The explicit automation limitation was lost');
    }else if(caseName==='resume'||caseName==='memory'){
     assert.ok(out.resume_evidence?.length,'Resume evidence missing');
     if(caseName==='resume')assert.match(out.resume_evidence.map(e=>e.claim+' '+e.quote).join(' '),/manual/i);
-    if(caseName==='resume')assert.match(out.concerns.join(' ')+' '+out.primary_signal+' '+out.jd_reason,/not |never|lack|no |without/i,'Resume limitation was lost');
+    if(caseName==='resume')assert.match(out.concerns.join(' ')+' '+out.primary_signal+' '+out.jd_reason,automationLimitation,'Resume limitation was lost');
     if(caseName==='memory'&&model==='sol'){assert.ok(out.applied_lessons.some(l=>l.lesson_id==='lesson-ownership'),'Approved lesson was not used');assert.notEqual(out.criteria_assessment[0].status,'supported','Team ownership became personal ownership');}
    }else{
     for(const key of ['jd_score','manager_score'])assert.ok(Number.isFinite(out[key])&&out[key]>=0&&out[key]<=10);
