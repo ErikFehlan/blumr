@@ -1,3 +1,4 @@
+import {isSourceInstruction} from '../_shared/source-instructions.mjs';
 const normalize=s=>String(s||'').replace(/\u00a0/g,' ').replace(/[ \t]+/g,' ').trim();
 const stripPrefix=s=>normalize(s).replace(/^\s*(?:[-•▪●*]+\s*)?/,'').replace(/^\s*(?:Must Have|Preferred|Bonus)\s*\|\s*/i,'').trim();
 const boilerplate=/\b(equal opportunity|e-?verify|benefits?|compensation|salary|pay range|401\s*\(?k\)?|medical insurance|dental insurance|vision insurance|about us|our company|we offer|apply now)\b/i;
@@ -97,7 +98,7 @@ function sentenceCandidates(passages){
  for(const passage of passages||[]){
    const parts=String(passage.text||'').split(/\n+|(?<=[.!?])\s+(?=[A-Z0-9•▪●*-])/).map(stripPrefix).filter(x=>x.length>=12);
    for(const text of parts){
-     if(boilerplate.test(text)||nonRequirement.test(text))continue;
+     if(isSourceInstruction(text)||boilerplate.test(text)||nonRequirement.test(text))continue;
      const f=skill(text),y=years(text),type=requirementType(text);
      let score=0;
      if(type==='required')score+=10;else if(type==='preferred')score+=8;

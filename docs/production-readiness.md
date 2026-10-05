@@ -28,9 +28,9 @@ workers, inactive schedulers, permission drift, startup failure and a missing or
 older-than-36-hours verified backup. Failed GitHub Actions runs use repository
 notification settings. No separate pager or email recipient is configured here.
 
-The independent backup run on 2026-10-05 (GitHub run 37337849271) already restored
-the application database and 105 stored objects successfully before this change.
-This release additionally verifies restored access-control fingerprints. Recovery
+The independent backup run on 2026-10-05 (GitHub run 37364891152, attempt 3) restored
+the application database and 105 stored objects successfully, including the new
+access-control fingerprints and managed-schema policies and triggers. Recovery
 runs in a fresh local Supabase database disconnected from external networks;
 files are recovered to disk. A complete hosted Supabase/Auth/Storage/worker and
 DNS cutover remains a separate disaster-recovery exercise.
@@ -40,6 +40,13 @@ and MIME allowlists, private object ownership, actual stored size/type and sourc
 length at server admission. They do not constitute server-side content scanning
 or malware detection. Source instructions are isolated from trusted prompts;
 schema validation, evidence checks and human approval remain mandatory.
+Recognizable evaluator instructions are excluded from deterministic priorities
+and eligible source quotations while preserving exact, contiguous legitimate
+text. This is a narrow defense in depth, not a complete injection detector.
+The first live adversarial run caught an instruction being ranked by the
+deterministic extractor; its regression fixture now covers both browser and
+server paths. The staging assertion checks generated items and retains the
+original description unchanged for revision tracking.
 
 Remaining proof includes sustained larger-volume load, independently reviewed
 security coverage, long hosted provider/database outages, server-side scanning,
