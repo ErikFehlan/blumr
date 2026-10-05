@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process'),path=require('node:path');
-function run(failureModel,failureKind){
+function run(failureModel,failureKind,limitationText=null){
  const program=`
  process.env.SUPABASE_ACCESS_TOKEN='synthetic';process.env.SUPABASE_PROJECT_REF='abcdefghijklmnopqrst';
  const json=(value,status=200)=>new Response(JSON.stringify(value),{status});
@@ -17,6 +17,7 @@ function run(failureModel,failureKind){
    const result={model,summary:'Manual testing confirmed; no automation authorship.',clarification_question:null};
    if(body.case!=='feedback')Object.assign(result,{jd_score:score,manager_score:body.case==='screening'?6:score,jd_reason:'No new evidence.',manager_reason:'No new evidence.',concerns:['No automation authorship.'],primary_signal:'Manual testing.',resume_evidence:[{claim:'Manual testing',quote:'Manual testing'}],criteria_assessment:[{status:'partial'}],applied_lessons:[{lesson_id:'lesson-ownership'}]});
    if(body.case==='screening'&&body.model===${JSON.stringify(failureModel)}&&${JSON.stringify(failureKind)}==='assertion')result.jd_score='invalid';
+   if(body.case==='resume'&&body.model==='sol'&&${JSON.stringify(limitationText)}!==null)Object.assign(result,{concerns:[${JSON.stringify(limitationText)}],primary_signal:'Manual testing confirmed.',jd_reason:'Automation experience assessed.'});
    return json({case:body.case,requested_model:model,duration_ms:100,result});
   }
   throw Error('Unexpected test request');
@@ -39,5 +40,17 @@ test('production provider or assertion failures stop release and still clean up'
   assert.notEqual(result.status,0);
   assert.doesNotMatch(result.stdout,/PASS: all six/);
   assert.match(result.stdout,/FIXTURE_CLEANED/);
+ }
+});
+test('equivalent automation limitation wording passes without masking invented experience',()=>{
+ const supported=run(null,null,'Hands-on test automation capability is unproven; experience excludes writing or maintaining automated tests.');
+ assert.equal(supported.status,0,supported.stderr);
+ assert.match(supported.stdout,/PASS: all six/);
+ assert.match(supported.stdout,/FIXTURE_CLEANED/);
+ for(const text of ['Candidate writes and maintains automated tests.','Experience excludes manual testing; candidate writes and maintains automated tests.']){
+  const unsupported=run(null,null,text);
+  assert.notEqual(unsupported.status,0,'Lost automation limitation passed');
+  assert.match(unsupported.stderr,/Resume limitation was lost/);
+  assert.match(unsupported.stdout,/FIXTURE_CLEANED/);
  }
 });
