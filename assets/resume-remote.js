@@ -2,6 +2,7 @@
   'use strict';
   function failureMessage(code){
     const saved='Your resume is saved. ';
+    if(code==='provider_outcome_uncertain')return saved+'Processing was interrupted. An administrator must verify the earlier request before another assessment can run.';
     if(typeof code==='string'&&code.startsWith('verification_'))return saved+'The AI assessment could not be verified against the resume. Try the assessment again.';
     if(code==='usage_limit')return saved+'AI processing has reached a beta limit or is paused. Try later or contact the administrator.';
     if(code==='ai_budget_exhausted')return saved+'AI assessments are paused because the service spending limit was reached. Contact the administrator and retry after the limit is raised.';

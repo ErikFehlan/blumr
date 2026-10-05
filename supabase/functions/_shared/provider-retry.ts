@@ -33,7 +33,7 @@ export async function fetchWithRetry(input:RequestInfo|URL,init:RequestInit={},o
   for(let attempt=0;attempt<=maxRetries;attempt++){
     const headers=new Headers(init.headers);
     if(options.requestId)headers.set('X-Client-Request-Id',`${options.requestId}-${attempt+1}`);
-    const requestInit={...init,headers,signal:options.timeoutMs?AbortSignal.timeout(options.timeoutMs):init.signal};
+    const requestInit={...init,headers,signal:options.timeoutMs?AbortSignal.any([AbortSignal.timeout(options.timeoutMs),...(init.signal?[init.signal]:[])]):init.signal};
     try{
       const response=await fetcher(input,requestInit);
       const explicit=response.headers.get('x-should-retry');

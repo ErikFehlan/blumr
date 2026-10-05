@@ -31,3 +31,13 @@ test('unsupported or missing source definitions fail closed',async()=>{
  assert.throws(()=>s.capacityExpectations(s.sql.replace('active_assessment_count(p_workspace','unexpected_function(p_workspace')));
  assert.throws(()=>s.capacityExpectations(s.sql.replace('security invoker','security definer')));
 });
+test('durable worker functions require their exact source and correct worker or admin grants',async()=>{
+ const {workerExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261005133313_durable_worker_recovery.sql','utf8'),expected=workerExpectations(sql);
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),definition:'new definition',routine:{source:e.body,language:e.language,result:e.result,setof:e.setof,args:e.args,defaults:e.defaults,security_definer:!!e.admin,volatility:e.volatility,config:['search_path=""'],worker_allowed:true,clients_denied:!e.admin,anon_denied:true,authenticated_allowed:!!e.admin}}));
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ const admin=stage.find(r=>r.name==='get_direct_ai_recovery()');admin.routine.anon_denied=false;
+ assert.deepEqual(structuralDifferences([],stage,expected),['function:get_direct_ai_recovery()']);
+ assert.throws(()=>workerExpectations(sql.replace('begin_assessment_provider(p_lease','unknown_provider(p_lease')));
+ assert.throws(()=>workerExpectations(sql.replace('language plpgsql stable security definer','language plpgsql stable security invoker')));
+});

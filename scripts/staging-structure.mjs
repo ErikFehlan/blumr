@@ -23,12 +23,37 @@ export function capacityExpectations(sql) {
  return expected;
 }
 export const normalizeStructure=value=>value.replaceAll('\r\n','\n').replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
+export function workerExpectations(sql) {
+ const names=['claim_resume_intakes','claim_job_reassessments','active_assessment_count','recover_expired_assessment_work','claim_assessment_work','heartbeat_assessment_work','begin_assessment_provider','end_assessment_provider','release_assessment_work','finish_assessment_work','finish_resume_intake','finish_job_reassessment','get_direct_ai_recovery','recover_direct_ai_request'];
+ const expected=new Map();
+ const expression=/create or replace function public\.(\w+)\(([^)]*)\)\s+returns\s+(setof\s+)?(?:public\.)?(\w+)\s+language\s+(sql|plpgsql)\s+(?:(volatile|stable)\s+)?security (invoker|definer) set search_path='' as \$\$([\s\S]*?)\$\$;/gi;
+ for(const m of sql.matchAll(expression)) {
+  const [,name,args,setof,result,language,volatility,security,body]=m;
+  const admin=['get_direct_ai_recovery','recover_direct_ai_request'].includes(name);
+  if(!names.includes(name)||(security==='definer')!==admin)throw Error('Unexpected worker function or permissions');
+  const parameters=args?args.split(',').map(arg=>{
+   const p=arg.trim().match(/^(\w+) (uuid|text|boolean|jsonb)(?: default (null|false))?$/i);
+   if(!p)throw Error('Unsupported worker function argument');
+   return {name:p[1],type:p[2],default:p[3]};
+  }):[];
+  const defaults=parameters.filter(p=>p.default!==undefined);
+  if(defaults.length>1||(defaults.length&&parameters.at(-1).default===undefined))throw Error('Unsupported worker defaults');
+  const key='function:'+name+'('+parameters.map(p=>p.type).join(',')+')';
+  if(expected.has(key))throw Error('Duplicate worker declaration');
+  expected.set(key,{body,language,result,setof:Boolean(setof),args:parameters.map(p=>p.name+' '+p.type).join(', '),
+   defaults:defaults.length?(defaults[0].default==='false'?'false':'NULL::'+defaults[0].type):null,
+   admin,volatility:volatility==='stable'?'s':'v'});
+ }
+ if(expected.size!==names.length||(sql.match(/create or replace function/gi)||[]).length!==names.length)throw Error('Worker declarations are incomplete or unsupported');
+ return expected;
+}
 export function structuralDifferences(production,stage,expected) {
  const actual=new Map(stage.map(x=>[x.kind+':'+x.name,x]));
  const differences=new Set();
  for(const [key,e] of expected) {
   const r=actual.get(key)?.routine;
-  if(!r||r.source!==e.body||r.language!==e.language||r.result!==e.result||r.setof!==e.setof||r.args!==e.args||r.defaults!==e.defaults||r.security_definer!==false||r.volatility!=='v'||JSON.stringify(r.config)!==JSON.stringify(['search_path=""'])||r.worker_allowed!==true||r.clients_denied!==true)differences.add(key);
+  const permissions=e.admin?(r?.anon_denied===true&&r?.authenticated_allowed===true):(r?.worker_allowed===true&&r?.clients_denied===true);
+  if(!r||r.source!==e.body||r.language!==e.language||r.result!==e.result||r.setof!==e.setof||r.args!==e.args||r.defaults!==e.defaults||r.security_definer!==Boolean(e.admin)||r.volatility!==(e.volatility||'v')||JSON.stringify(r.config)!==JSON.stringify(['search_path=""'])||!permissions)differences.add(key);
  }
  for(const row of production) {
   const key=row.kind+':'+row.name;

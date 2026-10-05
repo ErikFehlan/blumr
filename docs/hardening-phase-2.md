@@ -1,6 +1,6 @@
 # blumr hardening phase 2
 
-Started October 5, 2026 from the hardening recommendations. This extends the
+Started October 5, 2026 from the hardening recommendations. New product features are paused while reliability and hardening take priority. This extends the
 existing reliability work; the twelve recommendations below are not all complete.
 
 ## First increment: shared assessment admission
@@ -39,14 +39,20 @@ This allows intentional staging-first changes without ignoring function drift.
 
 ### Boundaries and remaining work
 
-These are **admission reservations**, not a guarantee about physically running
-provider calls. Durable queue reservations still follow the existing three-minute
-leases and source-revision changes. A provider request can outlive a lease or an
-input change; provider-start fencing, heartbeat/lease alignment and ambiguous
-outcome recovery for those durable workers remain part of the next increment.
-Criteria refinement and other non-assessment model calls retain their existing
-budget controls and do not use this gate. Six concurrent reservations is a
-conservative starting configuration, not a measured capacity claim for 1,000 users.
+The durable worker recovery increment below replaces the original lease-only
+reservation behavior. These remain admission controls, not a provider-side
+exactly-once guarantee. Criteria refinement and other non-assessment model calls
+retain their existing budget controls and do not use this gate. Six reservations
+is a conservative starting configuration, not proof of capacity for 1,000 users.
+
+## Second increment: durable worker recovery
+
+See [durable worker recovery](durable-worker-recovery.md) for the protocol,
+recovery procedure, tests and deployment boundaries. Intake and reassessment
+attempts now survive source changes, renew bounded leases, fence each provider
+start, retain ambiguous reservations and reject stale results. Unstarted expired
+work retries automatically. Started work with an unknown outcome requires audited
+admin verification; transient result-save failures retry the same save.
 
 The proposed per-stage workflow is upload → validate → parse → normalize → create
 job → evaluate → validate output → persist → notify. Its finer-grained persisted
@@ -54,8 +60,8 @@ state transitions and resume-level checkpoint recovery are still pending.
 
 ## Recommended work remaining
 
-1. Finish queue hardening: durable-worker provider fencing/recovery and capacity
-   validation under realistic assessment bursts.
+1. Capacity validation under realistic assessment bursts, including the operational
+   effect of reservations held for verified recovery.
 2. Explicit per-stage assessment state machine and checkpoint recovery.
 3. Tenant-isolation tests across every data and file access path.
 4. Server-side authorization audit.
