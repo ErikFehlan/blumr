@@ -12,10 +12,11 @@ const archive=join(directory,'private-archive.tar'),run=promisify(execFile);
 try{
  await unseal(resolve(encrypted),archive,{privateKey:await readFile(resolve(keyPath),'utf8')});
  const {stdout}=await run('tar',['-tf',archive]);
- for(const name of stdout.trim().split('\n'))if(!/^(roles\.sql|schema\.sql|data\.sql|manifest\.json|objects\/(\d+)?)$/.test(name))throw Error('Unexpected archive path; extraction refused');
+ for(const name of stdout.trim().split('\n'))if(!/^(roles\.sql|restore-prelude\.sql|managed-schema\.sql|schema\.sql|data\.sql|manifest\.json|objects\/(\d+)?)$/.test(name))throw Error('Unexpected archive path; extraction refused');
  await run('tar',['-xf',archive,'-C',directory,'--no-same-owner','--no-same-permissions']);
  const manifest=JSON.parse(await readFile(join(directory,'manifest.json'),'utf8'));
- if(manifest.version!==1||manifest.project!=='zqiqjzxcpznhzjengfff')throw Error('Unexpected backup manifest');
+ if(![1,2].includes(manifest.version)||manifest.project!=='zqiqjzxcpznhzjengfff')throw Error('Unexpected backup manifest');
+ if(manifest.version===2)for(const name of ['restore-prelude.sql','managed-schema.sql'])await readFile(join(directory,name),'utf8');
  for(const file of manifest.files){if(!/^objects\/\d+$/.test(file.file)||await digest(join(directory,file.file))!==file.sha256)throw Error('Recovered document verification failed');}
  console.log('PASS: decrypted backup and exact document checksums. Review the recovery runbook before restoring to a new isolated project.');
 }catch(error){await rm(directory,{recursive:true,force:true});throw error;}

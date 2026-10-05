@@ -4,7 +4,7 @@ export class PersistencePending extends Error {}
 
 // Transport retries are confined to idempotent acknowledgements and saving the
 // same result. Provider calls are never repeated after an ambiguous response.
-export function assessmentLease(task:{lease_id:string},rpc:RPC,{fetcher=fetch,intervalMs=30000}:{fetcher?:Fetcher,intervalMs?:number}={}) {
+export function assessmentLease(task:{lease_id:string},rpc:RPC,{fetcher=fetch,intervalMs=30000,wait=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms)),now=()=>Date.now()}:{fetcher?:Fetcher,intervalMs?:number,wait?:(ms:number)=>Promise<void>,now?:()=>number}={}) {
  const controller=new AbortController();
  const deadline=setTimeout(()=>controller.abort(),300000);
  let heartbeat:Promise<void>|undefined,disposed=false;
@@ -15,8 +15,14 @@ export function assessmentLease(task:{lease_id:string},rpc:RPC,{fetcher=fetch,in
    .finally(()=>{heartbeat=undefined;});
  },intervalMs);
  async function acknowledge(name:string,body:unknown) {
-  let error:unknown;
-  for(let n=0;n<3;n++)try{return await rpc(name,body);}catch(e){error=e;}
+  let error:unknown;const started=now();
+  // Only identical terminal acknowledgements/completions may retry. Provider
+  // starts never do. Backoff gives a brief database outage time to recover.
+  for(let n=0;n<9;n++){
+   try{return await rpc(name,body);}catch(e){error=e;}
+   if(n===8||now()-started>=60000)break;
+   await wait(Math.min(1000*2**n,8000,Math.max(0,60000-(now()-started))));
+  }
   throw error;
  }
  const provider:Fetcher=async(input,init={})=>{

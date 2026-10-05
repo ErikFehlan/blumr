@@ -29,7 +29,7 @@ jobs:
           node --check scripts/criteria-backend.mjs
           node --test tests/code-first-job-intake.test.js tests/code-first-job-intake-corpus.test.js tests/criteria-automation.test.js tests/hiring-priorities.test.js
       - name: Test focused feedback and authentication
-        run: deno test --allow-env tests/provider-retry.test.ts tests/sol-routing.test.ts tests/security-backend.test.ts tests/learning-routing.test.ts tests/account-controls.test.ts tests/analysis-latency.test.ts tests/job-reassessment-worker.test.ts tests/resume-intake-backend.test.ts tests/direct-idempotency.test.ts tests/durable-worker-lease.test.ts
+        run: deno test --allow-env tests/provider-retry.test.ts tests/sol-routing.test.ts tests/security-backend.test.ts tests/learning-routing.test.ts tests/account-controls.test.ts tests/analysis-latency.test.ts tests/job-reassessment-worker.test.ts tests/resume-intake-backend.test.ts tests/direct-idempotency.test.ts tests/durable-worker-lease.test.ts tests/untrusted-input.test.ts
       - name: Test queue transactions and permissions
         env:
           PGPASSWORD: postgres
@@ -95,6 +95,8 @@ jobs:
           createdb -h localhost -U postgres beta_security
           psql -h localhost -U postgres -d beta_security -f tests/beta-security.sql
           node tests/security-concurrency.mjs
+          createdb -h localhost -U postgres readiness_security
+          psql -h localhost -U postgres -d readiness_security -f tests/readiness-security.sql
 
       - name: Test direct analysis claims, recovery and retention
         env:

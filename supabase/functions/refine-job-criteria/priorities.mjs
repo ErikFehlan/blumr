@@ -1,4 +1,5 @@
 import {resumeSources} from '../analyze-patterns-v2/resume-sources.mjs';
+import {isSourceInstruction} from '../_shared/source-instructions.mjs';
 const text=maxLength=>({type:'string',minLength:1,maxLength});
 export function jobPassages(input){return resumeSources(String(input.description||'')).filter(s=>s.text.trim().length>=12);}
 export function prioritiesSchema(passages){
@@ -17,7 +18,7 @@ export function validatePriorities(items,passages){
  const seen=new Set();
  return items.map((p,i)=>{
   const source=passages.find(s=>s.id===p?.source_id);
-  for(const [key,max] of [['title',140],['reason',240],['question',220]])if(typeof p?.[key]!=='string'||!p[key].trim()||p[key].length>max)fail();
+  for(const [key,max] of [['title',140],['reason',240],['question',220]])if(typeof p?.[key]!=='string'||!p[key].trim()||p[key].length>max||isSourceInstruction(p[key]))fail();
   if(!source||!['required','preferred','inferred'].includes(p.requirement_type))fail();
   const title=p.title.trim(),key=title.toLowerCase();if(seen.has(key))fail();seen.add(key);
   const numbers=s=>(s.match(/\d+(?:\.\d+)?\s*\+?/g)||[]).map(n=>n.replace(/\s/g,''));

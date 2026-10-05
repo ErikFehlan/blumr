@@ -1,6 +1,7 @@
+import {evidenceTextRanges,isSourceInstruction} from '../_shared/source-instructions.mjs';
 // The model chooses evidence; the server supplies its exact source quotation.
 // Passages partition the original text without rewriting words or punctuation.
-export function resumeSources(text){
+function partitionSources(text){
   const sources=[];
   for(let start=0;start<text.length;){
     let end=Math.min(start+700,text.length);
@@ -22,12 +23,16 @@ export function resumeSources(text){
   return sources;
 }
 
+export function resumeSources(text){
+ return evidenceTextRanges(text).flatMap(partitionSources).map((s,i)=>({...s,id:'resume-'+(i+1)}));
+}
+
 export function resolveResumeSources(analysis,sources){
   const byId=new Map(sources.map(source=>[source.id,source.text]));
   const fail=()=>{throw Object.assign(new Error('Invalid resume evidence reference'),{code:'invalid_evidence'});};
   if(!analysis||!Array.isArray(analysis.resume_evidence)||analysis.resume_evidence.length>5)fail();
   return {...analysis,resume_evidence:analysis.resume_evidence.map(e=>{
-    if(!e||typeof e.source_id!=='string'||!byId.has(e.source_id)||Object.hasOwn(e,'quote'))fail();
+    if(!e||typeof e.source_id!=='string'||!byId.has(e.source_id)||Object.hasOwn(e,'quote')||isSourceInstruction(e.claim))fail();
     return {claim:e.claim,quote:byId.get(e.source_id)};
   })};
 }

@@ -1,6 +1,6 @@
 # Reliability verification: items 8–12
 
-This work extends the existing regression and fixture infrastructure. Production test identities use `example.invalid`; no confirmation or recovery email is sent. AI load testing is excluded.
+This work extends the existing regression and fixture infrastructure. Production test identities use `example.invalid`; no confirmation or recovery email is sent. AI load testing is excluded from this original canary; the later [production-readiness checks](production-readiness.md) exercise real paid staging assessments.
 
 | Item | Acceptance evidence | Automation |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ Storage deletion is verified through the privileged object listing before restor
 
 The scoped recovery drill is **not** a full-project backup restore. It does not prove recovery of Auth users, all customer workspaces, platform configuration, deployed functions, cron, or a historical Supabase physical/PITR backup. The management backup inventory is checked read-only and reported separately; unavailable inventory is not a passing restore result.
 
-Supabase database backups contain Storage metadata but do not back up the resume object bytes. An ongoing off-site, encrypted resume-file backup and retention policy still need a configured destination and credentials. The synthetic archive is a test artifact retained seven days; it is not a customer backup system.
+Supabase database backups contain Storage metadata but do not back up the resume object bytes. The later [independent backup](independent-recovery.md) now captures full application data and every Storage object, encrypts archives and retains verified copies for 90 days. The synthetic archive is a test artifact retained seven days; it is not a customer backup system.
 
 For a full disaster-recovery drill, restore a selected platform backup into a dedicated recovery project; pause outbound automation there, recover Storage objects from the independent file backup, check counts and checksums, then test isolated login, membership, signed downloads and recruiter workflows. Record backup age (RPO), recovery time (RTO), errors and cleanup. Do not restore a historical backup over production as a rehearsal.
 
@@ -32,7 +32,7 @@ For a full disaster-recovery drill, restore a selected platform backup into a de
 4. Merge the tested rollback PR and wait for matching-commit public verification and live recruiter checks.
 5. For backend regressions, prepare a reviewed forward fix or explicitly deploy compatible known-good functions. Do not reverse schema migrations or restore customer data automatically.
 
-Branch-protection settings could not be read through the available GitHub integration (403). Required checks and Cloudflare's independent deployment gate therefore remain unverified; CI coverage alone does not prove an enforced gate. Staging-first release parity also remains outstanding. This work does not change paid infrastructure or configure a new backup destination.
+Branch-protection settings could not be read through the available GitHub integration (403). Later work added Cloudflare's exact-commit deployment gate and staging-first structural parity; see [independent recovery and release controls](independent-recovery.md). CI coverage alone does not prove branch protection is enabled.
 
 ## Evidence
 

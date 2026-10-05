@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {backupSecuritySQL,backupManagedSchemaSQL} from '../scripts/backup-security.mjs';
+const psql=sql=>execFileSync('psql',['-h','localhost','-U','postgres','-d','backup_privileges','-v','ON_ERROR_STOP=1','-At'],{input:sql,encoding:'utf8'}).trim();
+psql(`create schema auth;create schema storage;
+ create function auth.uid() returns uuid language sql as 'select null::uuid';
+ create table auth.users(id uuid);create table storage.objects(name text);
+ create function public.application_guard() returns trigger language plpgsql as 'begin return new;end';
+ create trigger new_account after insert on auth.users for each row execute function public.application_guard();
+ create trigger file_budget before insert on storage.objects for each row execute function public.application_guard();
+ create policy private_object on storage.objects for select to authenticated using (name=auth.uid()::text);`);
+const before=JSON.parse(psql(backupSecuritySQL).split('\n').at(-1));
+const managed=psql(backupManagedSchemaSQL).replace(/^SET\n/,'');
+psql('drop policy private_object on storage.objects;drop trigger new_account on auth.users;drop trigger file_budget on storage.objects;');
+const missing=JSON.parse(psql(backupSecuritySQL).split('\n').at(-1));assert.notDeepEqual(missing,before);
+psql('set search_path=public,pg_catalog;'+managed);
+const after=JSON.parse(psql('set search_path=public,auth;'+backupSecuritySQL).split('\n').at(-1));assert.deepEqual(after,before);
+console.log('PASS: managed-schema policies and application triggers restore exactly regardless of target search path.');

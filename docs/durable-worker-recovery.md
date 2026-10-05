@@ -19,7 +19,7 @@ after seven days; uncertain work is never automatically purged.
 | Connection, response body, timeout or server outcome is uncertain | Attempt retains its reservation and becomes an admin recovery item. No transport replay. |
 | Provider explicitly rejects work, e.g. HTTP 429 | Complete response is acknowledged; existing bounded queue retry applies. |
 | One invalid intake output | One evidence-validation repair may run, with its own fenced request ID; original evidence and validators remain unchanged. |
-| Result-save acknowledgement is lost | Repeat the same save up to three times. A committed completion is idempotent; no second provider call. |
+| Result-save acknowledgement is lost | Repeat the same save with bounded exponential backoff (up to nine attempts, 60-second retry budget plus an in-flight RPC). A committed completion is idempotent; no second provider call. |
 | Database stays unavailable after a response | Preserve the unresolved attempt for recovery. Do not convert a possibly saved success into a retry. |
 | Sources change during processing | Hold the old reservation until settled; reject its stale result; process the latest saved revision. |
 | A terminal result arrives late | May finish only the still-owned attempt against current evidence; an admin-released or replaced owner cannot publish. |
@@ -69,7 +69,9 @@ Required release checks include:
   private ledger access, and live intake/reassessment workflows.
 - Existing production account isolation, usage and live recruiter checks.
 
-Still pending: a complete per-stage checkpoint state machine, realistic paid
-provider burst/load measurements, circuit breakers, and broader monitoring.
+The production-readiness checks now add a simulated 40-second database outage,
+real paid staging bursts, and scheduled operational monitoring; see
+[production-readiness.md](production-readiness.md) for their gates and limits.
+Still pending: a complete per-stage checkpoint state machine and circuit breakers.
 Current recovery preserves safe ownership and can retry a saved completion, but
 does not retrieve or reconstruct a provider response lost before persistence.

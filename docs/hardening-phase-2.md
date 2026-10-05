@@ -58,6 +58,14 @@ The proposed per-stage workflow is upload → validate → parse → normalize �
 job → evaluate → validate output → persist → notify. Its finer-grained persisted
 state transitions and resume-level checkpoint recovery are still pending.
 
+## Third increment: production readiness evidence
+
+See [production readiness](production-readiness.md) for paid staging bursts,
+bounded outage recovery, broader access and malicious-input checks, scheduled
+monitoring and fresh database recovery gates. The permission fingerprint check
+caught bootstrap default grants widening access during restore; recovery now
+clears target defaults before replaying source grants and must match exactly.
+
 ## Recommended work remaining
 
 1. Capacity validation under realistic assessment bursts, including the operational

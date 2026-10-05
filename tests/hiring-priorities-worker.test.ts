@@ -9,7 +9,7 @@ Deno.test('structured job intake finishes with code and no model request',async(
  let aiCalls=0,finished:any;
  try{
   ['worker','https://backend.invalid','service','ai','hybrid'].forEach((v,i)=>Deno.env.set(names[i],v));
-  globalThis.fetch=async(url,init)=>{
+  globalThis.fetch=async(url:RequestInfo|URL,init?:RequestInit)=>{
    const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
    if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'Senior .NET Engineer',description,criteria:['requires 5 years of .NET'],manager_notes:'',knockouts:[]}}]);
    if(path==='/v1/responses'){aiCalls++;throw Error('Model should not be called for structured intake');}
@@ -31,7 +31,7 @@ Deno.test('ambiguous JD-only jobs fall back to grounded AI priorities through th
  let calls=0,finished:any,forged=false;
  try{
   ['worker','https://backend.invalid','service','ai','hybrid'].forEach((v,i)=>Deno.env.set(names[i],v));
-  globalThis.fetch=async(url,init)=>{
+  globalThis.fetch=async(url:RequestInfo|URL,init?:RequestInit)=>{
    calls++;const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
    if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',usage_run_id:'run-criteria',input:{title:'QA',description,criteria:[],manager_notes:'',knockouts:[]}}]);
    if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
@@ -60,7 +60,7 @@ Deno.test('legacy rollout mode preserves the existing AI criteria path',async()=
  let aiCalls=0,finished:any;
  try{
   ['worker','https://backend.invalid','service','ai','legacy_ai'].forEach((v,i)=>Deno.env.set(names[i],v));
-  globalThis.fetch=async(url,init)=>{
+  globalThis.fetch=async(url:RequestInfo|URL,init?:RequestInit)=>{
    const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
    if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',usage_run_id:'run-legacy',input:{title:'Senior .NET Engineer',description:'Requires 5 years of .NET development experience.',criteria:['requires 5 years of .NET'],manager_notes:'',knockouts:[]}}]);
    if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
@@ -85,7 +85,7 @@ Deno.test('intake evaluates saved priorities with candidate sources and returns 
  const priorities={basis:'job_description',review_status:'suggested',items:[{id:'priority-1',title:'Manual regression ownership',reason:'Core responsibility.',question:'What work did you own?',requirement_type:'inferred',source_quote:'Own manual regression testing.'}]};
  try{
   Deno.env.set('OPENAI_API_KEY','test-only');
-  globalThis.fetch=async(_url,init)=>{
+  globalThis.fetch=async(_url:RequestInfo|URL,init?:RequestInit)=>{
    const body=JSON.parse(String(init?.body));assert(body.text.format.schema.required.includes('priority_assessment'),'priority contract missing');
    const input=JSON.parse(body.input.slice(body.input.indexOf('{'))),source=input.resume_sources[0].id;
    assert(body.text.format.schema.properties.priority_assessment.items.anyOf[0].properties.source_ids.items.enum.includes(source),'resume evidence unavailable');

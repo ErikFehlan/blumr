@@ -32,7 +32,7 @@ jobs:
           deno check supabase/functions/staging-provider-bridge/index.ts
           deno test --allow-env tests/staging-provider-bridge.test.ts
           deno check supabase/functions/account-controls/index.ts supabase/functions/reassess-job/index.ts supabase/functions/analyze-patterns-beta/index.ts supabase/functions/analyze-patterns-v2/index.ts supabase/functions/onboarding-reminders/index.ts supabase/functions/sol-model-check/index.ts
-          deno test --allow-env tests/provider-retry.test.ts tests/sol-routing.test.ts tests/assessment-memory-routing.test.ts tests/security-backend.test.ts tests/learning-routing.test.ts tests/account-controls.test.ts tests/analysis-latency.test.ts tests/resume-intake-backend.test.ts tests/job-reassessment-worker.test.ts tests/hiring-priorities-worker.test.ts tests/direct-idempotency.test.ts tests/durable-worker-lease.test.ts tests/reliability-faults.test.ts
+          deno test --allow-env tests/provider-retry.test.ts tests/sol-routing.test.ts tests/assessment-memory-routing.test.ts tests/security-backend.test.ts tests/learning-routing.test.ts tests/account-controls.test.ts tests/analysis-latency.test.ts tests/resume-intake-backend.test.ts tests/job-reassessment-worker.test.ts tests/hiring-priorities-worker.test.ts tests/direct-idempotency.test.ts tests/durable-worker-lease.test.ts tests/reliability-faults.test.ts tests/untrusted-input.test.ts
       - name: Check database transactions and permissions
         env:
           PGPASSWORD: postgres
@@ -52,6 +52,11 @@ jobs:
           createdb -h localhost -U postgres beta_security
           psql -h localhost -U postgres -d beta_security -f tests/beta-security.sql
           node tests/security-concurrency.mjs
+          createdb -h localhost -U postgres readiness_security
+          psql -h localhost -U postgres -d readiness_security -f tests/readiness-security.sql
+          createdb -h localhost -U postgres backup_privileges
+          psql -h localhost -U postgres -d backup_privileges -f tests/backup-privileges.sql
+          node tests/backup-structure.mjs
           createdb -h localhost -U postgres direct_idempotency
           psql -h localhost -U postgres -d direct_idempotency -f tests/direct-idempotency.sql
           createdb -h localhost -U postgres assessment_capacity

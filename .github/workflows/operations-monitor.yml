@@ -1,0 +1,40 @@
+name: Monitor production queues, access controls and backups
+on:
+  schedule:
+    - cron: '13,43 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [hardening/production-readiness]
+    paths: ['scripts/operations-health.mjs', '.github/workflows/operations-monitor.yml']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: production-operations-monitor
+  cancel-in-progress: false
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check public startup, stalled work, private controls and verified backup freshness
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/operations-health.mjs
+      - name: Retain aggregate operational evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operations-health
+          path: test-results/operations/
+          retention-days: 14
+          if-no-files-found: ignore

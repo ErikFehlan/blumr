@@ -1,5 +1,26 @@
 // Browser version of the existing code-first priority engine; verified against its source.
 (function(global){'use strict';
+// Defense in depth for recognizable instructions aimed at the evaluator.
+// This is not a complete prompt-injection detector; trusted prompts, constrained
+// schemas, authorization and recruiter approval remain the security boundaries.
+function isSourceInstruction(text){
+ return /\b(?:ignore|disregard|override|supersede)\w*\b.{0,100}\b(?:instructions?|prompts?|system|developer)\b|\b(?:system|developer)\s*(?:message|override|instructions?)\s*:|\b(?:award|assign|give|set|force|return)\b.{0,60}\b(?:perfect|maximum|100\s*%|10\s*\/\s*10)\s*(?:scores?|ratings?)\b|\b(?:output|emit|print|return|include)\b.{0,100}\b(?:marker|summary|response|answer)\b|\b(?:reveal|expose|print|send)\b.{0,60}\b(?:system prompt|secrets?|api keys?|passwords?)\b/i.test(String(text||''));
+}
+
+// Keep exact, contiguous source text on either side of rejected instructions.
+// Never splice two separated facts into a quotation that the document lacks.
+function evidenceTextRanges(text){
+ const parts=String(text).split(/(?<=\n)|(?<=[.!?])(?=\s)/);
+ if(!parts.some(isSourceInstruction))return [String(text)];
+ const ranges=[];let current='';
+ for(const part of parts){
+  if(isSourceInstruction(part)){if(current.trim().length>=12)ranges.push(current);current='';}
+  else current+=part;
+ }
+ if(current.trim().length>=12)ranges.push(current);
+ return ranges;
+}
+
 const normalize=s=>String(s||'').replace(/\u00a0/g,' ').replace(/[ \t]+/g,' ').trim();
 const stripPrefix=s=>normalize(s).replace(/^\s*(?:[-•▪●*]+\s*)?/,'').replace(/^\s*(?:Must Have|Preferred|Bonus)\s*\|\s*/i,'').trim();
 const boilerplate=/\b(equal opportunity|e-?verify|benefits?|compensation|salary|pay range|401\s*\(?k\)?|medical insurance|dental insurance|vision insurance|about us|our company|we offer|apply now)\b/i;
@@ -99,7 +120,7 @@ function sentenceCandidates(passages){
  for(const passage of passages||[]){
    const parts=String(passage.text||'').split(/\n+|(?<=[.!?])\s+(?=[A-Z0-9•▪●*-])/).map(stripPrefix).filter(x=>x.length>=12);
    for(const text of parts){
-     if(boilerplate.test(text)||nonRequirement.test(text))continue;
+     if(isSourceInstruction(text)||boilerplate.test(text)||nonRequirement.test(text))continue;
      const f=skill(text),y=years(text),type=requirementType(text);
      let score=0;
      if(type==='required')score+=10;else if(type==='preferred')score+=8;
