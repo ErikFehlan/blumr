@@ -1,6 +1,6 @@
 // A small, text-based PDF containing only synthetic resume text.
-module.exports=()=>{
- const lines=['Alex Example','QA Analyst','Example Systems | 2021 - 2026',
+module.exports=(suppliedLines)=>{
+ const lines=suppliedLines||['Alex Example','QA Analyst','Example Systems | 2021 - 2026',
  'Owned manual regression testing for billing systems.',
  'Created test plans, documented defects, and verified fixes.',
  'Used SQL to validate billing data and Jira to track remediation.',

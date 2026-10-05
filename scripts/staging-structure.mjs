@@ -23,6 +23,15 @@ export function capacityExpectations(sql) {
  return expected;
 }
 export const normalizeStructure=value=>value.replaceAll('\r\n','\n').replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
+export function guardExpectations(sql){
+ const names=['validate_resume_document','preserve_record_creator'],expected=new Map();
+ for(const m of sql.matchAll(/create or replace function public\.(\w+)\(\) returns trigger\s+language plpgsql volatile security invoker set search_path='' as \$\$([\s\S]*?)\$\$;/g)){
+  if(!names.includes(m[1]))throw Error('Unexpected readiness guard');
+  expected.set('function:'+m[1]+'()',{body:m[2],language:'plpgsql',result:'trigger',setof:false,args:'',defaults:null,admin:false,volatility:'v'});
+ }
+ if(expected.size!==2||(sql.match(/create or replace function/gi)||[]).length!==2)throw Error('Readiness guards are incomplete');
+ return expected;
+}
 export function workerExpectations(sql) {
  const names=['claim_resume_intakes','claim_job_reassessments','active_assessment_count','recover_expired_assessment_work','claim_assessment_work','heartbeat_assessment_work','begin_assessment_provider','end_assessment_provider','release_assessment_work','finish_assessment_work','finish_resume_intake','finish_job_reassessment','get_direct_ai_recovery','recover_direct_ai_request'];
  const expected=new Map();

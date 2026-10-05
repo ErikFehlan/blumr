@@ -12,10 +12,11 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     environment: criteria-backend
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
+      READINESS_STATE_FILE: /tmp/blumr-readiness-${{ github.run_id }}-${{ github.run_attempt }}.json
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,3 +66,16 @@ jobs:
           node scripts/security-live-smoke.mjs
           node scripts/core-live-smoke.mjs
           node scripts/usage-analytics-backend.mjs verify
+      - name: Verify real assessment bursts and adversarial access
+        run: node scripts/staging-readiness.mjs run
+      - name: Verify readiness fixture cleanup
+        if: always()
+        run: node scripts/staging-readiness.mjs cleanup
+      - name: Retain aggregate readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-readiness
+          path: test-results/readiness/
+          retention-days: 14
+          if-no-files-found: ignore

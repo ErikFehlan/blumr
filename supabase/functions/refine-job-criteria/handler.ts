@@ -1,3 +1,4 @@
+import {untrustedInputInstructions} from '../_shared/untrusted-input.mjs';
 import {reserveModelCall, recordProviderUsage, SecurityLimit} from '../_shared/security.ts';
 import {prepare,validate} from './logic.mjs';
 import {jobPassages,prioritiesSchema,priorityInstructions,validatePriorities} from './priorities.mjs';
@@ -58,7 +59,7 @@ export async function handleCriteria(request:Request){
       const input=legacy
         ? {job:{title:task.input.title},criteria:source,job_description_sources:passages}
         : {job:{title:task.input.title},job_description_sources:passages};
-      const r=await fetchWithRetry('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model,...modelReasoning(model,'reassessment'),store:false,max_output_tokens:legacy?8000:4000,instructions,input:JSON.stringify(input),text:{format:{type:'json_schema',name:legacy?'criteria_refinement':'job_priorities',strict:true,schema}}})},{timeoutMs:90000,maxRetries:2,requestId:`criteria-${task.usage_run_id||task.revision}-${kind}`});
+      const r=await fetchWithRetry('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model,...modelReasoning(model,'reassessment'),store:false,max_output_tokens:legacy?8000:4000,instructions:untrustedInputInstructions+instructions,input:JSON.stringify(input),text:{format:{type:'json_schema',name:legacy?'criteria_refinement':'job_priorities',strict:true,schema}}})},{timeoutMs:90000,maxRetries:2,requestId:`criteria-${task.usage_run_id||task.revision}-${kind}`});
       if(!r.ok)throw Error(r.status===429?'ai_rate_limit':'ai_unavailable');
       const body=await r.json();
       await recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null);

@@ -4,7 +4,7 @@ on:
     - cron: '17 7 * * *'
   workflow_dispatch:
   push:
-    branches: [reliability/backups-and-release-gates]
+    branches: [reliability/backups-and-release-gates, hardening/production-readiness, main]
     paths: ['scripts/*backup*', '.github/workflows/independent-backup.yml']
 permissions:
   contents: read

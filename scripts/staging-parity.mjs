@@ -1,6 +1,6 @@
 // Compare deployment structure only. Never copy production account data into staging.
 import {readFile} from 'node:fs/promises';
-import {capacityExpectations,workerExpectations,structuralDifferences} from './staging-structure.mjs';
+import {capacityExpectations,workerExpectations,guardExpectations,structuralDifferences} from './staging-structure.mjs';
 const token=process.env.SUPABASE_ACCESS_TOKEN;
 if(process.env.SUPABASE_PROJECT_REF!=='momfzjmycveqginxmqib'||!token)throw Error('Staging parity requires the isolated staging project');
 async function api(ref,path,body){
@@ -26,10 +26,15 @@ const query=`select 'column' as kind, table_name||'.'||column_name as name,
 const [production,stage]=await Promise.all(['zqiqjzxcpznhzjengfff','momfzjmycveqginxmqib'].map(ref=>api(ref,'/database/query',{query})));
 const expected=capacityExpectations(await readFile('supabase/migrations/20261005121611_assessment_capacity.sql','utf8'));
 for(const [key,value] of workerExpectations(await readFile('supabase/migrations/20261005133313_durable_worker_recovery.sql','utf8')))expected.set(key,value);
+for(const [key,value] of guardExpectations(await readFile('supabase/migrations/20261005190251_production_readiness_guards.sql','utf8')))expected.set(key,value);
 const differences=structuralDifferences(production,stage,expected);
 if(differences.length)throw Error('Staging structural differences: '+differences.join(', '));
 const [ledger]=await api('momfzjmycveqginxmqib','/database/query',{query:"select relrowsecurity and not has_table_privilege('anon',oid,'select,insert,update,delete') and not has_table_privilege('authenticated',oid,'select,insert,update,delete') and has_table_privilege('service_role',oid,'select,insert,update,delete') as private from pg_class where oid='public.assessment_worker_attempts'::regclass"});
 if(ledger?.private!==true)throw Error('Worker attempt ledger is not service-only');
+const [uploads]=await api('momfzjmycveqginxmqib','/database/query',{query:`select (select not public and file_size_limit=10485760 and allowed_mime_types=array['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','text/plain'] from storage.buckets where id='resumes') as private_bucket,
+ exists(select 1 from pg_trigger where tgrelid='public.candidate_documents'::regclass and tgname='validate_resume_document' and tgenabled='O' and tgfoid='public.validate_resume_document()'::regprocedure) as document_guard,
+ not exists(select 1 from information_schema.columns c where c.table_schema='public' and c.column_name='created_by' and not exists(select 1 from pg_trigger t where t.tgrelid=('public.'||quote_ident(c.table_name))::regclass and t.tgname='preserve_record_creator' and t.tgenabled='O')) as creator_guards`});
+if(!uploads?.private_bucket||!uploads.document_guard||!uploads.creator_guards)throw Error('Upload and author guards are incomplete');
 const functions=await api('momfzjmycveqginxmqib','/functions');
 for(const name of ['analyze-patterns-v2','analyze-patterns-beta','reassess-job','refine-job-criteria','account-controls','onboarding-reminders'])if(!functions.some(f=>f.slug===name&&f.status==='ACTIVE'))throw Error('Staging handler unavailable: '+name);
 console.log('PASS: unchanged production structure matches staging; capacity routines match the current migration and private permissions; all required handlers are active.');

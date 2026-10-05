@@ -16,6 +16,7 @@
     'assets/quality-ui.js?v=20260918-blumr',
     'assets/feedback.js?v=20260916-learning',
     'assets/idempotency.js?v=20260930-idempotency',
+    'assets/upload-validation.js?v=20261005-upload-guards',
     'assets/pdf-text.js?v=20260915-intake',
     'assets/resume-intake.js?v=20261002-legacy-doc-text-first',
     'assets/resume-remote.js?v=20260917-security',

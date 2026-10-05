@@ -41,3 +41,15 @@ test('durable worker functions require their exact source and correct worker or 
  assert.throws(()=>workerExpectations(sql.replace('begin_assessment_provider(p_lease','unknown_provider(p_lease')));
  assert.throws(()=>workerExpectations(sql.replace('language plpgsql stable security definer','language plpgsql stable security invoker')));
 });
+test('upload guards reject missing definitions, privilege drift and substituted source',async()=>{
+ const {guardExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261005190251_production_readiness_guards.sql','utf8'),expected=guardExpectations(sql);
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:e.setof,args:e.args,defaults:e.defaults,security_definer:false,volatility:'v',config:['search_path=""'],worker_allowed:true,clients_denied:true}}));
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ for(const patch of [{source:'return new;'},{clients_denied:false},{security_definer:true}]){
+  const changed=structuredClone(stage);Object.assign(changed[0].routine,patch);
+  assert.deepEqual(structuralDifferences([],changed,expected),['function:validate_resume_document()']);
+ }
+ assert.throws(()=>guardExpectations(sql.replace('security invoker','security definer')));
+ assert.throws(()=>guardExpectations(sql.replace('validate_resume_document() returns','unknown_guard() returns')));
+});

@@ -21,14 +21,14 @@ Deno.test('complete terminal responses are read before settlement; lost acknowle
  let providerCalls=0,endCalls=0;const requests:unknown[]=[];
  const lease=assessmentLease({lease_id:'lease'},async(name,body)=>{
   requests.push(body);if(name==='end_assessment_provider'&&++endCalls<3)throw Error('lost acknowledgement');return true;
- },{fetcher:async(_input,init)=>{providerCalls++;assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('durable-lease-'),'Missing recoverable provider identity');return new Response('{"status":"completed"}');}});
+ },{wait:async()=>{},fetcher:async(_input,init)=>{providerCalls++;assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('durable-lease-'),'Missing recoverable provider identity');return new Response('{"status":"completed"}');}});
  try{const response=await lease.provider('https://provider.invalid');assert(response.ok&&providerCalls===1&&endCalls===3,'Provider replayed while acknowledging response');assert(JSON.stringify(requests[1])===JSON.stringify(requests[3]),'Acknowledgement identity changed');}finally{await lease.close();}
 });
 Deno.test('a lost completion response repeats the identical save and never changes success to an error',async()=>{
  let attempts=0;const bodies:unknown[]=[],result={p_result:{score:8},p_error:null};
- const lease=assessmentLease({lease_id:'lease'},async(_name,body)=>{bodies.push(body);if(++attempts<3)throw Error('lost save acknowledgement');return true;});
+ const lease=assessmentLease({lease_id:'lease'},async(_name,body)=>{bodies.push(body);if(++attempts<3)throw Error('lost save acknowledgement');return true;},{wait:async()=>{}});
  try{assert(await lease.finish('finish_resume_intake',result),'Save never recovered');assert(bodies.length===3&&bodies.every(x=>x===result),'Saved result changed during retry');}finally{await lease.close();}
- const down=assessmentLease({lease_id:'lease'},async()=>{throw Error('database down');});
+ const down=assessmentLease({lease_id:'lease'},async()=>{throw Error('database down');},{wait:async()=>{}});
  try{let error;try{await down.finish('finish_resume_intake',result);}catch(e){error=e;}assert(error instanceof PersistencePending,'Persistence failure not held for recovery');}finally{await down.close();}
 });
 Deno.test('lost heartbeat cancels the running call and prevents another call',async()=>{
@@ -37,4 +37,19 @@ Deno.test('lost heartbeat cancels the running call and prevents another call',as
   calls++;started();return await new Promise<Response>((_resolve,reject)=>{const stop=()=>reject(Error('aborted'));if(init?.signal?.aborted)stop();else init?.signal?.addEventListener('abort',stop,{once:true});});
  }});
  try{const call=lease.provider('https://provider.invalid');await running;await call.catch(()=>{});await lease.provider('https://provider.invalid').catch(()=>{});assert(calls===1,'Lease loss allowed a second provider call');}finally{await lease.close();}
+});
+
+Deno.test('a forty-second database outage recovers the identical result without replaying the provider',async()=>{
+ let clock=0,calls=0,saves=0;const delays:number[]=[],result={p_result:{score:8},p_error:null};
+ const lease=assessmentLease({lease_id:'lease'},async(name,body)=>{
+  if(name==='finish_resume_intake'){saves++;assert(body===result,'Result changed during outage');if(clock<40000)throw Error('database unavailable');}
+  return true;
+ },{now:()=>clock,wait:async ms=>{delays.push(ms);clock+=ms;},fetcher:async()=>{calls++;return new Response('{"status":"completed"}');}});
+ try{await lease.provider('https://provider.invalid');assert(await lease.finish('finish_resume_intake',result),'Save failed after recovery');assert(calls===1&&saves===9&&clock===47000,'Outage replayed paid work or did not back off');assert(delays.every(d=>d>0&&d<=8000),'Retry delay is unbounded');}finally{await lease.close();}
+});
+Deno.test('a sustained database outage respects the elapsed retry budget and leaves work held',async()=>{
+ let clock=0,saves=0;const lease=assessmentLease({lease_id:'lease'},async()=>{saves++;clock+=15000;throw Error('database unavailable');},{now:()=>clock,wait:async ms=>{clock+=ms;}});
+ try{let failure;try{await lease.finish('finish_resume_intake',{p_result:{score:8}});}catch(e){failure=e;}
+  assert(failure instanceof PersistencePending&&saves===4&&clock<=75000,'Outage was replayed or retries exceeded the time budget');
+ }finally{await lease.close();}
 });

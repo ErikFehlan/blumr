@@ -1,0 +1,11 @@
+name: Verify daily staging assessment readiness
+on:
+  schedule:
+    - cron: '37 9 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  staging:
+    uses: ./.github/workflows/staging-backend.yml
+    secrets: inherit
