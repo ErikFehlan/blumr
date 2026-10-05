@@ -8,13 +8,14 @@ Deno.test('reassessment worker resolves evidence selections and keeps unsupporte
  try{
   for(const [i,value] of ['worker','https://backend.invalid','service','ai'].entries())Deno.env.set(names[i],value);
   globalThis.setTimeout=((fn:()=>void,ms:number)=>timerBefore(fn,ms===3500?0:ms)) as typeof setTimeout;
-  globalThis.fetch=async(url,init)=>{
+  globalThis.fetch=async(url:RequestInfo|URL,init?:RequestInit)=>{
    const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}')),json=(x:unknown)=>new Response(JSON.stringify(x));
-   if(path.endsWith('/claim_account_deletions')||path.endsWith('/claim_resume_intakes'))return json([]);
-   if(path.endsWith('/claim_job_reassessments'))return json([task]);
+   if(path.endsWith('/claim_account_deletions')||(path.endsWith('/claim_assessment_work')&&body.p_kind==='intake'))return json([]);
+   if(path.endsWith('/claim_assessment_work')&&body.p_kind==='reassessment')return json([task]);
+   if(path.endsWith('/begin_assessment_provider')||path.endsWith('/end_assessment_provider')||path.endsWith('/heartbeat_assessment_work'))return json(true);
    if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
    if(path==='/v1/responses'){
-    assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('reassessment-run-reassess-')===true,'durable reassessment request identity missing');
+    assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('durable-lease-')===true,'durable reassessment request identity missing');
     const format=body.text.format.schema,support=format.properties.evidence_support.items.properties;
     assert(!support.quote&&!support.source_id&&support.passage_id.enum.length,'model can write quotations');
     const context=JSON.parse(body.input).evaluation_context,source=context.sources.find((s:any)=>s.id==='profile-strength-1');
@@ -63,19 +64,20 @@ Deno.test('saved resumes start while job edits are still coalescing and retain t
    if(ms===3500){releaseDelay=()=>callback();markDelayed();return 0;}
    return originalTimer(callback,ms);
   }) as typeof setTimeout;
-  globalThis.fetch=async(url,init)=>{
-   const path=new URL(String(url)).pathname;
+  globalThis.fetch=async(url:RequestInfo|URL,init?:RequestInit)=>{
+   const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
    const json=(data:unknown)=>new Response(JSON.stringify(data));
+   if(path.endsWith('/begin_assessment_provider')||path.endsWith('/end_assessment_provider')||path.endsWith('/heartbeat_assessment_work'))return json(true);
    if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
    if(path.endsWith('/claim_account_deletions'))return json([]);
-   if(path.endsWith('/claim_resume_intakes'))return json([task]);
+   if(path.endsWith('/claim_assessment_work')&&body.p_kind==='intake')return json([task]);
    if(path==='/v1/responses'){
-    assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('resume-run-resume-')===true,'durable resume request identity missing');
+    assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('durable-lease-1-')===true,'durable resume request identity missing');
     markStarted();
     return json({output_text:JSON.stringify({criteria_assessment:[],feedback_impact:{effect:'confirmation',summary:'No additional qualification evidence.',source_ids:[]},applied_lessons:[],name:'Synthetic QA Analyst',role:'QA Analyst',score:7,manager_score:7,primary_signal:'Testing ownership',jd_reason:'Testing evidence',manager_reason:'Ownership evidence',concerns:[],tags:['QA'],screening_questions:[],resume_evidence:[{claim:'Manual regression ownership',source_id:'resume-1'}]})});
    }
    if(path.endsWith('/finish_resume_intake')){const body=JSON.parse(String(init?.body));assert(body.p_lease==='lease-1'&&body.p_revision==='revision-1','Lease or revision changed');assert(body.p_error===null&&body.p_result.resume_evidence[0].quote===task.input.resume_text,'Grounded completion missing');finished=true;return json(true);}
-   if(path.endsWith('/claim_job_reassessments')){jobClaimed=true;return json([]);}
+   if(path.endsWith('/claim_assessment_work')&&body.p_kind==='reassessment'){jobClaimed=true;return json([]);}
    throw Error('Unexpected test request');
   };
   run=handleReassessment(new Request('https://worker.invalid',{method:'POST',headers:{'x-worker-secret':'test-worker'},body:'{}'}));

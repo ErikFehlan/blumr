@@ -18,7 +18,7 @@ Deno.test('project spending cap gives a durable, actionable intake error',async(
 });
 Deno.test('automatic intake validates quoted evidence, preserves approved context, and keeps legacy resume clients compatible',async()=>{
  const original=globalThis.fetch;Deno.env.set('OPENAI_API_KEY','test-only');let output:unknown=analysis,auto=true;
- globalThis.fetch=async(_url,init)=>{
+ globalThis.fetch=async(_url:RequestInfo|URL,init?:RequestInit)=>{
   const body=JSON.parse(String(init?.body));
   assert(body.store===false,'resume model storage must be disabled');
   assert(body.input.includes('preference-1'),'approved preference lost');
@@ -39,7 +39,7 @@ Deno.test('intake repairs one invalid response, rejects repeated failures, and r
  const wordResume='Alex Carter\nQA Analyst\nOwned risk •documentation and business\u2011aligned security controls.';
  const valid={...analysis,resume_evidence:[{claim:'Risk documentation',source_id:'resume-1'}]};
  let outputs:unknown[]=[],requests:Record<string,any>[]=[];
- globalThis.fetch=async(_url,init)=>{
+ globalThis.fetch=async(_url:RequestInfo|URL,init?:RequestInit)=>{
   requests.push(JSON.parse(String(init?.body)));const output=outputs.shift();
   return new Response(JSON.stringify(typeof output==='string'?{output_text:output}:output),{status:200});
  };

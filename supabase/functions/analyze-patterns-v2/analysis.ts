@@ -120,7 +120,7 @@ const screeningSchema = {
   },
 };
 
-export async function handleAnalysis(request: Request, options: {feedbackModel?:string,modelOverride?:string,providerRequestId?:string,retainAmbiguousFailures?:boolean,beforeModel?:(bytes:number,tokens:number)=>Promise<void>,onUsage?:(response:unknown)=>Promise<void>} = {}) {
+export async function handleAnalysis(request: Request, options: {feedbackModel?:string,modelOverride?:string,providerRequestId?:string,retainAmbiguousFailures?:boolean,providerFetch?:(input:RequestInfo|URL,init?:RequestInit)=>Promise<Response>,beforeModel?:(bytes:number,tokens:number)=>Promise<void>,onUsage?:(response:unknown)=>Promise<void>} = {}) {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -247,7 +247,7 @@ ANALYSIS RULES
           },
         },
       }),
-    },{timeoutMs:providerTimeout,maxRetries:2,retryTransport:!options.retainAmbiguousFailures,requestId:options.providerRequestId||crypto.randomUUID()});
+    },{timeoutMs:providerTimeout,maxRetries:options.providerFetch?0:2,fetcher:options.providerFetch,retryTransport:!options.retainAmbiguousFailures,requestId:options.providerRequestId||crypto.randomUUID()});
     }catch(error){
       if(options.retainAmbiguousFailures)return json({code:'provider_outcome_uncertain',error:'The provider connection was interrupted. The earlier request must be checked before retrying.'},503);
       throw error;

@@ -1,6 +1,6 @@
 // Compare deployment structure only. Never copy production account data into staging.
 import {readFile} from 'node:fs/promises';
-import {capacityExpectations,structuralDifferences} from './staging-structure.mjs';
+import {capacityExpectations,workerExpectations,structuralDifferences} from './staging-structure.mjs';
 const token=process.env.SUPABASE_ACCESS_TOKEN;
 if(process.env.SUPABASE_PROJECT_REF!=='momfzjmycveqginxmqib'||!token)throw Error('Staging parity requires the isolated staging project');
 async function api(ref,path,body){
@@ -17,14 +17,19 @@ const query=`select 'column' as kind, table_name||'.'||column_name as name,
   'setof',p.proretset,'args',pg_get_function_identity_arguments(p.oid),'defaults',pg_get_expr(p.proargdefaults,0),
   'security_definer',p.prosecdef,'volatility',p.provolatile,'config',p.proconfig,
   'worker_allowed',has_function_privilege('service_role',p.oid,'execute'),
+  'anon_denied',not has_function_privilege('anon',p.oid,'execute'),
+  'authenticated_allowed',has_function_privilege('authenticated',p.oid,'execute'),
   'clients_denied',not has_function_privilege('authenticated',p.oid,'execute') and not has_function_privilege('anon',p.oid,'execute'))
  from pg_proc p join pg_namespace n on n.oid=p.pronamespace
  where n.nspname='public' and p.prokind='f' and p.proname<>'rls_auto_enable'
  order by kind,name`;
 const [production,stage]=await Promise.all(['zqiqjzxcpznhzjengfff','momfzjmycveqginxmqib'].map(ref=>api(ref,'/database/query',{query})));
 const expected=capacityExpectations(await readFile('supabase/migrations/20261005121611_assessment_capacity.sql','utf8'));
+for(const [key,value] of workerExpectations(await readFile('supabase/migrations/20261005133313_durable_worker_recovery.sql','utf8')))expected.set(key,value);
 const differences=structuralDifferences(production,stage,expected);
 if(differences.length)throw Error('Staging structural differences: '+differences.join(', '));
+const [ledger]=await api('momfzjmycveqginxmqib','/database/query',{query:"select relrowsecurity and not has_table_privilege('anon',oid,'select,insert,update,delete') and not has_table_privilege('authenticated',oid,'select,insert,update,delete') and has_table_privilege('service_role',oid,'select,insert,update,delete') as private from pg_class where oid='public.assessment_worker_attempts'::regclass"});
+if(ledger?.private!==true)throw Error('Worker attempt ledger is not service-only');
 const functions=await api('momfzjmycveqginxmqib','/functions');
 for(const name of ['analyze-patterns-v2','analyze-patterns-beta','reassess-job','refine-job-criteria','account-controls','onboarding-reminders'])if(!functions.some(f=>f.slug===name&&f.status==='ACTIVE'))throw Error('Staging handler unavailable: '+name);
 console.log('PASS: unchanged production structure matches staging; capacity routines match the current migration and private permissions; all required handlers are active.');

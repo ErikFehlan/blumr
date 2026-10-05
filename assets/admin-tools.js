@@ -88,18 +88,19 @@
    try{
     const rows=await recoveryLoad();if(!allowed||request!==version||!panel.isConnected)return;panel.replaceChildren();
     const heading=document.createElement('h4');heading.textContent='Interrupted analyses';panel.append(heading);
-    if(!rows?.length){const empty=document.createElement('p');empty.className='rf-sub';empty.textContent='No stalled direct analyses need recovery.';panel.append(empty);return;}
-    const note=document.createElement('p');note.className='rf-sub';note.textContent='Verify the request in provider logs before allowing another run. A retry can incur another AI charge. Saved candidate data is retained.';panel.append(note);
+    if(!rows?.length){const empty=document.createElement('p');empty.className='rf-sub';empty.textContent='No interrupted assessments need recovery.';panel.append(empty);return;}
+    const note=document.createElement('p');note.className='rf-sub';note.textContent='Verify the request in provider logs before allowing another run. Background assessment recovery also waits at least seven minutes for the earlier worker to stop. A retry can incur another AI charge. Saved candidate data is retained.';panel.append(note);
     for(const row of rows){
      const form=document.createElement('form');form.className='rf-card';form.dataset.recoveryClaim=row.claim_id;
-     const title=document.createElement('p');title.textContent='Request '+row.claim_id+' · '+healthTime(row.created_at);form.append(title);
+     const title=document.createElement('p');title.textContent=(row.kind==='intake'?'Resume intake':row.kind==='reassessment'?'Reassessment':'Direct analysis')+' · Request '+row.claim_id+' · '+healthTime(row.created_at);form.append(title);
      const state=document.createElement('p');state.className='rf-sub';state.textContent=row.provider_started_at?'Provider work may have started. Verify it is no longer running.':'Provider work was not started.';form.append(state);
+     if(row.provider_call){const ref=document.createElement('p');ref.className='rf-sub';ref.textContent='Provider request: durable-'+row.claim_id+'-'+row.provider_call;form.append(ref);}
      const label=document.createElement('label'),input=document.createElement('textarea');input.required=true;input.minLength=20;input.maxLength=500;input.rows=2;input.setAttribute('aria-label','Recovery verification note');label.textContent='Verification note (20–500 characters)';label.append(input);form.append(label);
      const checkLabel=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.required=!!row.provider_started_at;check.setAttribute('aria-label','Provider request is no longer running');checkLabel.append(check,document.createTextNode(' I verified that the provider request is no longer running.'));checkLabel.hidden=!row.provider_started_at;form.append(checkLabel);
      const button=document.createElement('button');button.type='submit';button.className='rf-btn';button.textContent='Allow retry';button.disabled=true;
      const sync=()=>{button.disabled=input.value.trim().length<20||(!!row.provider_started_at&&!check.checked);};input.addEventListener('input',sync);check.addEventListener('change',sync);
      const status=document.createElement('p');status.setAttribute('role','status');form.append(button,status);
-     form.addEventListener('submit',async event=>{event.preventDefault();if(!allowed||request!==version)return;button.disabled=true;try{await recoveryRetry(row.claim_id,input.value.trim(),check.checked);if(allowed&&request===version){toast('Retry is available. The recruiter can run the analysis again.');await loadRecovery(panel,request);}}catch(error){if(error.code==='42501')deny();else{status.textContent=error.message||'Recovery could not be saved. Refresh health and try again.';sync();}}});panel.append(form);
+     form.addEventListener('submit',async event=>{event.preventDefault();if(!allowed||request!==version)return;button.disabled=true;try{await recoveryRetry(row.claim_id,input.value.trim(),check.checked);if(allowed&&request===version){toast(row.kind==='intake'||row.kind==='reassessment'?'Recovery verified. Saved work is queued for processing.':'Retry is available. The recruiter can run the analysis again.');await loadRecovery(panel,request);}}catch(error){if(error.code==='42501')deny();else{status.textContent=error.message||'Recovery could not be saved. Refresh health and try again.';sync();}}});panel.append(form);
     }
    }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='Interrupted analyses could not be checked. Refresh health to retry.';}
   }

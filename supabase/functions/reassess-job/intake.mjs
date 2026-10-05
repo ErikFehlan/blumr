@@ -1,4 +1,5 @@
 import '../../../assets/context.js';
+import {assessmentLease,PersistencePending} from './lease.ts';
 export function prepareIntake(input){
   if(!input?.job?.id||!input?.candidate?.id||input.candidate.jobId!==input.job.id)throw Error('invalid_scope');
   if(typeof input.resume_text!=='string'||input.resume_text.trim().length<40||input.resume_text.length>120000)throw Error('invalid_resume');
@@ -12,23 +13,25 @@ export function prepareIntake(input){
 
 export async function processIntakes(tasks,{rpc,analyze}){
   return Promise.all(tasks.map(async task=>{
+    const lease=assessmentLease(task,rpc);
     try{
       const prepared=prepareIntake(task.input);
-      const response=await analyze(new Request('https://internal.invalid/resume-intake',{method:'POST',body:JSON.stringify(prepared.payload)}),task.workspace_id,task.usage_actor_id||null,task.usage_run_id||null);
+      const response=await analyze(new Request('https://internal.invalid/resume-intake',{method:'POST',body:JSON.stringify(prepared.payload)}),task.workspace_id,task.usage_actor_id||null,task.usage_run_id||null,lease.provider);
       if(!response.ok){
         const failure=await response.json().catch(()=>({}));
         const issue=['invalid_score','invalid_profile','invalid_concerns','invalid_questions','invalid_tags','invalid_evidence','unmatched_quote','unsupported_score','incomplete_output','invalid_json','invalid_assessment_details'].includes(failure?.validation_issue)?failure.validation_issue:null;
-        throw Error(failure?.code==='ai_budget_exhausted'?'ai_budget_exhausted':['usage_limit','ai_paused','beta_access_required','usage_check_unavailable'].includes(failure?.code)?'usage_limit':response.status===429?'ai_rate_limit':response.status===502?(issue?'verification_'+issue:'verification_failed'):'ai_unavailable');
+        throw Error(failure?.code==='provider_outcome_uncertain'?'provider_outcome_uncertain':failure?.code==='ai_budget_exhausted'?'ai_budget_exhausted':['usage_limit','ai_paused','beta_access_required','usage_check_unavailable'].includes(failure?.code)?'usage_limit':response.status===429?'ai_rate_limit':response.status===502?(issue?'verification_'+issue:'verification_failed'):'ai_unavailable');
       }
       const result=await response.json();
-      const accepted=await rpc('finish_resume_intake',{p_candidate:task.candidate_id,p_revision:task.revision,p_lease:task.lease_id,
+      const accepted=await lease.finish('finish_resume_intake',{p_candidate:task.candidate_id,p_revision:task.revision,p_lease:task.lease_id,
         p_result:{...result,context_signature:prepared.signature},p_error:null});
       return accepted?'ready':'superseded';
     }catch(error){
+      if(error instanceof PersistencePending)return 'recovery_required';
       const message=error instanceof Error?error.message:'';
-      const code=['invalid_scope','invalid_resume','input_too_large','ai_rate_limit','ai_budget_exhausted','usage_limit','verification_failed','ai_unavailable'].includes(message)||/^verification_(invalid_score|invalid_profile|invalid_concerns|invalid_questions|invalid_tags|invalid_evidence|unmatched_quote|unsupported_score|incomplete_output|invalid_json|invalid_assessment_details)$/.test(message)?message:'processing_failed';
-      try{await rpc('finish_resume_intake',{p_candidate:task.candidate_id,p_revision:task.revision,p_lease:task.lease_id,p_result:null,p_error:code});}catch{/* The lease expires and the scheduler retries. */}
+      const code=['provider_outcome_uncertain','invalid_scope','invalid_resume','input_too_large','ai_rate_limit','ai_budget_exhausted','usage_limit','verification_failed','ai_unavailable'].includes(message)||/^verification_(invalid_score|invalid_profile|invalid_concerns|invalid_questions|invalid_tags|invalid_evidence|unmatched_quote|unsupported_score|incomplete_output|invalid_json|invalid_assessment_details)$/.test(message)?message:'processing_failed';
+      try{await lease.finish('finish_resume_intake',{p_candidate:task.candidate_id,p_revision:task.revision,p_lease:task.lease_id,p_result:null,p_error:code});}catch{/* Started provider work stays reserved for verified recovery. */}
       return 'retry_or_attention';
-    }
+    }finally{await lease.close();}
   }));
 }
