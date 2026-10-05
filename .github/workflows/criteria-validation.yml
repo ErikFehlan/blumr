@@ -102,3 +102,11 @@ jobs:
         run: |
           createdb -h localhost -U postgres direct_idempotency
           psql -h localhost -U postgres -d direct_idempotency -f tests/direct-idempotency.sql
+
+      - name: Test shared assessment capacity across concurrent routes
+        env:
+          PGPASSWORD: postgres
+        run: |
+          createdb -h localhost -U postgres assessment_capacity
+          psql -h localhost -U postgres -d assessment_capacity -f tests/assessment-capacity.sql
+          node tests/assessment-capacity-concurrency.mjs

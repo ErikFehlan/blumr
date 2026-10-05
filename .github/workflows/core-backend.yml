@@ -54,6 +54,9 @@ jobs:
           node tests/security-concurrency.mjs
           createdb -h localhost -U postgres direct_idempotency
           psql -h localhost -U postgres -d direct_idempotency -f tests/direct-idempotency.sql
+          createdb -h localhost -U postgres assessment_capacity
+          psql -h localhost -U postgres -d assessment_capacity -f tests/assessment-capacity.sql
+          node tests/assessment-capacity-concurrency.mjs
           createdb -h localhost -U postgres reliability_health
           psql -h localhost -U postgres -d reliability_health -f tests/reliability-health.sql
   staging:

@@ -9,8 +9,8 @@ Deno.test('semantic keys preserve changed evidence and ignore object key order',
 Deno.test('two devices share one durable claim, provider call and result; actors stay isolated',async()=>{
  const original=globalThis.fetch,rows=new Map<string,{claim:string,body?:unknown}>();let calls=0;
  globalThis.fetch=async(url,init)=>{
-  const body=JSON.parse(String(init?.body)),key=body.p_workspace+':'+body.p_actor+':'+body.p_fingerprint;
-  assert(new Headers(init?.headers).get('Authorization')==='Bearer private','ledger used client credentials');
+  const body=JSON.parse(String((init as RequestInit)?.body)),key=body.p_workspace+':'+body.p_actor+':'+body.p_fingerprint;
+  assert(new Headers((init as RequestInit)?.headers).get('Authorization')==='Bearer private','ledger used client credentials');
   if(String(url).includes('claim_direct')){
    let row=rows.get(key);if(!row){row={claim:body.p_claim};rows.set(key,row);}
    return json(row.body?{state:'complete',body:row.body}:{state:row.claim===body.p_claim?'owner':'processing'});
@@ -63,9 +63,25 @@ Deno.test('an expired or cleaned claim stops a late worker before provider work'
  try{const response=await withDirectIdempotency({workspace:'w',actor:'a',payload:{},base:'https://db.invalid',serviceKey:'private',execute:async(_id,mark)=>{await mark();calls++;return json({});}});assert(response.status===503&&calls===0,'late worker reached provider');}finally{globalThis.fetch=original;}
 });
 
+Deno.test('capacity rejection does not execute or finish work and permits an explicit retry',async()=>{
+ const original=globalThis.fetch;let available=false,calls=0,finishes=0;
+ globalThis.fetch=async(url)=>{
+  if(String(url).includes('claim_direct'))return json({state:available?'owner':'capacity'});
+  finishes++;return json(true);
+ };
+ const options={workspace:'w',actor:'a',payload:{text:'new evidence'},base:'https://db.invalid',serviceKey:'private',execute:async()=>{calls++;return json({result:42});}};
+ try{
+  const busy=await withDirectIdempotency(options);
+  assert(busy.status===429&&busy.headers.get('Retry-After')==='10'&&(await busy.json()).code==='assessment_capacity','capacity response is not actionable');
+  assert(calls===0&&finishes===0,'capacity rejection executed or released another request');
+  available=true;const retried=await withDirectIdempotency(options);
+  assert(retried.ok&&Number(calls)===1&&Number(finishes)===1,'retry did not complete when capacity returned');
+ }finally{globalThis.fetch=original;}
+});
+
 Deno.test('concurrent known failures replay one error without extra provider or budget calls',async()=>{
  const original=globalThis.fetch;let owner='',saved:any=null,calls=0;
- globalThis.fetch=async(url,init)=>{const p=JSON.parse(String(init?.body));if(String(url).includes('claim_direct')){if(saved)return json({state:'failed',status:saved.status,body:saved.body});if(!owner)owner=p.p_claim;return json({state:p.p_claim===owner?'owner':'processing'});}saved=p.p_body;return json(true);};
+ globalThis.fetch=async(url,init)=>{const p=JSON.parse(String((init as RequestInit)?.body));if(String(url).includes('claim_direct')){if(saved)return json({state:'failed',status:saved.status,body:saved.body});if(!owner)owner=p.p_claim;return json({state:p.p_claim===owner?'owner':'processing'});}saved=p.p_body;return json(true);};
  const options={workspace:'w',actor:'a',payload:{},base:'https://db.invalid',serviceKey:'private',wait:()=>new Promise<void>(r=>setTimeout(r,1)),execute:async()=>{calls++;await new Promise(r=>setTimeout(r,5));return json({error:'Temporary provider failure'},502);}};
  try{const responses=await Promise.all([withDirectIdempotency(options),withDirectIdempotency(options)]);assert(calls===1,'Waiting duplicate restarted failed provider work');for(const r of responses)assert(r.status===502&&(await r.json()).error==='Temporary provider failure','Failure status/body changed on replay');}finally{globalThis.fetch=original;}
 });

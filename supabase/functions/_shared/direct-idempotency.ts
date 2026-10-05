@@ -8,7 +8,7 @@ export async function fingerprint(value: unknown): Promise<string> {
   const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(canonical(value)));
   return Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
 }
-type Claim = {state:'owner'|'processing'|'uncertain'|'complete'|'failed',body?:unknown,status?:number,claim_id?:string};
+type Claim = {state:'owner'|'processing'|'capacity'|'uncertain'|'complete'|'failed',body?:unknown,status?:number,claim_id?:string};
 type Options = {
   workspace:string; actor:string; payload:unknown; base:string; serviceKey:string;
   execute:(requestId:string,markStarted:()=>Promise<void>)=>Promise<Response>;
@@ -33,6 +33,7 @@ export async function withDirectIdempotency(options:Options):Promise<Response> {
       const result=await rpc('claim_direct_ai_request',scope) as Claim;
       if(result.state==='failed'&&Number.isInteger(result.status)&&result.status!>=400&&result.status!<=599)return new Response(JSON.stringify(result.body),{status:result.status,headers});
       if(result.state==='complete')return new Response(JSON.stringify(result.body),{status:200,headers});
+      if(result.state==='capacity')return new Response(JSON.stringify({code:'assessment_capacity',error:'Assessments are already running. Wait briefly, then try again. Your saved work is unchanged.',retry_after:10}),{status:429,headers:{...headers,'Retry-After':'10','Access-Control-Expose-Headers':'Retry-After'}});
       if(result.state==='uncertain')return failure('analysis_outcome_uncertain','The earlier analysis was interrupted. Ask your administrator to check System health before retrying.',503,result.claim_id);
       if(result.state==='owner'){
         // Ownership is durable before any admission, telemetry or provider work.
