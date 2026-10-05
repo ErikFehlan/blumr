@@ -54,6 +54,8 @@ jobs:
           node tests/security-concurrency.mjs
           createdb -h localhost -U postgres readiness_security
           psql -h localhost -U postgres -d readiness_security -f tests/readiness-security.sql
+          createdb -h localhost -U postgres backup_privileges
+          psql -h localhost -U postgres -d backup_privileges -f tests/backup-privileges.sql
           createdb -h localhost -U postgres direct_idempotency
           psql -h localhost -U postgres -d direct_idempotency -f tests/direct-idempotency.sql
           createdb -h localhost -U postgres assessment_capacity

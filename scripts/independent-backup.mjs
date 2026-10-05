@@ -4,6 +4,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
+import {isDeepStrictEqual} from 'node:util';
 import {seal,unseal,digest} from './backup-crypto.mjs';
 import {inventorySQL} from './backup-inventory.mjs';
 import {backupSecuritySQL} from './backup-security.mjs';
@@ -58,8 +59,9 @@ try{
  try{assert.deepEqual(await inventory(),before);assert.deepEqual((await api('/database/query',{query:backupSecuritySQL}))[0].security,securityBefore);}
  catch{throw Object.assign(Error('Source changed during backup; no archive accepted'),{backupRetryable:true});}
  await writeFile(join(source,'manifest.json'),JSON.stringify({version:1,project:ref,created_at:new Date(capturedAt).toISOString(),inventory:before,security:securityBefore,files}),{mode:0o600});
+ await writeFile(join(source,'restore-prelude.sql'),await readFile('scripts/backup-restore-prelude.sql','utf8'),{mode:0o600});
  // Exclude CLI credentials and local config from the archive.
- const archive=join(work,'backup.tar');await command('tar',['-cf',archive,'roles.sql','schema.sql','data.sql','manifest.json','objects'],{cwd:source});
+ const archive=join(work,'backup.tar');await command('tar',['-cf',archive,'roles.sql','restore-prelude.sql','schema.sql','data.sql','manifest.json','objects'],{cwd:source});
  const encrypted=join(output,'backup.tar.enc');const publicKey=await readFile(join(process.cwd(),'scripts/backup-public-key.pem'),'utf8');
  const sealed=await seal(archive,encrypted,publicKey);recoveryStarted=Date.now();const decoded=join(work,'decoded.tar');await unseal(encrypted,decoded,sealed);sealed.key.fill(0);
  assert.equal(await digest(archive),await digest(decoded),'Encrypted archive failed recovery');
@@ -81,11 +83,17 @@ try{
  // grants. Use its local administrative role; this never connects remotely.
  const psql=input=>command('docker',['exec','-e','PGPASSWORD=postgres','-i',database,'psql','-h','127.0.0.1','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1','-At'],{input,databaseDiagnostics:true});
  const roles=await readFile(join(restore,'roles.sql'),'utf8'),schema=await readFile(join(restore,'schema.sql'),'utf8'),data=await readFile(join(restore,'data.sql'),'utf8');
- await psql('begin;\n'+roles+'\n'+schema+'\nSET session_replication_role=replica;\n'+data+'\ncommit;\n');
+ const prelude=await readFile(join(restore,'restore-prelude.sql'),'utf8');
+ await psql('begin;\n'+roles+'\n'+prelude+'\n'+schema+'\nSET session_replication_role=replica;\n'+data+'\ncommit;\n');
  const actual=JSON.parse((await psql(inventorySQL)).trim().split('\n').at(-1));
  assert.deepEqual(actual,before,'Restored database row counts or contents differ from the source snapshot');
  const securityAfter=JSON.parse((await psql(backupSecuritySQL)).trim().split('\n').at(-1));
- assert.deepEqual(securityAfter,securityBefore,'Restored permissions, RLS policies or function bodies differ from the source');
+ if(!isDeepStrictEqual(securityAfter,securityBefore)){
+  const original=new Map(securityBefore.map(x=>[x.kind+':'+(x.schema||'')+':'+(x.table||'')+':'+x.name,x]));
+  const changed=securityAfter.filter(x=>!isDeepStrictEqual(x,original.get(x.kind+':'+(x.schema||'')+':'+(x.table||'')+':'+x.name))).map(x=>x.kind+':'+x.name);
+  console.error('Restored access-control differences: '+JSON.stringify({source_count:securityBefore.length,restored_count:securityAfter.length,changed}));
+  throw Error('Restored permissions, RLS policies or function bodies differ from source; archive rejected');
+ }
  console.log('PASS: restored RLS, grants, policies and privileged function fingerprints match the source.');
  const evidence={recovery_elapsed_seconds:Math.round((Date.now()-recoveryStarted)/1000),snapshot_age_at_verification_seconds:Math.round((Date.now()-capturedAt)/1000),total_elapsed_seconds:Math.round((Date.now()-runStarted)/1000),restored_access_controls:'passed',completed_at:new Date().toISOString(),project:ref,database_tables:before.length,database_rows:before.reduce((n,t)=>n+Number(t.rows),0),storage_objects:files.length,storage_bytes:files.reduce((n,f)=>n+f.bytes,0),archive_sha256:await digest(encrypted),database_restore:'passed',encrypted_archive_recovery:'passed',storage_byte_recovery:'passed',isolation:'local database with Docker networks disconnected'};
  await writeFile(join(output,'verification.json'),JSON.stringify(evidence,null,2));console.log('PASS: full application database restored into an isolated local database with exact row checksums.');
