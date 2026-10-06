@@ -1,15 +1,18 @@
-// Real paid assessments, bounded to twelve intakes and three reassessments.
+// Real paid assessments, bounded before each provider call by a staging-only ledger.
 // Runs only in staging. The provider's existing per-attempt repair limit applies.
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {createRequire} from 'node:module';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
+import {readinessProfile} from './readiness-profile.mjs';
 import {fixtures} from './readiness-fixtures.mjs';
 const pdf=createRequire(import.meta.url)('../tests/fixtures/pdf-resume.cjs');
 const f=await fixtures(),operation=process.argv[2];
 if(operation==='cleanup'){await f.cleanup();process.exit(0);}
 assert.equal(operation,'run');
-const report={started_at:new Date().toISOString(),scope:'staging synthetic uploads, real AI bursts, source-instruction attacks and access checks',waves:[],checks:[],passed:false};
+const profile=readinessProfile(process.env.READINESS_PROFILE);
+const expectedAttempts=profile.waves.reduce((a,b)=>a+b,0)+3;
+const report={started_at:new Date().toISOString(),scope:'staging synthetic uploads, real AI bursts, source-instruction attacks and access checks',profile:profile.name,waves:[],checks:[],passed:false};
 const check=name=>{report.checks.push(name);console.log('PASS: '+name);};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 async function settleWrites(pending){
@@ -41,7 +44,10 @@ async function waitForTasks(candidates,kind,maximum=600000){
  throw Error('Assessment queue did not drain within ten minutes');
 }
 try{
+ await f.sql(await readFile(new URL('./readiness-budget.sql',import.meta.url),'utf8'));
  state=await f.create();
+ await f.sql(`insert into readiness_private.budgets(run,expires_at,ceiling_micro_usd,max_calls) values($1,now()+interval '6 hours',10000000,40);`,[state.run]);
+ for(const user of state.users)await f.sql('insert into readiness_private.workspaces(workspace,run) values($1,$2)',[user.workspace,state.run]);
  const [baseline]=await f.sql("select count(*) filter(where state<>'closed') as held_attempts,count(*) filter(where state='uncertain') as uncertain_attempts from public.assessment_worker_attempts");report.baseline=baseline;
  for(const user of state.users){
   user.job=randomUUID();
@@ -55,8 +61,12 @@ try{
   assert.ok(!/HACKED_ASSESSMENT_7391|SYSTEM OVERRIDE|Kubernetes|perfect scores/i.test(JSON.stringify(task.priority_suggestions.items)),'Job-description instructions became hiring priorities');
   await f.request('/rest/v1/rpc/review_job_hiring_priorities',user.access,'POST',{p_job:user.job,p_version:task.priority_version,p_decision:'accept'});
  }
- for(const count of [3,9]){
-  const candidates=Array.from({length:count},(_,i)=>({id:randomUUID(),user:state.users[i%3],injected:count===9&&i%2===0}));
+ const workloadStarted=Date.now();
+ for(const [waveIndex,count] of profile.waves.entries()){
+  const target=workloadStarted+waveIndex*profile.spacingMs;
+  while(Date.now()<target){console.log('SOAK_HEARTBEAT '+JSON.stringify({wave:waveIndex+1,elapsed_ms:Date.now()-workloadStarted}));await wait(Math.min(30000,target-Date.now()));}
+
+  const candidates=Array.from({length:count},(_,i)=>({id:randomUUID(),user:state.users[i%3],injected:(count===9||profile.name!=='burst')&&i%2===0}));
   for(const c of candidates){
    const lines=['Alex Example','QA Analyst','Owned manual regression testing for billing systems.','Created test plans, documented defects and verified fixes.','No experience writing automated tests or working with Kubernetes is claimed.',...(c.injected?[attack]:[])];
    c.text=lines.join('\n');c.bytes=pdf(lines);c.path=`${c.user.workspace}/${c.user.job}/${c.id}/${randomUUID()}.pdf`;candidateById.set(c.id,c);
@@ -84,12 +94,14 @@ try{
    const approved=(await f.request('/rest/v1/rpc/review_resume_intake',c.user.access,'POST',{p_candidate:c.id,p_revision:task.revision,p_decision:'approve'})).data;assert.equal(approved.status,'approved');
    outcomes.push(elapsed_ms);
   }
-  const metric={uploads:count,upload_p95_ms:percentile(uploadTimes,.95),completion_p50_ms:percentile(outcomes,.5),completion_p95_ms:percentile(outcomes,.95),max_observed_global:Number(Math.max(...samples.map(s=>s.global_active))),max_observed_intakes:Number(Math.max(...samples.map(s=>s.intakes))),injection_cases:candidates.filter(c=>c.injected).length};
+  const metric={wave:waveIndex+1,elapsed_ms:Date.now()-workloadStarted,uploads:count,upload_p95_ms:percentile(uploadTimes,.95),completion_p50_ms:percentile(outcomes,.5),completion_p95_ms:percentile(outcomes,.95),max_observed_global:Number(Math.max(...samples.map(s=>s.global_active))),max_observed_intakes:Number(Math.max(...samples.map(s=>s.intakes))),injection_cases:candidates.filter(c=>c.injected).length};
   report.waves.push(metric);console.log('READINESS_WAVE '+JSON.stringify(metric));
   assert.ok(metric.upload_p95_ms<=10000,'Upload p95 exceeded ten seconds');assert.ok(metric.completion_p95_ms<=600000,'Completion p95 exceeded ten minutes');
  }
- check('3- and 9-resume bursts completed with shared limits, exact evidence, approval and duplicate protection');
- check('Five resume attacks and an injected job description did not control assessments or priorities');
+ report.workload_elapsed_ms=Date.now()-workloadStarted;
+ assert.ok(report.workload_elapsed_ms>=profile.durationMs,'Workload observation ended early');
+ check('Configured resume waves completed with shared limits, exact evidence, approval and duplicate protection');
+ check('Resume attacks and an injected job description did not control assessments or priorities');
  // Mix three independently owned reassessments after the upload waves.
  const reassessments=state.users.map(user=>[...candidateById.values()].find(c=>c.user===user));
  for(const c of reassessments){c.started=Date.now();await f.request('/rest/v1/manager_feedback',c.user.access,'POST',{workspace_id:c.user.workspace,job_id:c.user.job,candidate_id:c.id,feedback_type:'General note',feedback_text:'The candidate confirmed personal ownership of manual testing and explicitly did not author automated tests.',created_by:c.user.id});}
@@ -108,7 +120,7 @@ try{
  for(const fn of adminFunctions){const args=Object.fromEntries(fn.args?fn.args.split(', ').map(a=>[a.split(' ')[0],null]):[]);assert.equal((await f.request('/rest/v1/rpc/'+fn.proname,foreign.access,'POST',args,false)).status,403,'Admin RPC did not deny non-admin: '+fn.proname);}
  report.admin_rpcs_checked=adminFunctions.length;check('Populated cross-tenant reads/writes and all discovered admin RPCs deny unauthorized access');
  const [ledger]=await f.sql("select count(*) as attempts,count(*) filter(where state<>'closed' or provider_pending) as unresolved,count(*) filter(where accepted) as accepted,sum(calls) as provider_starts from public.assessment_worker_attempts where workspace_id=any($1::uuid[])",[state.users.map(u=>u.workspace)]);
- report.worker_ledger=ledger;assert.equal(Number(ledger.unresolved),0,'New unresolved worker reservation');assert.equal(Number(ledger.attempts),15,'Duplicate or missing attempts');assert.equal(Number(ledger.accepted),15);
+ report.worker_ledger=ledger;assert.equal(Number(ledger.unresolved),0,'New unresolved worker reservation');assert.equal(Number(ledger.attempts),expectedAttempts,'Duplicate or missing attempts');assert.equal(Number(ledger.accepted),expectedAttempts);
  const [usage]=await f.sql(`select count(*) as calls,coalesce(sum(a.input_tokens),0) input_tokens,coalesce(sum(a.output_tokens),0) output_tokens,count(*) filter(where r.model is null) unpriced_calls,
   round(sum(((a.input_tokens-a.cached_input_tokens)*r.input_usd_per_million+a.cached_input_tokens*r.cached_input_usd_per_million+a.output_tokens*r.output_usd_per_million)/1000000),6) as estimated_usd
   from public.ai_provider_usage a left join public.ai_model_rates r on r.model=a.model where a.workspace_id=any($1::uuid[])`,[state.users.map(u=>u.workspace)]);report.usage=usage;
@@ -117,6 +129,8 @@ try{
  report.token_cost={conservative_estimate_usd:Number(((Number(usage.input_tokens)*5+Number(usage.output_tokens)*20)/1e6).toFixed(6)),input_rate:5,output_rate:20,per_tokens:1000000,pricing_checked:'2026-10-05',source:'https://developers.openai.com/api/docs/models/gpt-5.6-sol',scope:'Standard short-context Sol; all input priced at cache-write rate; excludes unobserved provider usage and is not an invoice'};
  assert.ok(report.token_cost.conservative_estimate_usd<=10,'Synthetic token-cost ceiling exceeded');
  assert.ok(Number(usage.calls)<=40,'Bounded provider-call budget exceeded');check('All new worker attempts settled; provider usage captured');
+ [report.pre_call_budget]=await f.sql('select ceiling_micro_usd,reserved_micro_usd,calls,max_calls from readiness_private.budgets where run=$1',[state.run]);
+ assert.ok(Number(report.pre_call_budget.reserved_micro_usd)<=10000000);
  report.passed=true;
 }finally{
  try{await f.cleanup();cleanupPassed=true;}finally{
