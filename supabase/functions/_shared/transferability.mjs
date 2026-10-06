@@ -1,6 +1,7 @@
 // Deterministic transferability hints for resume assessment.
 // These hints are context for the model, never proof of direct experience.
-const normalize = value => String(value || '').toLowerCase();
+import {evidenceTextRanges} from './source-instructions.mjs';
+const normalize = value => String(value || '').toLowerCase().replace(/[‐‑–—]/g,'-');
 
 const relationships = [
   { target:'playwright', related:['cypress','selenium','webdriver','test automation','typescript'], concept:'browser test automation' },
@@ -59,29 +60,61 @@ const workflowRelationships = [
   }
 ];
 
-function hintsFor(group, resume, job) {
-  const hints=[];
-  for (const relation of group) {
-    if (!job.includes(relation.target) || resume.includes(relation.target)) continue;
-    const found=relation.related.filter(term=>resume.includes(term)).slice(0,6);
-    if (!found.length) continue;
-    hints.push({
-      target: relation.target,
-      concept: relation.concept,
-      adjacent_evidence: found,
-      instruction: 'Treat as transferable/adjacent evidence only. Do not claim direct '+relation.target+' experience without explicit resume evidence.'
-    });
-  }
-  return hints;
+// Boundaries avoid React/reactive, SPA/Spanish and AWS/draws matches.
+const escapeRE = value => value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function has(text,term){return new RegExp('(^|[^a-z0-9])'+escapeRE(normalize(term))+'(?=$|[^a-z0-9])','i').test(normalize(text));}
+const aliases={'secure sdlc':['ssdlc','secure software development lifecycle'],'site reliability':['sre','site reliability engineering'],'application security':['appsec'],'palo alto':['pan-os','panorama'],'gcp':['google cloud']};
+function negative(text,term){
+ const t=normalize(text),at=t.indexOf(normalize(term));
+ if(at<0)return false;
+ const before=t.slice(Math.max(0,at-100),at),after=t.slice(at+term.length,at+term.length+70);
+ return /\b(no|not|never|without|lack(?:s|ing)?|unfamiliar|learning|studying|interested in|plan to)\b[^.;:]*$/.test(before)
+   || /^\s*(?:experience\s*)?(?:is |was )?(?:not |none|only theoretical|not hands-on)/.test(after);
 }
-
-export function transferabilityHints(resumeText, jobContext) {
-  const resume=normalize(resumeText), job=normalize(jobContext);
-  return [...hintsFor(relationships,resume,job),...hintsFor(workflowRelationships,resume,job)].slice(0,12);
+function fragments(source){
+ return evidenceTextRanges(source.text||'').flatMap(text=>text.split(/\n+|(?<=[.!?;])\s+/)).map(text=>text.trim()).filter(text=>text.length>=12&&text.length<=1000);
+}
+export function candidateEvidence(source){
+ return /^(resume quotation|candidate feedback|recruiter screening|recruiter correction|recruiter clarification|interview outcome)/.test(source.kind||'');
+}
+function hintsFor(group, sources, job, kind) {
+ const hints=[];
+ for(const relation of group){
+  const names=[relation.target,...(aliases[relation.target]||[])];
+  if(!names.some(term=>has(job,term)))continue;
+  const excerpts=sources.flatMap(source=>fragments(source).map(quote=>({source_id:source.id,quote})));
+  // A target mention is not automatically direct positive experience, including negation.
+  const targetExcerpts=excerpts.filter(e=>names.some(term=>has(e.quote,term)));
+  if(targetExcerpts.some(e=>names.some(term=>has(e.quote,term)&&!negative(e.quote,term))))continue;
+  if(targetExcerpts.some(e=>names.some(term=>has(e.quote,term)&&negative(e.quote,term))))continue;
+  const signals=new Map();
+  for(const term of relation.related){
+   const e=excerpts.find(e=>has(e.quote,term)&&!negative(e.quote,term));
+   if(!e)continue;
+   // Collapse overlapping aliases and repeated mentions; repetition is not corroboration.
+   const canonical=term.replace('event driven','event-driven').replace('azure service bus','service bus');
+   if(!signals.has(canonical))signals.set(canonical,{term,...e});
+  }
+  if(!signals.size)continue;
+  const evidence=[...signals.values()].slice(0,6);
+  const substantive=evidence.filter(e=>!['javascript','typescript','spa','cloud infrastructure','code review','owasp','itil'].includes(e.term));
+  const strength=substantive.length>=2?'medium':'low';
+  hints.push({target:relation.target,kind,concept:relation.concept,adjacent_evidence:evidence.map(e=>e.term),evidence,
+   confidence_ceiling:strength,verification_question:'Which parts of '+relation.target+' have you personally used, and how does your related experience transfer?',
+   instruction:'Treat as transferable/adjacent evidence only. Do not claim direct '+relation.target+' experience without explicit resume evidence.'});
+ }
+ return hints;
+}
+export function transferabilityHints(resumeOrSources, jobContext) {
+ const sources=typeof resumeOrSources==='string'?[{id:'resume',kind:'resume quotation',text:resumeOrSources}]:
+   (Array.isArray(resumeOrSources)?resumeOrSources:[]).filter(candidateEvidence);
+ const job=typeof jobContext==='string'?jobContext:JSON.stringify(jobContext||{});
+ return [...hintsFor(relationships,sources,job,'tool'),...hintsFor(workflowRelationships,sources,job,'workflow')].slice(0,12);
 }
 
 export const transferabilityInstructions = `
 ADJACENT AND TRANSFERABLE EVIDENCE
+- Read beyond exact keywords. Transferability is partial credit, never proof of years, certification, required direct tool experience or a mandatory credential. Missing keywords alone must not trigger a rejection. Assess the underlying capability and propose a focused screen when it could change the recommendation. Do not raise fit solely because the manager wants an interview.
 - Read beyond exact keywords. When direct evidence is absent, consider job-relevant adjacent tools, underlying concepts, comparable workflows, and responsibilities that reasonably transfer.
 - Never treat a related tool as proof of the requested tool. "RabbitMQ" is not "Kafka"; "Selenium" is not "Playwright".
 - Use deterministic transferability_hints only as prompts to inspect the cited resume evidence. They are not candidate facts by themselves.

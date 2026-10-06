@@ -75,6 +75,7 @@ jobs:
           npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.8.0
       - name: Test recruiter browser journey
         run: |
+          node tests/assessment-memory-browser.cjs
           node --test tests/interaction-browser.cjs
           CAPTURE_UI=test-results/presentation node tests/presentation-browser.cjs
           node tests/security-browser.cjs
@@ -82,7 +83,6 @@ jobs:
           node tests/settings-browser.cjs
           node tests/browser-journey.cjs
           node tests/job-review-browser.cjs
-          node tests/assessment-memory-browser.cjs
           node tests/hiring-priorities-browser.cjs
           node tests/resume-intake-browser.cjs
           node tests/streamline-browser.cjs

@@ -3,6 +3,7 @@ import '../../../assets/context.js';
 import {withPriorityAssessment,validatePriorityAssessment} from '../_shared/priority-assessment.mjs';
 import {withDetails,validateDetails} from '../_shared/assessment-depth.mjs';
 import {resumeSources} from '../analyze-patterns-v2/resume-sources.mjs';
+import {transferabilityHints} from '../_shared/transferability.mjs';
 const contextAPI=globalThis.AncalagonContext;
 export function prepare(input){
   if(!input?.job?.id||!input?.candidate?.id||input.candidate.jobId!==input.job.id)throw Error('invalid_scope');
@@ -21,7 +22,7 @@ export function prepare(input){
     });
     return {...source,...(parts.length?{passages:parts}:{text})};
   });
-  const payload={job:{title:job.title},candidate:{current_manager_score:Number(candidate.managerScore),current_jd_score:Number(candidate.jdScore)},evaluation_context:{...context,sources:modelSources}};
+  const payload={transferability_hints:transferabilityHints(context.sources,{description:job.description,criteria:context.requirements,knockouts:context.knockouts}),job:{title:job.title},candidate:{current_manager_score:Number(candidate.managerScore),current_jd_score:Number(candidate.jdScore)},evaluation_context:{...context,sources:modelSources}};
   if(JSON.stringify(payload).length>180000)throw Error('input_too_large');
   return {payload,contextSignature,sourceIds:new Set(context.sources.map(s=>s.id)),sources:context.sources,criteria:context.requirements,priorities:context.hiring_priorities,passages};
 }
