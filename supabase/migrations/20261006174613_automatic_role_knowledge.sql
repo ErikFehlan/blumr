@@ -56,6 +56,7 @@ create table if not exists blumr_knowledge.observations (
  primary key(candidate_id,source_id,rule_key)
 );
 create index if not exists knowledge_observation_lookup on blumr_knowledge.observations(workspace_id,role_key,target,observed_at);
+create index if not exists knowledge_observation_job on blumr_knowledge.observations(job_id);
 create table if not exists blumr_knowledge.job_snapshots (
  job_id uuid primary key references public.jobs(id) on delete cascade,
  workspace_id uuid not null references public.workspaces(id) on delete cascade,
