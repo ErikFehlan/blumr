@@ -59,7 +59,7 @@ create index if not exists knowledge_observation_lookup on blumr_knowledge.obser
 create table if not exists blumr_knowledge.job_snapshots (
  job_id uuid primary key references public.jobs(id) on delete cascade,
  workspace_id uuid not null references public.workspaces(id) on delete cascade,
- input_revision text not null, items jsonb not null default '[]',
+ input_revision text not null, items jsonb not null default '[]' check(jsonb_array_length(items)<=6),
  excluded text[] not null default '{}', created_at timestamptz not null default now()
 );
 create index if not exists knowledge_snapshot_workspace on blumr_knowledge.job_snapshots(workspace_id);
@@ -104,7 +104,8 @@ declare c record; src record; rule record; sentence text; term text; signal inte
 begin
  select x.id,x.job_id,x.workspace_id,blumr_knowledge.role_key(j.title) role_key,
  blumr_knowledge.normalized(to_jsonb(j)->>'client') client_key into c
- from public.candidates x join public.jobs j on j.id=x.job_id where x.id=p_candidate;
+ from public.candidates x join public.jobs j on j.id=x.job_id and j.workspace_id=x.workspace_id
+ join public.workspaces w on w.id=x.workspace_id where x.id=p_candidate;
  if not found then return;end if;
  -- Serialize overlapping feedback edits for the same candidate.
  perform pg_advisory_xact_lock(hashtextextended(p_candidate::text,718));
@@ -189,13 +190,13 @@ language sql stable security definer set search_path='' as $$
  and (c.kind<>'preference' or d.client_key<>'' and o.client_key=d.client_key and blumr_knowledge.normalized(to_jsonb(original)->>'client')=d.client_key)
  and exists(select from jsonb_array_elements_text(c.aliases) a where blumr_knowledge.contains_term(d.context,a))
  group by o.rule_key,o.target,o.related,c.kind,c.concept,c.version
- ), qualified as (select * from patterns where supports>=3 and jobs>=2 and excerpts>=2 and contradictions=0 order by supports desc,last_seen desc,rule_key limit 6)
+ ), qualified as (select * from patterns where supports>=3 and jobs>=2 and excerpts>=2 and contradictions=0)
  select coalesce(jsonb_agg(jsonb_build_object('id','auto-'||rule_key,'rule_key',rule_key,'kind',kind,'version',version,
   'text',case when kind='preference' then 'Previous searches for this client repeatedly emphasized '||related||'. Use only as a soft Manager Fit preference when consistent with this opening.'
    else 'Screening feedback across similar searches confirmed transfer from '||related||' to '||target||'. Consider partial credit only when this candidate has relevant source evidence; verify exact '||target||' experience.' end,
   'question',case when kind='preference' then 'What did you personally do that demonstrates '||related||' in a comparable role?'
    else 'How would you apply your '||related||' experience to '||target||', and what would you need to learn?' end,
-  'supporting_candidates',supports,'supporting_jobs',jobs,'last_seen',last_seen) order by rule_key),'[]'::jsonb) from qualified;
+  'supporting_candidates',supports,'supporting_jobs',jobs,'last_seen',last_seen) order by supports desc,last_seen desc,rule_key),'[]'::jsonb) from qualified;
 $$;
 
 create or replace function blumr_knowledge.capture_job() returns trigger
@@ -205,7 +206,8 @@ begin
  fingerprint:=md5(jsonb_build_array(new.workspace_id,new.title,new.description,new.criteria,new.manager_feedback,to_jsonb(new)->>'client')::text);
  if exists(select from blumr_knowledge.job_snapshots where job_id=new.id and input_revision=fingerprint) then return new;end if;
  insert into blumr_knowledge.job_snapshots(job_id,workspace_id,input_revision,items)
- values(new.id,new.workspace_id,fingerprint,blumr_knowledge.eligible(new.id))
+ values(new.id,new.workspace_id,fingerprint,(select coalesce(jsonb_agg(item),'[]'::jsonb) from
+  (select item from jsonb_array_elements(blumr_knowledge.eligible(new.id)) item limit 6) selected))
  on conflict(job_id) do update set workspace_id=excluded.workspace_id,input_revision=excluded.input_revision,items=excluded.items;
  return new;
 end$$;
