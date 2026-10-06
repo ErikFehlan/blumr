@@ -19,3 +19,7 @@ verify_jwt = false
 [functions.staging-provider-bridge]
 # A private per-run worker credential is checked before parsing any request.
 verify_jwt = false
+
+[functions.operations-health]
+# Dedicated random bearer token is verified by the service-only health RPC.
+verify_jwt = false

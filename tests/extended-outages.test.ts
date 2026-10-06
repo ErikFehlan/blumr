@@ -27,7 +27,7 @@ Deno.test({name:'1, 5 and 15 minute dependency interruptions preserve paid-call 
    // A surviving owner still holding the exact result may retry persistence.
    // Process termination is different: this test does not claim its RAM survives.
    assert(await lease.finish('finish_resume_intake',result),'Identical result could not be saved after transport recovery');
-   assert(paidCalls===1&&accepted===1,'Recovery duplicated billing or result acceptance');
+   assert(paidCalls===1&&Number(accepted)===1,'Recovery duplicated billing or result acceptance');
    return {outage_minutes:minutes,elapsed_ms:Date.now()-started,paid_calls:paidCalls,save_attempts:saves,accepted_results:accepted,pending_observed:pending,scope:'Real elapsed dependency transport harness; real lease implementation; simulated RPC and provider; surviving process'};
   }finally{await lease.close();}
  }));

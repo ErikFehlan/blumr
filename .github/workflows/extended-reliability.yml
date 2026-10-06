@@ -11,11 +11,11 @@ on:
         default: hour
 permissions:
   contents: read
-concurrency:
-  group: staging-backend
-  cancel-in-progress: false
 jobs:
   preflight:
+    permissions:
+      contents: read
+      actions: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
@@ -32,11 +32,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Stop superseded runs of this branch only
+        if: github.ref == 'refs/heads/hardening/continuous-reliability'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/cancel-superseded-reliability.mjs
+      - name: Verify monitor failure detection and delivery idempotency
+        run: node --test tests/operations-health.test.js tests/independent-monitor.test.mjs tests/hosted-recovery.test.mjs
       - name: Prove pre-call cutoff and rollback on real Postgres
         env:
           PGPASSWORD: postgres
         run: psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f tests/readiness-budget.sql
   soak:
+    concurrency:
+      group: staging-backend
+      cancel-in-progress: false
     needs: preflight
     runs-on: ubuntu-latest
     environment: criteria-backend
