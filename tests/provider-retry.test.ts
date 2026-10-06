@@ -34,3 +34,10 @@ Deno.test('provider retries connection errors with a fresh attempt',async()=>{
 Deno.test('direct paid calls never repeat an ambiguous transport failure or gateway timeout',async()=>{
  for(const status of [null,408,504]){let calls=0;try{const response=await fetchWithRetry('https://provider.invalid',{},{retryTransport:false,wait:async()=>{},fetcher:async()=>{calls++;if(status===null)throw Error('connection reset');return new Response('timeout',{status});}});assert(response.status===status,'wrong gateway status');}catch{assert(status===null,'unexpected transport failure');}assert(calls===1,'ambiguous paid request was retried');}
 });
+
+Deno.test('exhausted credits are not retried and preserve the provider body',async()=>{
+ let calls=0;
+ const response=await fetchWithRetry('https://provider.invalid',{},{wait:async()=>{},fetcher:async()=>{calls++;return Response.json({error:{code:'credit_balance_exhausted',type:'insufficient_quota'}},{status:429});}});
+ assert(calls===1,'permanent billing failure retried');
+ assert((await response.json()).error.code==='credit_balance_exhausted','error body consumed');
+});
