@@ -563,6 +563,7 @@
       const assessmentMemory=window.BlumrAssessmentMemory.create({
         root,jobs:()=>jobs,job:activeJob,workspace:()=>dataReady?window.ancalagonAuth?.workspace?.id:null,
         ready:()=>!!dataService?.loadAssessmentLessons,load:()=>dataService.loadAssessmentLessons(),
+        loadAutomatic:()=>dataService.loadAutomaticKnowledge?.()||[],excludeAutomatic:(...args)=>dataService.excludeAutomaticKnowledge(...args),
         persist:()=>dataService.flush(stateSnapshot()),save:(...args)=>dataService.saveAssessmentLesson(...args),
         update:(...args)=>dataService.updateAssessmentLesson(...args),refreshAssessments:()=>jobReview.refresh(),
         changed:()=>window.AncalagonWorkspace?.refreshEvaluation(),toast:showToast
@@ -948,7 +949,7 @@ function renderJobs(){
         const correctedScore=Math.max(0,Math.min(10,Number(root.querySelector('#reviewCorrectedScore').value)));
         if(verdict==='Needs Adjustment'&&!Number.isFinite(correctedScore)){showToast('Enter a valid corrected score.','error');return;}
         const reasons=[...root.querySelectorAll('[data-review-reason].active')].map(b=>b.dataset.reviewReason),notes=root.querySelector('#reviewNotes').value.trim();
-        c.aiReview={verdict,assessment:c.aiReview?.assessment||c.resumeIntake?.brief||null,originalScores:{jd:c.jdScore,manager:c.managerScore},correctedJDScore:c.aiReview?.correctedJDScore,correctedScore:verdict==='Accurate'?c.managerScore:correctedScore,reasons,notes,createdAt:Date.now()};c.updatedAt=Date.now();
+        c.aiReview={verdict,source:'recruiter',assessment:c.aiReview?.assessment||c.resumeIntake?.brief||null,originalScores:{jd:c.jdScore,manager:c.managerScore},correctedJDScore:c.aiReview?.correctedJDScore,correctedScore:verdict==='Accurate'?c.managerScore:correctedScore,reasons,notes,createdAt:Date.now()};c.updatedAt=Date.now();
         recalibrateAll();
         const previousLabel=submit?.textContent;
         if(submit){submit.disabled=true;submit.textContent='Saving…';}
@@ -1060,6 +1061,7 @@ function renderJobs(){
         if(submit){submit.disabled=true;submit.textContent='Saving…';}
         try{
           await flushCriticalState();confirmed=true;
+          void assessmentMemory.refresh();
           jobWizard.status('Job saved.');showToast('Job saved.');
           if(creating)trackProductEvent('job_created');
           delete form.dataset.pendingCreate;resetJobForm();

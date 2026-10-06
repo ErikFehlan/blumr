@@ -10,7 +10,7 @@
   panels[0].append(titleRow,description);panels[1].append(criteria,knockouts);
   const optional=document.createElement('details');optional.innerHTML='<summary>Manager notes (optional)</summary>';optional.append(manager);panels[1].append(optional);
   panels[2].innerHTML+='<p class="rf-sub">Suggested from the job description. Select a priority to add it to your screening criteria. Unselected suggestions remain optional.</p><div id="jobPriorityDraft"></div>';
-  panels[3].innerHTML+='<div id="jobReviewDraft"></div><p class="rf-sub">You can edit this job later. Assessments and submittals require your review.</p>';
+  panels[3].innerHTML+='<div id="jobReviewDraft"></div><p class="rf-sub">Relevant learning from previous searches is applied automatically when this job is saved. You can edit this job later. Assessments and submittals require your review.</p>';
   const submit=form.querySelector('[type="submit"]');submit.textContent='Create job';
   form.querySelectorAll(':scope > .rf-note').forEach(el=>el.remove());
   const actions=document.createElement('div');actions.className='rf-wizard-actions';

@@ -23,6 +23,19 @@ export function capacityExpectations(sql) {
  return expected;
 }
 export const normalizeStructure=value=>value.replaceAll('\r\n','\n').replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
+export function knowledgeExpectations(sql){
+ const expected=new Map(),names=['normalized','contains_term','role_key','capture_candidate','capture_source','eligible','capture_job','for_job','get_automatic_job_knowledge','get_workspace_job_knowledge','get_assessment_lessons','exclude_automatic_job_knowledge','reassessment_job_input'];
+ const pattern=/create or replace function (public|blumr_knowledge)\.(\w+)\(([^)]*)\) returns (text|boolean|void|trigger|jsonb)\s+language (sql|plpgsql)\s+(?:(immutable|stable|volatile)\s+)?(?:security (definer|invoker)\s+)?set search_path='' as \$\$([\s\S]*?)\$\$;/g;
+ for(const [,schema,name,args,result,language,volatility,security,body] of sql.matchAll(pattern)){
+  if(!names.includes(name))throw Error('Unexpected knowledge routine');
+  const parameters=args?args.split(',').map(arg=>{const p=arg.trim().match(/^(\w+) (uuid|text)$/);if(!p)throw Error('Unsupported knowledge argument');return p;}):[];
+  const key='function:'+(schema==='public'?'':schema+'.')+name+'('+parameters.map(p=>p[2]).join(',')+')';
+  expected.set(key,{body,language,result,setof:false,args:parameters.map(p=>p[1]+' '+p[2]).join(', '),defaults:null,
+   private:schema==='blumr_knowledge',admin:schema==='public'&&name!=='reassessment_job_input',securityDefiner:security==='definer',volatility:volatility==='immutable'?'i':volatility==='stable'?'s':'v'});
+ }
+ if(expected.size!==names.length||(sql.match(/create or replace function/gi)||[]).length!==names.length)throw Error('Knowledge declarations incomplete');
+ return expected;
+}
 export function guardExpectations(sql){
  const names=['validate_resume_document','preserve_record_creator'],expected=new Map();
  for(const m of sql.matchAll(/create or replace function public\.(\w+)\(\) returns trigger\s+language plpgsql volatile security invoker set search_path='' as \$\$([\s\S]*?)\$\$;/g)){
@@ -77,7 +90,7 @@ export function structuralDifferences(production,stage,expected) {
  const differences=new Set();
  for(const [key,e] of expected) {
   const r=actual.get(key)?.routine;
-  const permissions=e.authHook?(r?.clients_denied===true&&r?.auth_admin_allowed===true):e.triggerOnly?r?.clients_denied===true:e.admin?(r?.anon_denied===true&&r?.authenticated_allowed===true):(r?.worker_allowed===true&&r?.clients_denied===true);
+  const permissions=e.private?(r?.clients_denied===true&&r?.worker_allowed===false):e.authHook?(r?.clients_denied===true&&r?.auth_admin_allowed===true):e.triggerOnly?r?.clients_denied===true:e.admin?(r?.anon_denied===true&&r?.authenticated_allowed===true):(r?.worker_allowed===true&&r?.clients_denied===true);
   if(!r||r.source!==e.body||r.language!==e.language||r.result!==e.result||r.setof!==e.setof||r.args!==e.args||r.defaults!==e.defaults||r.security_definer!==Boolean(e.securityDefiner??e.admin)||r.volatility!==(e.volatility||'v')||JSON.stringify(r.config)!==JSON.stringify(['search_path=""'])||!permissions)differences.add(key);
  }
  for(const row of production) {

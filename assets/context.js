@@ -10,6 +10,10 @@
     list(job.knockouts).forEach((text,i)=>add(`knockout-${i+1}`,'requirement',text,null,'job'));
     if(priorities)priorities.items.forEach(p=>add(p.id,'requirement',p.title+': '+p.reason+' ('+p.requirement_type+'; '+priorities.review_status+' JD priority)',null,'job'));
     add('manager-calibration','manager context',job.managerFeedback,null,'job');
+    for(const pattern of list(job.automaticKnowledge).slice(0,6)){
+      if(!/^auto-[a-f0-9]{32}$/.test(pattern.id||''))continue;
+      add(pattern.id,'automatic learning',pattern.text,pattern.last_seen,'job');
+    }
     for(const lesson of list(job.assessmentLessons)){
       if(!lesson.active||!['manager_priority','evaluation_method'].includes(lesson.kind))continue;
       if(lesson.scope==='job'&&lesson.job_id!==job.id)continue;

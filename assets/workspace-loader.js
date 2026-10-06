@@ -3,14 +3,14 @@
 
   const sources = [
     'assets/job-intake-code.js?v=20261002-guided-experience',
-    'assets/job-wizard.js?v=20261002-guided-experience',
+    'assets/job-wizard.js?v=20261006-automatic-learning',
     'assets/hiring-priorities.js?v=20260924-priorities',
-    'assets/data.js?v=20261002-legacy-doc-storage',
+    'assets/data.js?v=20261006-automatic-learning',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20260917-concise',
     'assets/evidence.js?v=20260911-quick-feedback',
-    'assets/context.js?v=20260924-priorities',
-    'assets/assessment-memory.js?v=20261006-inference',
+    'assets/context.js?v=20261006-automatic-learning',
+    'assets/assessment-memory.js?v=20261006-automatic-learning',
     'assets/scoring.js?v=20260911-quick-feedback',
     'assets/quality.js?v=20260915-core',
     'assets/quality-ui.js?v=20260918-blumr',
@@ -35,7 +35,7 @@
     'assets/settings-ui.js?v=20261002-guided-experience',
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
-    'assets/app.js?v=20261002-legacy-doc-text-first'
+    'assets/app.js?v=20261006-automatic-learning'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
