@@ -63,7 +63,7 @@ try{
     const finding=out.criteria_assessment[0];
     assert.ok(finding.evidence?.length&&finding.evidence.every(e=>e.quote&&e.source_id),'Inference lacks attached original evidence');
     assert.ok(out.evidence_summary?.method==='evidence-support-v1','Server confidence contract missing');
-    if(caseName==='transfer'){assert.equal(finding.evidence_type,'inferred','Adjacent messaging became direct Kafka experience');assert.equal(finding.status,'partial');assert.ok(finding.inference_basis&&finding.verification_question);assert.ok(finding.confidence_score<=70);}
+    if(caseName==='transfer'){assert.equal(finding.evidence_type,'inferred','Adjacent messaging became direct Kafka experience');assert.equal(finding.status,'partial');assert.ok(finding.inference_basis&&finding.verification_question);assert.ok(finding.confidence_score<=70);assert.ok(out.applied_lessons.some(l=>l.lesson_id==='auto-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'&&l.automatic),'Automatic context was not applied with provenance');assert.ok(!finding.source_ids.some(id=>id.startsWith('auto-')),'Historical learning became candidate evidence');}
     if(caseName==='workflow')assert.ok(['supported','partial'].includes(finding.status),'Explicit workflow activities were ignored');
     if(caseName==='tool_denial')assert.notEqual(finding.status,'supported','Explicit Kafka denial became supported Kafka experience');
    }

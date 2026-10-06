@@ -55,7 +55,7 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   const suppliedContext=payload.evaluation_context as {job_id?:string,sources?:Array<{id?:string,kind?:string}>}|undefined;
   const memoryJob=suppliedContext?.job_id;
   if(suppliedContext){
-    const cleanSources=(Array.isArray(suppliedContext.sources)?suppliedContext.sources:[]).filter(s=>s.kind!=='approved learning'&&!s.id?.startsWith('lesson-')&&!s.id?.startsWith('priority-'));
+    const cleanSources=(Array.isArray(suppliedContext.sources)?suppliedContext.sources:[]).filter(s=>!['approved learning','automatic learning'].includes(s.kind||'')&&!s.id?.startsWith('auto-')&&!s.id?.startsWith('lesson-')&&!s.id?.startsWith('priority-'));
     payload.evaluation_context={...suppliedContext,hiring_priorities:null,sources:cleanSources};
     if(typeof memoryJob==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(memoryJob)){
       try{
@@ -68,7 +68,7 @@ export async function handleAuthenticatedAnalysis(request: Request) {
         const lessons=await response.json();
         if(!Array.isArray(lessons))return json({error:'Learning memory temporarily unavailable. Try again.'},503);
         const saved=await priorityResponse.json(),priorities=saved?.items?.length?{basis:saved.basis,review_status:saved.review_status,items:saved.items}:null;
-        payload.evaluation_context={...suppliedContext,hiring_priorities:priorities,sources:[...cleanSources,...(priorities?.items||[]).map((p:{id:string,title:string,reason:string})=>({id:p.id,kind:'requirement',text:p.title+': '+p.reason,scope:'job'})),...lessons.map(l=>({id:`lesson-${l.id}`,kind:'approved learning',text:`${l.kind}: ${l.text}`,recorded_at:l.updated_at,scope:l.scope}))]};
+        payload.evaluation_context={...suppliedContext,hiring_priorities:priorities,sources:[...cleanSources,...(priorities?.items||[]).map((p:{id:string,title:string,reason:string})=>({id:p.id,kind:'requirement',text:p.title+': '+p.reason,scope:'job'})),...lessons.map(l=>({id:l.automatic?l.id:`lesson-${l.id}`,kind:l.automatic?'automatic learning':'approved learning',text:`${l.kind}: ${l.text}`,recorded_at:l.last_seen||l.updated_at,scope:l.scope}))]};
       }catch{return json({error:'Learning memory temporarily unavailable. Try again.'},503);}
     }
   }

@@ -42,6 +42,8 @@ jobs:
           psql -h localhost -U postgres -d core_intake -f tests/core-intake.sql
           createdb -h localhost -U postgres assessment_memory
           psql -h localhost -U postgres -d assessment_memory -f tests/assessment-memory.sql
+          createdb -h localhost -U postgres automatic_knowledge
+          psql -h localhost -U postgres -d automatic_knowledge -f tests/automatic-knowledge.sql
           createdb -h localhost -U postgres hiring_priorities
           psql -h localhost -U postgres -d hiring_priorities -f tests/hiring-priorities.sql
           createdb -h localhost -U postgres usage_analytics

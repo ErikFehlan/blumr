@@ -51,6 +51,7 @@ export function validate(result,prepared){
       const source=prepared.sources.find(s=>s.id===e?.source_id);
       const quote=source&&typeof e.quote==='string'&&e.quote.length>=12&&e.quote.length<=1000?globalThis.AncalagonIntake.sourceQuote(source.text,e.quote):null;
       if(!source)fail('evidence_source');
+      if(['automatic learning','approved learning'].includes(source.kind))fail('evidence_source');
       if(!quote)fail('unmatched_quote');
       if(typeof e.claim!=='string'||!e.claim.trim()||e.claim.length>800||!result.evidence_ids.includes(e.source_id))fail('evidence_claim');
       return {...e,quote};
@@ -62,6 +63,6 @@ export function validate(result,prepared){
 }
 export const schema=prepared=>withPriorityAssessment(withDetails({type:'object',additionalProperties:false,required:['jd_score','manager_score','confidence','summary','manager_reason','jd_reason','evidence_support','questions'],properties:{
   jd_score:{type:'number',minimum:0,maximum:10},manager_score:{type:'number',minimum:0,maximum:10},confidence:{type:'string',enum:['low','medium','high']},
-  evidence_support:{type:'array',minItems:1,maxItems:5,items:{type:'object',additionalProperties:false,required:['passage_id','claim'],properties:{passage_id:{type:'string',enum:prepared.passages.map(p=>p.id)},claim:{type:'string',minLength:1,maxLength:800}}}},
+  evidence_support:{type:'array',minItems:1,maxItems:5,items:{type:'object',additionalProperties:false,required:['passage_id','claim'],properties:{passage_id:{type:'string',enum:prepared.passages.filter(p=>!['automatic learning','approved learning'].includes(prepared.sources.find(s=>s.id===p.source_id)?.kind)).map(p=>p.id)},claim:{type:'string',minLength:1,maxLength:800}}}},
   summary:{type:'string',maxLength:320},manager_reason:{type:'string',maxLength:320},jd_reason:{type:'string',maxLength:320},questions:{type:'array',items:{type:'string',maxLength:220},maxItems:2}
 }},true,{sources:prepared.sources,criteria:prepared.criteria}),prepared.priorities,prepared.sources);

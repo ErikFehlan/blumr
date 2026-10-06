@@ -3,7 +3,7 @@
 import {evidenceTextRanges} from './source-instructions.mjs';
 const normalize = value => String(value || '').toLowerCase().replace(/[‐‑–—]/g,'-');
 
-const relationships = [
+export const relationships = [
   { target:'playwright', related:['cypress','selenium','webdriver','test automation','typescript'], concept:'browser test automation' },
   { target:'cypress', related:['playwright','selenium','webdriver','test automation','javascript','typescript'], concept:'browser test automation' },
   { target:'selenium', related:['playwright','cypress','webdriver','test automation'], concept:'browser test automation' },
@@ -27,7 +27,7 @@ const relationships = [
   { target:'microsoft fabric', related:['power bi','synapse','data factory','lakehouse','delta lake'], concept:'Microsoft analytics and lakehouse ecosystem' },
 ];
 
-const workflowRelationships = [
+export const workflowRelationships = [
   {
     target:'secure sdlc',
     related:['sast','dast','threat model','secure code review','code review','security gate','devsecops','owasp','vulnerability remediation'],
@@ -63,7 +63,7 @@ const workflowRelationships = [
 // Boundaries avoid React/reactive, SPA/Spanish and AWS/draws matches.
 const escapeRE = value => value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function has(text,term){return new RegExp('(^|[^a-z0-9])'+escapeRE(normalize(term))+'(?=$|[^a-z0-9])','i').test(normalize(text));}
-const aliases={'secure sdlc':['ssdlc','secure software development lifecycle'],'site reliability':['sre','site reliability engineering'],'application security':['appsec'],'palo alto':['pan-os','panorama'],'gcp':['google cloud']};
+export const aliases={'secure sdlc':['ssdlc','secure software development lifecycle'],'site reliability':['sre','site reliability engineering'],'application security':['appsec'],'palo alto':['pan-os','panorama'],'gcp':['google cloud']};
 function negative(text,term){
  const t=normalize(text),at=t.indexOf(normalize(term));
  if(at<0)return false;
