@@ -95,3 +95,16 @@ insert into screening_insights(workspace_id,job_id,candidate_id,notes) values
 do $$begin if jsonb_array_length(blumr_knowledge.eligible('90000000-0000-0000-0000-000000000007'))<>1 then raise exception 'Screening notes not captured';end if;end$$;
 update blumr_knowledge.observations set observed_at=now()-interval '181 days' where candidate_id::text like '91000000%';
 do $$begin if jsonb_array_length(blumr_knowledge.for_job('90000000-0000-0000-0000-000000000007'))<>0 then raise exception 'Expired observations still apply';end if;end$$;
+-- Match production's overlapping account-delete cascades: the owner deletes
+-- the workspace while created_by is set null on the same job.
+alter table workspaces add column owner_id uuid references auth.users(id) on delete cascade;
+alter table jobs drop constraint jobs_workspace_id_fkey;
+alter table jobs add foreign key(workspace_id) references workspaces(id) on delete cascade;
+alter table jobs add column created_by uuid references auth.users(id) on delete set null;
+insert into auth.users values('92000000-0000-0000-0000-000000000001');
+insert into workspaces(id,owner_id) values('92000000-0000-0000-0000-000000000002','92000000-0000-0000-0000-000000000001');
+insert into jobs(id,workspace_id,title,created_by) values('92000000-0000-0000-0000-000000000003','92000000-0000-0000-0000-000000000002','Java Developer','92000000-0000-0000-0000-000000000001');
+delete from auth.users where id='92000000-0000-0000-0000-000000000001';
+do $$begin
+ if exists(select from blumr_knowledge.job_snapshots where job_id='92000000-0000-0000-0000-000000000003') then raise exception 'Account deletion left a job snapshot';end if;
+end$$;

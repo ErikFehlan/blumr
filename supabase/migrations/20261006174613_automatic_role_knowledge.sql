@@ -206,6 +206,8 @@ create or replace function blumr_knowledge.capture_job() returns trigger
 language plpgsql security definer set search_path='' as $$
 declare fingerprint text;
 begin
+ -- Account deletion can queue a created_by update after its job was cascaded.
+ if not exists(select from public.jobs j join public.workspaces w on w.id=j.workspace_id where j.id=new.id) then return new;end if;
  fingerprint:=md5(jsonb_build_array(new.workspace_id,new.title,new.description,new.criteria,new.manager_feedback,to_jsonb(new)->>'client')::text);
  if exists(select from blumr_knowledge.job_snapshots where job_id=new.id and input_revision=fingerprint) then return new;end if;
  insert into blumr_knowledge.job_snapshots(job_id,workspace_id,input_revision,items)
