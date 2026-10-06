@@ -167,7 +167,8 @@
     if(reasons){
       const latest=c.aiReview?.notes,screen=c.screeningInsight?.assessment,brief=c.resumeIntake?.brief;
       const items=latest?[['Latest review',latest]]:[['JD Fit',screen?.jd_reason||brief?.jd_reason],['Manager Fit',screen?.manager_reason||brief?.manager_reason]];
-      reasons.innerHTML=items.filter(([,text])=>text).map(([label,text])=>'<p><strong>'+label+':</strong> '+escape(prose.brief(text,35))+'</p>').join('')||'<p>Scores reflect recorded job evidence and approved manager priorities.</p>';
+      const explanation=(items.filter(([,text])=>text).map(([label,text])=>'<p><strong>'+label+':</strong> '+escape(prose.brief(text,35))+'</p>').join('')||'<p>Scores reflect recorded job evidence and approved manager priorities.</p>')+(global.BlumrAssessmentMemory?.details(c.aiReview?.assessment||screen||brief)||'');
+      if(reasons.dataset.markup!==explanation){const expanded=[...reasons.querySelectorAll('details')].map(d=>d.open);reasons.innerHTML=explanation;reasons.dataset.markup=explanation;reasons.querySelectorAll('details').forEach((d,i)=>d.open=expanded[i]||false);}
     }
     const readiness=api.readiness(c);
     const overview=api.root.querySelector('.rf-workspace-overview > div');
