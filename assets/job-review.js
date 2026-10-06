@@ -86,6 +86,7 @@
       const task=taskFor(candidate),pending=requests.has(candidate.id);
       if((!task||(['ignored','cancelled'].includes(task.status)||task.status==='approved'&&!task.result?.feedback_impact))&&!pending){wrap.hidden=true;return false;}
       wrap.hidden=false;
+      wrap.dataset.replacesAssessment=String(!pending&&task?.status==='ready');
       updateContent(wrap,`<span class="rf-kicker">Automatic assessment</span><h3>${pending?'Saving feedback for assessment…':task?.status==='ready'?'Updated candidate assessment':'Assessment update'}</h3>${pending?'<p class="rf-sub">Preparing the latest evidence for background processing.</p>':body(task,candidate,true)}`);
       return true;
     }
