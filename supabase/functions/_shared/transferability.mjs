@@ -17,6 +17,13 @@ const relationships = [
   { target:'aws', related:['azure','gcp','google cloud','cloud infrastructure'], concept:'public cloud engineering' },
   { target:'azure', related:['aws','gcp','google cloud','cloud infrastructure'], concept:'public cloud engineering' },
   { target:'gcp', related:['aws','azure','google cloud','cloud infrastructure'], concept:'public cloud engineering' },
+  { target:'palo alto', related:['fortinet','cisco asa','cisco firepower','checkpoint','firewall','network security'], concept:'enterprise firewall engineering' },
+  { target:'fortinet', related:['palo alto','cisco asa','cisco firepower','checkpoint','firewall','network security'], concept:'enterprise firewall engineering' },
+  { target:'terraform', related:['cloudformation','bicep','pulumi','infrastructure as code','iac'], concept:'infrastructure as code' },
+  { target:'kubernetes', related:['openshift','eks','aks','gke','container orchestration','docker swarm'], concept:'container orchestration' },
+  { target:'servicenow', related:['it service management','itsm','itil','service management platform'], concept:'enterprise service management' },
+  { target:'snowflake', related:['bigquery','redshift','synapse','data warehouse','cloud data warehouse'], concept:'cloud data warehousing' },
+  { target:'microsoft fabric', related:['power bi','synapse','data factory','lakehouse','delta lake'], concept:'Microsoft analytics and lakehouse ecosystem' },
 ];
 
 const workflowRelationships = [
@@ -34,6 +41,16 @@ const workflowRelationships = [
     target:'site reliability',
     related:['sre','observability','incident response','on-call','on call','slis','slos','error budget','prometheus','grafana'],
     concept:'reliability engineering workflow'
+  },
+  {
+    target:'application security',
+    related:['sast','dast','owasp','threat model','secure code review','api security','vulnerability remediation','devsecops'],
+    concept:'application security engineering workflow'
+  },
+  {
+    target:'vulnerability management',
+    related:['tenable','nessus','qualys','defender vulnerability management','vulnerability scanning','remediation tracking','cvss'],
+    concept:'vulnerability identification and remediation workflow'
   },
   {
     target:'agile',
