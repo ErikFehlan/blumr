@@ -4,8 +4,8 @@ on:
     - cron: '13,43 * * * *'
   workflow_dispatch:
   push:
-    branches: [hardening/production-readiness]
-    paths: ['scripts/operations-health.mjs', '.github/workflows/operations-monitor.yml']
+    branches: [hardening/production-readiness, hardening/continuous-reliability]
+    paths: ['scripts/operations-health.mjs', 'scripts/operations/**', '.github/workflows/operations-monitor.yml']
 permissions:
   contents: read
   actions: read

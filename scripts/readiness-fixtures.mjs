@@ -27,9 +27,19 @@ export async function fixtures(){
   const saved=pendingSave.then(async()=>{await mkdir(dirname(file),{recursive:true});await writeFile(file+'.next',snapshot,{mode:0o600});await rename(file+'.next',file);});
   pendingSave=saved.catch(()=>{});return saved;
  }
- async function request(path,access,method='GET',body,expected=true){
+ const refreshing=new Map();
+ async function request(path,access,method='GET',body,expected=true,retried=false){
+  const user=state?.users.find(u=>u.access===access);
   const r=await fetch(base+path,{method,headers:{apikey:access===service?service:anon,Authorization:'Bearer '+(access||anon),'Content-Type':'application/json',Prefer:'return=representation'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(path.startsWith('/functions/')?110000:25000)});
   const data=await r.json().catch(()=>null);
+  if(r.status===401&&user&&!retried){
+   if(!refreshing.has(user.id))refreshing.set(user.id,(async()=>{
+    const session=await request('/auth/v1/token?grant_type=password',null,'POST',{email:user.email,password:user.password});
+    assert.ok(session.data?.access_token,'Fixture session renewal failed');
+    user.access=session.data.access_token;mask(user.access);await save();
+   })().finally(()=>refreshing.delete(user.id)));
+   await refreshing.get(user.id);return request(path,user.access,method,body,expected,true);
+  }
   if(expected&&!r.ok)throw Error('Fixture request failed: '+r.status+' '+path.split('?')[0]);
   return {status:r.status,data,ok:r.ok};
  }
@@ -69,7 +79,11 @@ export async function fixtures(){
    await sql('delete from public.beta_access where email=$1 and user_id is null',[user.email]);
    assert.equal((await sql('select id from auth.users where email=$1',[user.email])).length,0);
   }catch(e){failures.push(i);console.error('Readiness cleanup failed at fixture index '+i+' ('+e.name+')');}
-  assert.equal(failures.length,0,'Fixture cleanup failed; private state retained');await rm(file,{force:true});console.log('PASS: readiness accounts, workspaces and stored files removed');
+  assert.equal(failures.length,0,'Fixture cleanup failed; private state retained');
+  // Remove guards only after the registered identities and workspaces are gone.
+  const [guard]=await sql("select to_regclass('readiness_private.budgets') is not null as installed");
+  if(guard.installed){await sql('delete from readiness_private.workspaces where run=$1',[state.run]);await sql('delete from readiness_private.budgets where run=$1',[state.run]);}
+  await rm(file,{force:true});console.log('PASS: readiness accounts, workspaces and stored files removed');
  }
  return {get state(){return state;},create,cleanup,request,upload,sql,base,anon,save};
 }

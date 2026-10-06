@@ -1,0 +1,97 @@
+name: Extended staging reliability
+on:
+  push:
+    branches: [hardening/continuous-reliability]
+    paths: [scripts/readiness-*, scripts/staging-readiness.mjs, tests/extended-outages.test.ts, tests/readiness-budget.sql, .github/workflows/extended-reliability.yml]
+  workflow_dispatch:
+    inputs:
+      profile:
+        type: choice
+        options: [hour, four-hours]
+        default: hour
+permissions:
+  contents: read
+jobs:
+  preflight:
+    permissions:
+      contents: read
+      actions: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Stop superseded runs of this branch only
+        if: github.ref == 'refs/heads/hardening/continuous-reliability'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/cancel-superseded-reliability.mjs
+      - name: Verify monitor failure detection and delivery idempotency
+        run: node --test tests/operations-health.test.js tests/independent-monitor.test.mjs tests/hosted-recovery.test.mjs
+      - name: Prove pre-call cutoff and rollback on real Postgres
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f tests/readiness-budget.sql
+  soak:
+    concurrency:
+      group: staging-backend
+      cancel-in-progress: false
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 280
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
+      READINESS_STATE_FILE: /tmp/blumr-soak-${{ github.run_id }}-${{ github.run_attempt }}.json
+      READINESS_PROFILE: ${{ inputs.profile || 'hour' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Sustained synthetic uploads with database-enforced ten-dollar reservation limit
+        run: node scripts/staging-readiness.mjs run
+      - name: Verify fixture cleanup even after interruption
+        if: always()
+        run: node scripts/staging-readiness.mjs cleanup
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extended-staging-evidence
+          path: test-results/readiness/
+          retention-days: 14
+  outages:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Real elapsed dependency interruptions in the production lease implementation
+        env:
+          EXTENDED_OUTAGES: '1'
+        run: deno test --allow-env --allow-write=test-results tests/extended-outages.test.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extended-outage-evidence
+          path: test-results/outages/
+          retention-days: 14
