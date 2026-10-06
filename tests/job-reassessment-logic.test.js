@@ -10,7 +10,8 @@ test('worker uses the same evidence model, includes shared approvals, and isolat
 test('worker rejects invented source references, invalid scores, and unbounded questions',async()=>{
  const {prepare,validate}=await logic,p=prepare(input());
  const result={criteria_assessment:[{criterion:'Must Have | manual testing',status:'supported',evidence_type:'direct',confidence:'medium',inference_basis:'',reason:'Candidate described hands-on ownership.',source_ids:['feedback-own']}],feedback_impact:{effect:'new_evidence',summary:'Ownership clarified.',source_ids:['feedback-own']},applied_lessons:[],learning_suggestions:[],manager_score:8,jd_score:7,confidence:'medium',summary:'Evidence reviewed',manager_reason:'Ownership supports manual testing',jd_reason:'Baseline unchanged',evidence_ids:['feedback-own'],evidence_support:[{source_id:'feedback-own',claim:'Ownership described',quote:'Explained hands-on ownership.'}],questions:['Which releases did you own?']};
- assert.equal(validate(result,p).context_signature,p.contextSignature);
+ const validated=validate(result,p);assert.equal(validated.context_signature,p.contextSignature);
+ assert.equal(validated.experience_profile.version,'experience-intelligence-v2');assert.deepEqual(validated.questions,[]);
  assert.throws(()=>validate({...result,evidence_ids:['invented']},p),/invalid_result/);
  assert.throws(()=>validate({...result,manager_score:11},p),/invalid_result/);
  assert.throws(()=>validate({...result,evidence_ids:[]},p),/invalid_result/);

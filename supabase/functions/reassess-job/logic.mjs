@@ -43,7 +43,6 @@ export function validate(result,prepared){
   const fail=issue=>{throw Object.assign(new Error('invalid_result'),{validationIssue:issue});};
   result=validatePriorityAssessment(result,prepared.priorities,prepared.sources);
   validateDetails(result,prepared.sources,{suggestions:true,criteria:prepared.criteria||[]});
-  enrichExperience(result,prepared.sources,prepared.experienceJob,prepared.experience);
   if(!result||!['jd_score','manager_score'].every(k=>typeof result[k]==='number'&&Number.isFinite(result[k])&&result[k]>=0&&result[k]<=10)
     ||!['low','medium','high'].includes(result.confidence)
     ||!['summary','manager_reason','jd_reason'].every(k=>typeof result[k]==='string'&&result[k].trim()&&result[k].length<=4000)
@@ -63,6 +62,7 @@ export function validate(result,prepared){
     const supported=new Set(result.evidence_support.map(e=>e.source_id));
     if(result.evidence_ids.some(id=>!supported.has(id)))fail('missing_support');
   }
+  enrichExperience(result,prepared.sources,prepared.experienceJob,prepared.experience);
   return {...result,manager_score:Math.round(result.manager_score*10)/10,jd_score:Math.round(result.jd_score*10)/10,context_signature:prepared.contextSignature};
 }
 export const schema=prepared=>withPriorityAssessment(withDetails({type:'object',additionalProperties:false,required:['jd_score','manager_score','confidence','summary','manager_reason','jd_reason','evidence_support','questions'],properties:{

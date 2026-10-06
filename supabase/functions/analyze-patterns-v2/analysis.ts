@@ -280,10 +280,10 @@ ANALYSIS RULES
       analysis=JSON.parse(outputText);
       if(deepAssessment)analysis=validatePriorityAssessment(analysis,priorities,assessmentSources);
       if(deepAssessment)validateDetails(analysis,assessmentSources,{criteria:evidence.evaluation_context?.requirements||evidence.job.criteria||[]});
-      if(deepAssessment)enrichExperience(analysis,assessmentSources,experienceJob,experience);
       if(isFeedback&&!validFeedback(analysis))throw Error("Invalid feedback result");
       if(autoIntake)analysis=resolveResumeSources(analysis,sources);
       if(autoIntake)analysis=(globalThis as typeof globalThis & {AncalagonIntake:{validate(a:unknown,text:string):Record<string,unknown>}}).AncalagonIntake.validate(analysis,evidence.resume_text);
+      if(experience)enrichExperience(analysis,assessmentSources,experienceJob,experience);
     }catch(error){
       if(!autoIntake)return json({error:'The model returned no complete structured analysis'},502);
       const code=(error as {code?:string})?.code||(error instanceof Error?error.message:undefined);
