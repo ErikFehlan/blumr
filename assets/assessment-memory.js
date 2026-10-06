@@ -8,7 +8,7 @@
   if(!result?.feedback_impact&&!result?.criteria_assessment)return '';
   return (global.BlumrHiringPriorities?.details(result)||'')+`<div class="rf-assessment-depth">${result.feedback_impact?`<p><strong>${result.feedback_impact.effect==='initial'?'Assessment basis':'Feedback impact'}:</strong> ${esc(result.feedback_impact.summary)}</p>`:''}
    ${result.applied_lessons?.length?`<p class="rf-sub"><strong>Applied approved learning:</strong> ${result.applied_lessons.map(l=>esc(l.application)).join(' ')}</p>`:''}
-   ${result.criteria_assessment?.length?`<details><summary>Requirement-by-requirement assessment</summary><ul class="rf-criteria-findings">${result.criteria_assessment.map(c=>`<li><strong>${esc(c.criterion)}</strong> <span class="rf-pill rf-gray">${esc(c.status)}</span><p>${esc(c.reason)}</p></li>`).join('')}</ul></details>`:''}</div>`;
+   ${result.criteria_assessment?.length?`<details><summary>Requirement-by-requirement assessment</summary><ul class="rf-criteria-findings">${result.criteria_assessment.map(c=>`<li><strong>${esc(c.criterion)}</strong> <span class="rf-pill rf-gray">${esc(c.status)}</span> <span class="rf-pill rf-gray">${esc(c.evidence_type==='direct'?'Direct evidence':c.evidence_type==='inferred'?'Inferred evidence':c.evidence_type==='contradicted'?'Contradicted':'Unknown')}</span> <span class="rf-sub">${esc(c.confidence||'')} confidence</span><p>${esc(c.reason)}</p>${c.inference_basis?`<p class="rf-sub"><strong>Why inferred:</strong> ${esc(c.inference_basis)}</p>`:''}</li>`).join('')}</ul></details>`:''}</div>`;
  }
  function suggestions(task,candidate){
   if(!['ready','approved'].includes(task?.status)||!task.result?.learning_suggestions?.length)return '';
