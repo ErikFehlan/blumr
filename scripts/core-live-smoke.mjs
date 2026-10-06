@@ -1,6 +1,7 @@
 // Only disposable, randomly named test users and their synthetic data are touched.
 // Credentials remain in this process; no request bodies, tokens or traces are logged.
 import assert from 'node:assert/strict';
+import {checkInferenceLearning} from './inference-learning-smoke.mjs';
 import {checkAutomaticKnowledge} from './automatic-knowledge-smoke.mjs';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {prepare as prepareReassessment} from '../supabase/functions/reassess-job/logic.mjs';
@@ -38,6 +39,7 @@ try{
  assert.notEqual(users[0].workspace,users[1].workspace,'Workspaces must be isolated');
  const owner=users[0],other=users[1],job=randomUUID(),candidate=randomUUID(),note=randomUUID();
  await checkAutomaticKnowledge(req,owner,other);
+ await checkInferenceLearning(req,(path,method,body)=>req(path,service,method,body),owner,other);
  await req('/rest/v1/jobs',owner.access,'POST',{id:job,workspace_id:owner.workspace,title:'Synthetic core QA',description:'Manual regression testing and documented defect remediation.',criteria:['Must Have | manual regression testing'],created_by:owner.id});
  // Wait for JD-only generation before adding evidence, then use the same
  // reviewed priorities for intake and every subsequent reassessment.

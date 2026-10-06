@@ -1,3 +1,4 @@
+import {buildExperienceIntelligence,intelligencePrompt,enrichExperience} from '../_shared/experience-intelligence.mjs';
 import '../../../assets/resume-intake.js';
 import '../../../assets/context.js';
 import {withPriorityAssessment,validatePriorityAssessment} from '../_shared/priority-assessment.mjs';
@@ -22,9 +23,11 @@ export function prepare(input){
     });
     return {...source,...(parts.length?{passages:parts}:{text})};
   });
-  const payload={transferability_hints:transferabilityHints(context.sources,{description:job.description,criteria:context.requirements,knockouts:context.knockouts}),job:{title:job.title},candidate:{current_manager_score:Number(candidate.managerScore),current_jd_score:Number(candidate.jdScore)},evaluation_context:{...context,sources:modelSources}};
+  const experienceJob={description:job.description,criteria:context.requirements,knockouts:context.knockouts,hiring_priorities:context.hiring_priorities};
+  const experience=buildExperienceIntelligence(context.sources,experienceJob);
+  const payload={experience_intelligence:intelligencePrompt(experience),transferability_hints:transferabilityHints(context.sources,{description:job.description,criteria:context.requirements,knockouts:context.knockouts}),job:{title:job.title},candidate:{current_manager_score:Number(candidate.managerScore),current_jd_score:Number(candidate.jdScore)},evaluation_context:{...context,sources:modelSources}};
   if(JSON.stringify(payload).length>180000)throw Error('input_too_large');
-  return {payload,contextSignature,sourceIds:new Set(context.sources.map(s=>s.id)),sources:context.sources,criteria:context.requirements,priorities:context.hiring_priorities,passages};
+  return {payload,experience,experienceJob,contextSignature,sourceIds:new Set(context.sources.map(s=>s.id)),sources:context.sources,criteria:context.requirements,priorities:context.hiring_priorities,passages};
 }
 export function resolveEvidence(result,prepared){
   const fail=()=>{throw Object.assign(new Error('invalid_result'),{validationIssue:'evidence_source'});};
@@ -40,6 +43,7 @@ export function validate(result,prepared){
   const fail=issue=>{throw Object.assign(new Error('invalid_result'),{validationIssue:issue});};
   result=validatePriorityAssessment(result,prepared.priorities,prepared.sources);
   validateDetails(result,prepared.sources,{suggestions:true,criteria:prepared.criteria||[]});
+  enrichExperience(result,prepared.sources,prepared.experienceJob,prepared.experience);
   if(!result||!['jd_score','manager_score'].every(k=>typeof result[k]==='number'&&Number.isFinite(result[k])&&result[k]>=0&&result[k]<=10)
     ||!['low','medium','high'].includes(result.confidence)
     ||!['summary','manager_reason','jd_reason'].every(k=>typeof result[k]==='string'&&result[k].trim()&&result[k].length<=4000)

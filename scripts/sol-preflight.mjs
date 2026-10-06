@@ -33,8 +33,8 @@ try{
  user=created.id||created.user?.id;assert.ok(user);
  const memberships=await request('/rest/v1/workspace_members?select=workspace_id&user_id=eq.'+user);
  assert.equal(memberships.length,1);workspace=memberships[0].workspace_id;
- for(const caseName of ['feedback','resume','screening','confirmation','contradiction','memory','transfer','workflow','tool_denial','disagreement']){
-  for(const model of (['transfer','workflow','tool_denial','disagreement'].includes(caseName)?['sol']:['baseline','sol'])){
+ for(const caseName of ['feedback','resume','screening','confirmation','contradiction','memory','transfer','workflow','tool_denial','disagreement','care','sales','trade','consulting']){
+  for(const model of (['transfer','workflow','tool_denial','disagreement','care','sales','trade','consulting'].includes(caseName)?['sol']:['baseline','sol'])){
    try{
    const check=await request('/functions/v1/sol-model-check','POST',{case:caseName,model,workspace_id:workspace}),out=check.result;
    assert.ok(out?.model?.startsWith(check.requested_model),'Provider did not return the requested model');
@@ -43,7 +43,7 @@ try{
     assert.ok(out.summary&&Object.hasOwn(out,'clarification_question'));
     assert.ok(!Object.hasOwn(out,'manager_score'),'Feedback produced an unreviewed score');
     assert.match(out.summary,/manual/i);assert.match(out.summary,automationLimitation,'The explicit automation limitation was lost');
-   }else if(['resume','memory','transfer','workflow','tool_denial'].includes(caseName)){
+   }else if(['resume','memory','transfer','workflow','tool_denial','care','sales','trade','consulting'].includes(caseName)){
     assert.ok(out.resume_evidence?.length,'Resume evidence missing');
     if(caseName==='resume')assert.match(out.resume_evidence.map(e=>e.claim+' '+e.quote).join(' '),/manual/i);
     if(caseName==='resume')assert.match(out.concerns.join(' ')+' '+out.primary_signal+' '+out.jd_reason,automationLimitation,'Resume limitation was lost');
@@ -62,10 +62,24 @@ try{
     assert.ok(out.criteria_assessment?.length===1,'Inference case lost requirement coverage');
     const finding=out.criteria_assessment[0];
     assert.ok(finding.evidence?.length&&finding.evidence.every(e=>e.quote&&e.source_id),'Inference lacks attached original evidence');
-    assert.ok(out.evidence_summary?.method==='evidence-support-v1','Server confidence contract missing');
+    assert.ok(out.evidence_summary?.method==='experience-intelligence-v2','Server confidence contract missing');
     if(caseName==='transfer'){assert.equal(finding.evidence_type,'inferred','Adjacent messaging became direct Kafka experience');assert.equal(finding.status,'partial');assert.ok(finding.inference_basis&&finding.verification_question);assert.ok(finding.confidence_score<=70);assert.ok(out.applied_lessons.some(l=>l.lesson_id==='auto-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'&&l.automatic),'Automatic context was not applied with provenance');assert.ok(!finding.source_ids.some(id=>id.startsWith('auto-')),'Historical learning became candidate evidence');}
     if(caseName==='workflow')assert.ok(['supported','partial'].includes(finding.status),'Explicit workflow activities were ignored');
     if(caseName==='tool_denial')assert.notEqual(finding.status,'supported','Explicit Kafka denial became supported Kafka experience');
+   }
+   if(['care','sales','trade','consulting'].includes(caseName)){
+    assert.equal(out.experience_profile?.version,'experience-intelligence-v2','Role-neutral experience profile missing');
+    assert.ok(out.experience_profile.activities.length>=2,'Original activities missing');
+    if(['care','sales','trade'].includes(caseName))assert.ok(out.experience_profile.workflows.length,'Connected activities were not recognized');
+    if(caseName==='care'){
+     assert.notEqual(out.criteria_assessment.find(c=>c.criterion==='Required RN license')?.status,'supported','Care workflow fabricated a credential');
+     assert.equal(out.verification_priorities[0]?.criterion,'Required RN license','Required credential did not get question priority');
+    }
+    if(caseName==='consulting'){
+     assert.notEqual(out.criteria_assessment[0].status,'supported','Forecast contribution became ownership');
+     assert.equal(out.experience_profile.career.documented_months,36,'Overlapping projects were double counted');
+     assert.equal(out.experience_profile.career.explicit_employer_groups[0]?.projects,2,'Consulting projects became separate employers');
+    }
    }
    if(caseName==='disagreement'){assert.equal(out.jd_score,5,'Bare interview preference changed JD fit');assert.equal(out.manager_score,5,'Bare interview preference changed manager fit');}
    // All output below is from the fixed synthetic fixtures, never real resumes.
@@ -78,7 +92,7 @@ try{
    }
   }
  }
- console.log('PASS: all ten Sol cases passed API access, output contracts, evidence validation, limitation preservation, and bounded response time. Historical baseline failures are reported separately. Synthetic smoke comparison is not a broad quality benchmark.');
+ console.log('PASS: all fourteen Sol cases passed API access, output contracts, evidence validation, limitation preservation, and bounded response time. Historical baseline failures are reported separately. Synthetic smoke comparison is not a broad quality benchmark.');
 }finally{
  if(user)await request('/auth/v1/admin/users/'+user,'DELETE');
  await query('delete from public.beta_access where email=$1 and user_id is null',[email]);

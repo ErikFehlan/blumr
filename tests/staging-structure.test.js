@@ -65,3 +65,14 @@ test('open signup routines match source, pinned search path and restricted calle
  }
  assert.throws(()=>signupExpectations(sql.replace('before_beta_signup(event','unknown_signup(event')));
 });
+
+test('inference learning deployment requires exact private routines and scoped quality RPC',async()=>{
+ const {inferenceExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261006200406_role_neutral_inference_learning.sql','utf8'),expected=inferenceExpectations(sql);
+ assert.equal(expected.size,8);
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:false,args:e.args,defaults:null,security_definer:e.securityDefiner,volatility:e.volatility,config:['search_path=""'],clients_denied:!e.admin,worker_allowed:!e.private,anon_denied:true,authenticated_allowed:e.admin}}));
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ stage.find(r=>r.name==='blumr_knowledge.capture_prediction()').routine.worker_allowed=true;
+ assert.deepEqual(structuralDifferences([],stage,expected),['function:blumr_knowledge.capture_prediction()']);
+ assert.throws(()=>inferenceExpectations(sql.replace('capture_prediction()', 'unlisted_routine()')));
+});
