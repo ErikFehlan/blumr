@@ -46,7 +46,7 @@
    if(!error&&patterns.length)list.insertAdjacentHTML('afterbegin',`<div class="rf-automatic-knowledge"><p class="rf-sub">${patterns.length} ${patterns.length===1?'pattern is':'patterns are'} used automatically for this job. Your current requirements take precedence.</p>${patterns.map(p=>`<details><summary>${esc(p.text)}</summary><p class="rf-sub">Supported by feedback on ${esc(p.supporting_candidates)} candidates across ${esc(p.supporting_jobs)} searches. Historical context, not evidence about this candidate.</p><p>${esc(p.question)}</p><button type="button" class="rf-btn" data-exclude-pattern="${esc(p.rule_key)}">Doesn’t apply here</button></details>`).join('')}</div>`);
    list.querySelectorAll('[data-exclude-pattern]').forEach(button=>button.addEventListener('click',async()=>{
     const id=job.id,key=id+':'+button.dataset.excludePattern;if(busy.has(key))return;busy.add(key);button.disabled=true;
-    try{await api.excludeAutomatic(id,button.dataset.excludePattern);await refresh();api.toast('Pattern removed for this job. Future assessments will use the updated context.');}
+    try{await api.excludeAutomatic(id,button.dataset.excludePattern);button.blur();await refresh();api.toast('Pattern removed for this job. Future assessments will use the updated context.');}
     catch(e){api.toast(e.message||'Unable to update this job’s learning.','error');}finally{busy.delete(key);button.disabled=false;}
    }));
    list.querySelectorAll('.rf-memory-item').forEach(d=>{d.open=expanded.includes(d.querySelector('[data-memory-edit]')?.dataset.memoryEdit);});
