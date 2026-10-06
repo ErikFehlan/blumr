@@ -50,6 +50,11 @@ do $$begin
  if jsonb_array_length(blumr_knowledge.for_job('90000000-0000-0000-0000-000000000003'))<>0 then raise exception 'Contradiction ignored';end if;
  if exists((select candidate_id,revision,status from job_reassessment_tasks where job_id='90000000-0000-0000-0000-000000000003') except (select * from untouched_tasks)) then raise exception 'Learning caused AI reassessment fanout';end if;
 end$$;
+update manager_feedback set feedback_text='Screening confirmed RabbitMQ experience didn''t transfer to Kafka.' where id='91000000-0000-0000-0000-000000000001';
+do $$begin
+ if jsonb_array_length(blumr_knowledge.for_job('90000000-0000-0000-0000-000000000003'))<>0 then raise exception 'Contracted negation became confirmation';end if;
+ if not exists(select from blumr_knowledge.observations where candidate_id='91000000-0000-0000-0000-000000000001' and polarity=-1) then raise exception 'Contracted contradiction was dropped';end if;
+end$$;
 update manager_feedback set feedback_text='Screening verified RabbitMQ experience transferred to Kafka for event handling.' where id='91000000-0000-0000-0000-000000000001';
 set role authenticated;
 select exclude_automatic_job_knowledge('90000000-0000-0000-0000-000000000003',md5('kafka|rabbitmq'));

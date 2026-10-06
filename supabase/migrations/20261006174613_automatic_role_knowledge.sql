@@ -129,7 +129,9 @@ begin
   if src.body ~* '(ignore (all|previous)|system prompt|override.*instructions|always (approve|reject)|reason not yet explained|no supporting reason provided)' then continue;end if;
   for sentence in select trim(v) from regexp_split_to_table(src.body,E'[.!;\n]+') v loop
    if length(sentence) not between 12 and 700 or position('?' in sentence)>0 then continue;end if;
-   if sentence ~* '\m(if|hypothetical|might|could|would|maybe|perhaps)\M' then continue;end if;
+   sentence:=regexp_replace(sentence,'([a-z]+)n[''’]t','\1 not','gi');
+   if sentence ~* '\m(if|hypothetical|might|maybe|perhaps)\M'
+    or sentence ~* '\m(could|would)\M' and sentence !~* '\mnot\M' then continue;end if;
    for rule in select * from blumr_knowledge.catalog loop
     if not exists(select from jsonb_array_elements_text(rule.aliases) a where blumr_knowledge.contains_term(sentence,a)) then continue;end if;
     for term in select v from jsonb_array_elements_text(rule.related) v loop
