@@ -152,19 +152,16 @@
    try{
     const snapshot=await securityLoad();if(!allowed||request!==version)return;panel.replaceChildren();
     const h=document.createElement('h3');h.textContent='Beta access and security';panel.append(h);
-    const note=document.createElement('p');note.className='rf-sub';note.textContent='Approve an email before its owner creates an account. Approval sends no email. New accounts must verify their email. Revoking access blocks new data requests and AI processing.';panel.append(note);
-    const form=document.createElement('form');form.className='rf-form';const label=document.createElement('label');label.textContent='Beta tester email';
-    const input=document.createElement('input');input.type='email';input.required=true;input.maxLength=254;input.autocomplete='off';input.id='betaAccessEmail';label.htmlFor=input.id;
-    const submit=document.createElement('button');submit.type='submit';submit.className='rf-btn primary';submit.textContent='Approve beta access';
-    const status=document.createElement('p');status.setAttribute('role','status');
-    form.append(label,input,submit,status);form.addEventListener('submit',async event=>{event.preventDefault();submit.disabled=true;try{await securityAccess(input.value.trim(),true);if(allowed&&request===version)await loadSecurity(request);}catch(error){status.textContent=error.message||'Approval could not be saved.';}finally{submit.disabled=false;}});panel.append(form);
+    const note=document.createElement('p');note.className='rf-sub';note.textContent='The free beta is open. Anyone can create an account and verify their email without an invitation. Manage registered users here. Suspending access blocks new data requests and AI processing.';panel.append(note);
+    const status=document.createElement('p');status.setAttribute('role','status');panel.append(status);
     const list=document.createElement('ul');
     for(const account of snapshot.accounts||[]){const row=document.createElement('li'),text=document.createElement('span'),button=document.createElement('button');
-     text.textContent=account.email+' · '+(account.approved?(account.registered?'Active account':'Approved to register'):'Access revoked')+' ';
-     button.type='button';button.className='rf-btn';button.textContent=account.approved?'Revoke access':'Restore access';
+     const labels={active:'Active account',unverified:'Awaiting email verification',suspended:'Access suspended',deleting:'Deletion in progress',not_registered:'Not registered'};
+     text.textContent=account.email+' · '+(labels[account.status]||(account.approved?(account.registered?'Active account':'Not registered'):'Access suspended'))+' ';
+     button.type='button';button.className='rf-btn';button.textContent=account.approved?'Suspend access':'Restore access';
      button.addEventListener('click',async()=>{button.disabled=true;try{await securityAccess(account.email,!account.approved);if(allowed&&request===version)await loadSecurity(request);}catch(error){status.textContent=error.message||'Access could not be updated.';}finally{button.disabled=false;}});row.append(text,button);list.append(row);}
     panel.append(list);
-    count('users',(snapshot.accounts||[]).filter(account=>account.approved).length);count('usage',snapshot.today?.calls||0);
+    count('users',(snapshot.accounts||[]).filter(account=>account.active===true).length);count('usage',snapshot.today?.calls||0);
     const usage=document.createElement('p');usage.textContent=`AI calls today: ${snapshot.today?.calls||0} / ${snapshot.limits.global_day}. Per workspace: ${snapshot.limits.workspace_day} per day, ${snapshot.limits.workspace_minute} per minute. Retries count toward these limits.`;panel.append(usage);
     const pause=document.createElement('button');pause.type='button';pause.className='rf-btn';pause.textContent=snapshot.limits.ai_paused?'Resume AI processing':'Pause AI processing';
     pause.addEventListener('click',async()=>{pause.disabled=true;try{await securityPause(!snapshot.limits.ai_paused);if(allowed&&request===version)await loadSecurity(request);}catch(error){status.textContent=error.message||'Processing control could not be saved.';}finally{pause.disabled=false;}});panel.append(pause);

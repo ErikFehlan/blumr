@@ -22,7 +22,9 @@ insert into auth.users(id,email,email_confirmed_at) values
  ('00000000-0000-0000-0000-000000000001','efehlan@gmail.com',now()),
  ('00000000-0000-0000-0000-000000000002','recruiter@example.test',now());
 \ir ../supabase/migrations/20260917200000_beta_security.sql
+\ir ../supabase/patches/open-beta-signup.sql
 \ir ../supabase/migrations/20260917200000_beta_security.sql
+\ir ../supabase/patches/open-beta-signup.sql
 grant select,insert,update,delete on public.jobs,public.workspace_members,public.workspaces,storage.objects to authenticated;
 create table test_ids as select owner_id as user_id,id as workspace_id from workspaces;
 grant select on test_ids to authenticated,service_role;
@@ -35,9 +37,12 @@ do $$begin
 end$$;
 reset role;
 do $$begin
- if before_beta_signup('{"user":{"email":"unknown@example.test"}}')#>>'{error,http_code}'<>'403' then raise exception 'Signup hook allowed stranger';end if;
+ if before_beta_signup('{"user":{"email":"unknown@example.test"}}')<>'{}' then raise exception 'Self-service signup blocked';end if;
  if before_beta_signup('{"user":{"email":"approved@example.test"}}')<>'{}' then raise exception 'Approved signup blocked';end if;
- begin insert into auth.users(id,email,email_confirmed_at) values(gen_random_uuid(),'unknown@example.test',now());raise exception 'Direct account creation bypassed approval';exception when insufficient_privilege then null;end;
+ if before_beta_signup('{"user":{"email":""}}')#>>'{error,http_code}'<>'400' then raise exception 'Emailless signup allowed';end if;
+ if before_beta_signup('{"user":{"email":"anonymous@example.test","is_anonymous":true}}')#>>'{error,http_code}'<>'400' then raise exception 'Anonymous signup allowed';end if;
+ insert into auth.users(id,email) values('00000000-0000-0000-0000-000000000004','unknown@example.test');
+ if not exists(select from beta_access where email='unknown@example.test' and approved and user_id='00000000-0000-0000-0000-000000000004') then raise exception 'Automatic access binding missing';end if;
 end$$;
 insert into auth.users(id,email) values('00000000-0000-0000-0000-000000000003','approved@example.test');
 do $$begin
@@ -84,6 +89,7 @@ set test.actor='00000000-0000-0000-0000-000000000001';set role authenticated;
 select manage_beta_access('recruiter@example.test',false);
 reset role;
 \ir ../supabase/migrations/20260917200000_beta_security.sql
+\ir ../supabase/patches/open-beta-signup.sql
 set test.actor='00000000-0000-0000-0000-000000000002';set role authenticated;
 do $$declare w uuid;begin
  select workspace_id into w from test_ids where user_id=auth.uid();
@@ -117,4 +123,40 @@ do $$declare w uuid;begin
  if has_function_privilege('authenticated','public.enforce_beta_signup()','execute') then raise exception 'Auth trigger exposed';end if;
 end$$;
 truncate ai_budget_counters;
-select 'PASS: approval, verification, admin identity, revocation, direct REST and storage quotas, worker budgets, and replay safety' as result;
+select 'PASS: self-service registration, verification, admin identity, revocation, direct REST and storage quotas, worker budgets, and replay safety' as result;
+
+-- A self-service user gets exactly one private workspace, hidden until verification.
+set test.actor='00000000-0000-0000-0000-000000000004';set role authenticated;
+do $$begin
+ if exists(select from workspace_members) or exists(select from jobs) then raise exception 'Unverified account read private data';end if;
+ if is_app_admin() then raise exception 'Self-service user became admin';end if;
+end$$;
+reset role;
+update auth.users set email_confirmed_at=now(),raw_user_meta_data='{"role":"admin","approved":true}' where id='00000000-0000-0000-0000-000000000004';
+set role authenticated;
+do $$declare w uuid;begin
+ select workspace_id into strict w from workspace_members where user_id=auth.uid();
+ if is_app_admin() then raise exception 'Forged metadata promoted user';end if;
+ insert into jobs(workspace_id,title) values(w,'Open beta private role');
+ if (select count(*) from jobs)<>1 then raise exception 'Another workspace leaked';end if;
+end$$;
+reset role;
+-- Existing blocks, even after deletion, must never be auto-approved again.
+insert into beta_access(email,approved) values('blocked@example.test',false);
+do $$begin
+ if before_beta_signup('{"user":{"email":" BLOCKED@example.test "}}')#>>'{error,http_code}'<>'403' then raise exception 'Block ignored';end if;
+ begin insert into auth.users(id,email) values(gen_random_uuid(),'blocked@example.test');raise exception 'Blocked direct signup allowed';exception when insufficient_privilege then null;end;
+ if exists(select from auth.users where email='blocked@example.test') then raise exception 'Failed signup left a partial account';end if;
+end$$;
+-- Suspension follows identity even after a verified email change.
+update auth.users set email='changed@example.test' where id='00000000-0000-0000-0000-000000000004';
+set test.actor='00000000-0000-0000-0000-000000000001';set role authenticated;
+select manage_beta_access('changed@example.test',false);
+reset role;
+\ir ../supabase/patches/open-beta-signup.sql
+set test.actor='00000000-0000-0000-0000-000000000004';set role authenticated;
+do $$begin
+ if exists(select from jobs) or exists(select from workspace_members) then raise exception 'Suspended user still has access';end if;
+end$$;
+reset role;
+select 'PASS: new verified account, isolated job creation, forged admin metadata, blocked signup rollback, changed-email suspension and replay protection';

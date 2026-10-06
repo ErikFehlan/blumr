@@ -4,7 +4,7 @@ const sql=fs.readFileSync(path.join(dir,'supabase/migrations/20260915150000_admi
 const resources=Object.fromEntries([...sql.matchAll(/\('([a-z]+)', \$resource\$([\s\S]*?)\$resource\$\)/g)].map(m=>[m[1],m[2]]));
 const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.txt',pkg:'package.json',env:'.env.example'};
 (async()=>{
- let betaAccounts=[],aiPaused=false,recovered=false,workerRecovered=false;
+ let betaAccounts=[{email:'tester@example.test',approved:true,registered:true,email_verified:true,active:true,status:'active'}],aiPaused=false,recovered=false,workerRecovered=false;
  let revoked=false,failTools=false,holdTools=false,held=null,downloads=0,failUsage=false,usageCalls=0;
  const server=http.createServer(async(req,res)=>{
   if(req.url.startsWith('/rpc/')){
@@ -14,7 +14,7 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
    if(op==='is-admin'){res.end(JSON.stringify(admin));return;}
    if(!admin){res.statusCode=403;res.end(JSON.stringify({code:'42501',message:'Admin access required'}));return;}
    if(op==='security'){res.end(JSON.stringify({accounts:betaAccounts,limits:{ai_paused:aiPaused,global_day:1000,workspace_day:200,workspace_minute:20},today:{calls:4}}));return;}
-   if(op==='access'){betaAccounts=[{email:input.email,approved:input.approved,registered:false}];res.end('{}');return;}
+   if(op==='access'){betaAccounts=[{email:input.email,approved:input.approved,registered:true,email_verified:true,active:input.approved,status:input.approved?'active':'suspended'}];res.end('{}');return;}
    if(op==='pause'){aiPaused=input.paused;res.end('{}');return;}
    if(op==='usage'){
     usageCalls++;if(failUsage){res.statusCode=503;res.end(JSON.stringify({message:'Temporary outage'}));return;}
@@ -95,10 +95,11 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
   }
   await page.getByText('No interrupted assessments need recovery.',{exact:true}).waitFor();assert.equal(recovered,true);assert.equal(workerRecovered,true);
   await page.getByRole('button',{name:'Users',exact:true}).click();
-  await page.locator('#betaAccessEmail').waitFor();assert.equal(await page.locator('.rf-globaljob').isVisible(),false);
-  await page.locator('#betaAccessEmail').fill('tester@example.test');await page.getByRole('button',{name:'Approve beta access',exact:true}).click();
-  await page.getByText('tester@example.test · Approved to register').waitFor();assert.equal(betaAccounts[0].approved,true);
-  await page.getByRole('button',{name:'Revoke access',exact:true}).click();await page.getByText('tester@example.test · Access revoked').waitFor();assert.equal(betaAccounts[0].approved,false);
+  await page.getByText('tester@example.test · Active account').waitFor();
+  assert.equal(await page.locator('#betaAccessEmail').count(),0,'Registration needs no administrator invitation');
+  assert.equal(await page.locator('.rf-globaljob').isVisible(),false);
+  await page.getByRole('button',{name:'Suspend access',exact:true}).click();await page.getByText('tester@example.test · Access suspended').waitFor();assert.equal(betaAccounts[0].approved,false);
+  await page.getByRole('button',{name:'Restore access',exact:true}).click();await page.getByText('tester@example.test · Active account').waitFor();assert.equal(betaAccounts[0].approved,true);
   await page.getByRole('button',{name:'Pause AI processing',exact:true}).click();await page.getByRole('button',{name:'Resume AI processing',exact:true}).waitFor();assert.equal(aiPaused,true);
   await page.locator('[data-goto="backend"]').first().click();assert.equal(await page.locator('#page-backend #downloadServer').count(),0);
   await page.locator('#adminToolsNav').click();await page.getByRole('button',{name:'Technical setup',exact:true}).click();await page.getByText('Advanced configuration and downloads',{exact:true}).click();await page.locator('#downloadServer').waitFor();await page.locator('#backendProject').fill('example-project');await page.locator('#backendModel').fill('example-model');
