@@ -36,6 +36,12 @@ export async function fetchWithRetry(input:RequestInfo|URL,init:RequestInit={},o
     const requestInit={...init,headers,signal:options.timeoutMs?AbortSignal.any([AbortSignal.timeout(options.timeoutMs),...(init.signal?[init.signal]:[])]):init.signal};
     try{
       const response=await fetcher(input,requestInit);
+      // A depleted balance is permanent until billing changes. Keep the original
+      // body readable for callers, and never amplify it with transport retries.
+      if(response.status===429){
+        const body=await response.clone().json().catch(()=>null);
+        if(['credit_balance_exhausted','project_spend_limit_exceeded','organization_spend_limit_exceeded','insufficient_quota'].includes(body?.error?.code))return response;
+      }
       const explicit=response.headers.get('x-should-retry');
       const shouldRetry=explicit==='true'||(explicit!=='false'&&retryableStatus(response.status));
       if(options.retryTransport===false&&[408,504].includes(response.status))return response;
