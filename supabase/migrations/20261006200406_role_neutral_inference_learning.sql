@@ -100,6 +100,9 @@ begin
    (row->>'confidence_score')::integer,'experience-intelligence-v2',(('x'||substr(md5(new.candidate_id::text),1,8))::bit(32)::bigint%5=0),originals)
   on conflict(candidate_id,criterion_key) do nothing;
  end loop;
+ -- Candidate-level evaluation holdout also excludes legacy catalog learning.
+ if exists(select from blumr_knowledge.inference_predictions where candidate_id=new.candidate_id and held_out) then
+  delete from blumr_knowledge.observations where candidate_id=new.candidate_id;end if;
  return new;
 end$$;
 -- These durable result tables are writable only by service-owned workers.
@@ -111,10 +114,12 @@ create trigger capture_inference_prediction after insert or update on public.job
 create or replace function blumr_knowledge.capture_source() returns trigger
 language plpgsql security definer set search_path='' as $$
 begin
- if tg_op='DELETE' then perform blumr_knowledge.capture_candidate(old.candidate_id);perform blumr_knowledge.validate_predictions(old.candidate_id);return old;end if;
+ if tg_op='DELETE' then perform blumr_knowledge.capture_candidate(old.candidate_id);perform blumr_knowledge.validate_predictions(old.candidate_id);delete from blumr_knowledge.observations o where o.candidate_id=old.candidate_id and exists(select from blumr_knowledge.inference_predictions p where p.candidate_id=o.candidate_id and p.held_out);return old;end if;
  if tg_op='UPDATE' and old.candidate_id is distinct from new.candidate_id then
-  perform blumr_knowledge.capture_candidate(old.candidate_id);perform blumr_knowledge.validate_predictions(old.candidate_id);end if;
- perform blumr_knowledge.capture_candidate(new.candidate_id);perform blumr_knowledge.validate_predictions(new.candidate_id);return new;
+  perform blumr_knowledge.capture_candidate(old.candidate_id);perform blumr_knowledge.validate_predictions(old.candidate_id);delete from blumr_knowledge.observations o where o.candidate_id=old.candidate_id and exists(select from blumr_knowledge.inference_predictions p where p.candidate_id=o.candidate_id and p.held_out);end if;
+ perform blumr_knowledge.capture_candidate(new.candidate_id);perform blumr_knowledge.validate_predictions(new.candidate_id);
+ delete from blumr_knowledge.observations o where o.candidate_id=new.candidate_id and exists(select from blumr_knowledge.inference_predictions p where p.candidate_id=o.candidate_id and p.held_out);
+ return new;
 end$$;
 
 create or replace function blumr_knowledge.inference_history(p_job uuid) returns jsonb

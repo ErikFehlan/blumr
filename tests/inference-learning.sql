@@ -53,6 +53,12 @@ do $$begin
  if jsonb_array_length(blumr_knowledge.for_job('a0000000-0000-0000-0000-000000000003'))<>0 then raise exception 'Stale positive history survived correction';end if;
  if exists(select from candidates where id::text like 'b0000000%' and manager_score<>7) then raise exception 'Learning changed fit scores';end if;
 end$$;
+-- Held-out candidates are excluded from the older catalog loop as well.
+update manager_feedback set feedback_text='Interview confirmed RabbitMQ experience transferred to Kafka for scenario '||right(id::text,2),updated_at=now() where id::text like 'b0000000%';
+do $$begin
+ if exists(select from blumr_knowledge.observations o join blumr_knowledge.inference_predictions p using(candidate_id) where p.held_out) then raise exception 'Evaluation case taught legacy catalog';end if;
+ if not exists(select from blumr_knowledge.observations) then raise exception 'Non-held-out legacy catalog stopped learning';end if;
+end$$;
 -- Decisions, unverified claims, hypotheses, questions, and generated text are not labels.
 update manager_feedback set feedback_text='Advance candidate. Financial close was discussed, not yet verified.' where id::text like 'b0000000%';
 do $$begin if exists(select from blumr_knowledge.inference_validations) then raise exception 'Unverified qualification became a negative label';end if;end$$;
