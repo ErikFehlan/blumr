@@ -13,6 +13,7 @@
     for(const pattern of list(job.automaticKnowledge).slice(0,6)){
       if(!/^auto-[a-f0-9]{32}$/.test(pattern.id||''))continue;
       add(pattern.id,'automatic learning',pattern.text,pattern.last_seen,'job');
+      if(pattern.inference_history&&sources.at(-1)?.id===pattern.id)sources.at(-1).inference_history=pattern.inference_history;
     }
     for(const lesson of list(job.assessmentLessons)){
       if(!lesson.active||!['manager_priority','evaluation_method'].includes(lesson.kind))continue;

@@ -563,7 +563,7 @@
       const assessmentMemory=window.BlumrAssessmentMemory.create({
         root,jobs:()=>jobs,job:activeJob,workspace:()=>dataReady?window.ancalagonAuth?.workspace?.id:null,
         ready:()=>!!dataService?.loadAssessmentLessons,load:()=>dataService.loadAssessmentLessons(),
-        loadAutomatic:()=>dataService.loadAutomaticKnowledge?.()||[],excludeAutomatic:(...args)=>dataService.excludeAutomaticKnowledge(...args),
+        loadAutomatic:()=>dataService.loadAutomaticKnowledge?.()||[],loadQuality:()=>dataService.loadInferenceQuality?.()||null,excludeAutomatic:(...args)=>dataService.excludeAutomaticKnowledge(...args),
         persist:()=>dataService.flush(stateSnapshot()),save:(...args)=>dataService.saveAssessmentLesson(...args),
         update:(...args)=>dataService.updateAssessmentLesson(...args),refreshAssessments:()=>jobReview.refresh(),
         changed:()=>window.AncalagonWorkspace?.refreshEvaluation(),toast:showToast

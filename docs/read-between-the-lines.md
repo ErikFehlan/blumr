@@ -1,5 +1,7 @@
 # Read between the lines
 
+For the current role-neutral engine and automatic outcome learning, see [Experience intelligence](experience-intelligence.md). The notes below describe the initial inference release.
+
 This release completes the October 6 inference commits. Inspection found a literal newline escape in the analysis handler, an inconsistent evidence-type schema, missing integration in reassessment, and three failing existing Node tests. These are corrected without rewriting saved assessments or approving scores.
 
 ## Evidence and fit

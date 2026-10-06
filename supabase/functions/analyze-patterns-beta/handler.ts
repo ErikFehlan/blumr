@@ -68,7 +68,7 @@ export async function handleAuthenticatedAnalysis(request: Request) {
         const lessons=await response.json();
         if(!Array.isArray(lessons))return json({error:'Learning memory temporarily unavailable. Try again.'},503);
         const saved=await priorityResponse.json(),priorities=saved?.items?.length?{basis:saved.basis,review_status:saved.review_status,items:saved.items}:null;
-        payload.evaluation_context={...suppliedContext,hiring_priorities:priorities,sources:[...cleanSources,...(priorities?.items||[]).map((p:{id:string,title:string,reason:string})=>({id:p.id,kind:'requirement',text:p.title+': '+p.reason,scope:'job'})),...lessons.map(l=>({id:l.automatic?l.id:`lesson-${l.id}`,kind:l.automatic?'automatic learning':'approved learning',text:`${l.kind}: ${l.text}`,recorded_at:l.last_seen||l.updated_at,scope:l.scope}))]};
+        payload.evaluation_context={...suppliedContext,hiring_priorities:priorities,sources:[...cleanSources,...(priorities?.items||[]).map((p:{id:string,title:string,reason:string})=>({id:p.id,kind:'requirement',text:p.title+': '+p.reason,scope:'job'})),...lessons.map(l=>({id:l.automatic?l.id:`lesson-${l.id}`,kind:l.automatic?'automatic learning':'approved learning',text:`${l.kind}: ${l.text}`,recorded_at:l.last_seen||l.updated_at,scope:l.scope,...(l.automatic&&l.inference_history?{inference_history:l.inference_history}:{})}))]};
       }catch{return json({error:'Learning memory temporarily unavailable. Try again.'},503);}
     }
   }

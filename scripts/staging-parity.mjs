@@ -1,6 +1,6 @@
 // Compare deployment structure only. Never copy production account data into staging.
 import {readFile} from 'node:fs/promises';
-import {capacityExpectations,workerExpectations,guardExpectations,signupExpectations,knowledgeExpectations,structuralDifferences} from './staging-structure.mjs';
+import {capacityExpectations,workerExpectations,guardExpectations,signupExpectations,knowledgeExpectations,inferenceExpectations,structuralDifferences} from './staging-structure.mjs';
 const token=process.env.SUPABASE_ACCESS_TOKEN;
 if(process.env.SUPABASE_PROJECT_REF!=='momfzjmycveqginxmqib'||!token)throw Error('Staging parity requires the isolated staging project');
 async function api(ref,path,body){
@@ -30,14 +30,16 @@ for(const [key,value] of workerExpectations(await readFile('supabase/migrations/
 for(const [key,value] of guardExpectations(await readFile('supabase/migrations/20261005190251_production_readiness_guards.sql','utf8')))expected.set(key,value);
 for(const [key,value] of signupExpectations(await readFile('supabase/patches/open-beta-signup.sql','utf8')))expected.set(key,value);
 for(const [key,value] of knowledgeExpectations(await readFile('supabase/migrations/20261006174613_automatic_role_knowledge.sql','utf8')))expected.set(key,value);
+for(const [key,value] of inferenceExpectations(await readFile('supabase/migrations/20261006200406_role_neutral_inference_learning.sql','utf8')))expected.set(key,value);
 const differences=structuralDifferences(production,stage,expected);
 if(differences.length)throw Error('Staging structural differences: '+differences.join(', '));
 const [knowledge]=await api('momfzjmycveqginxmqib','/database/query',{query:`select
  not has_schema_privilege('authenticated','blumr_knowledge','usage') and not has_schema_privilege('anon','blumr_knowledge','usage') as private_schema,
- (select count(*)=4 and bool_and(relrowsecurity and not has_table_privilege('authenticated',c.oid,'select,insert,update,delete') and not has_table_privilege('anon',c.oid,'select,insert,update,delete')) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='blumr_knowledge' and c.relkind='r') as private_tables,
+ (select count(*)=6 and bool_and(relrowsecurity and not has_table_privilege('authenticated',c.oid,'select,insert,update,delete') and not has_table_privilege('anon',c.oid,'select,insert,update,delete')) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='blumr_knowledge' and c.relkind='r') as private_tables,
  (select count(*)=4 from pg_trigger where tgname='capture_automatic_knowledge' and tgenabled='O' and tgfoid='blumr_knowledge.capture_source()'::regprocedure) as capture_triggers,
- exists(select from pg_trigger where tgname='a_capture_job_knowledge' and tgrelid='public.jobs'::regclass and tgenabled='O' and tgfoid='blumr_knowledge.capture_job()'::regprocedure) as job_trigger`});
-if(!knowledge?.private_schema||!knowledge.private_tables||!knowledge.capture_triggers||!knowledge.job_trigger)throw Error('Automatic knowledge isolation or capture is incomplete');
+ exists(select from pg_trigger where tgname='a_capture_job_knowledge' and tgrelid='public.jobs'::regclass and tgenabled='O' and tgfoid='blumr_knowledge.capture_job()'::regprocedure) as job_trigger,
+ (select count(*)=2 from pg_trigger where tgname='capture_inference_prediction' and tgenabled='O' and tgfoid='blumr_knowledge.capture_prediction()'::regprocedure) as prediction_triggers`});
+if(!knowledge?.private_schema||!knowledge.private_tables||!knowledge.capture_triggers||!knowledge.job_trigger||!knowledge.prediction_triggers)throw Error('Automatic knowledge isolation or capture is incomplete');
 const [ledger]=await api('momfzjmycveqginxmqib','/database/query',{query:"select relrowsecurity and not has_table_privilege('anon',oid,'select,insert,update,delete') and not has_table_privilege('authenticated',oid,'select,insert,update,delete') and has_table_privilege('service_role',oid,'select,insert,update,delete') as private from pg_class where oid='public.assessment_worker_attempts'::regclass"});
 if(ledger?.private!==true)throw Error('Worker attempt ledger is not service-only');
 const [uploads]=await api('momfzjmycveqginxmqib','/database/query',{query:`select (select not public and file_size_limit=10485760 and allowed_mime_types=array['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','text/plain'] from storage.buckets where id='resumes') as private_bucket,

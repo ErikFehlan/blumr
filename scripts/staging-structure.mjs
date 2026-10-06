@@ -23,8 +23,11 @@ export function capacityExpectations(sql) {
  return expected;
 }
 export const normalizeStructure=value=>value.replaceAll('\r\n','\n').replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
-export function knowledgeExpectations(sql){
- const expected=new Map(),names=['normalized','contains_term','role_key','capture_candidate','capture_source','eligible','capture_job','for_job','get_automatic_job_knowledge','get_workspace_job_knowledge','get_assessment_lessons','exclude_automatic_job_knowledge','reassessment_job_input'];
+export function inferenceExpectations(sql){
+ return knowledgeExpectations(sql,['criterion_key','human_sources','validate_predictions','capture_prediction','capture_source','inference_history','capture_job','for_job','get_inference_learning_quality']);
+}
+export function knowledgeExpectations(sql,requestedNames){
+ const expected=new Map(),names=requestedNames||['normalized','contains_term','role_key','capture_candidate','capture_source','eligible','capture_job','for_job','get_automatic_job_knowledge','get_workspace_job_knowledge','get_assessment_lessons','exclude_automatic_job_knowledge','reassessment_job_input'];
  const pattern=/create or replace function (public|blumr_knowledge)\.(\w+)\(([^)]*)\) returns (text|boolean|void|trigger|jsonb)\s+language (sql|plpgsql)\s+(?:(immutable|stable|volatile)\s+)?(?:security (definer|invoker)\s+)?set search_path='' as \$\$([\s\S]*?)\$\$;/g;
  for(const [,schema,name,args,result,language,volatility,security,body] of sql.matchAll(pattern)){
   if(!names.includes(name))throw Error('Unexpected knowledge routine');
