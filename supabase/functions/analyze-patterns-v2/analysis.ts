@@ -4,7 +4,8 @@ import {feedbackInstructions,feedbackInput,feedbackSchema,validFeedback} from '.
 import {analysisModel,modelReasoning} from '../_shared/model-routing.mjs';
 import {resumeSources,resolveResumeSources} from './resume-sources.mjs';
 import {withPriorityAssessment,validatePriorityAssessment,priorityAssessmentInstructions} from '../_shared/priority-assessment.mjs';
-import {depthInstructions,withDetails,validateDetails} from '../_shared/assessment-depth.mjs';\nimport {transferabilityHints,transferabilityInstructions} from '../_shared/transferability.mjs';
+import {depthInstructions,withDetails,validateDetails} from '../_shared/assessment-depth.mjs';
+import {transferabilityHints,transferabilityInstructions} from '../_shared/transferability.mjs';
 import {fetchWithRetry} from '../_shared/provider-retry.ts';
 import '../../../assets/resume-intake.js';
 // Deployed as analyze-patterns-v2, matching the dashboard's configured endpoint.
