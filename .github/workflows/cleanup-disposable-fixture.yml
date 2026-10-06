@@ -1,0 +1,55 @@
+name: Clean canceled automatic-learning fixture
+on:
+  push:
+    branches: [maintenance/cleanup-automatic-fixture]
+permissions:
+  contents: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 5
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Remove only the verified disposable staging fixture
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const ref='momfzjmycveqginxmqib';
+          const id='992761d7-9ce1-483f-8af9-bec39c4bf161';
+          const token=process.env.SUPABASE_ACCESS_TOKEN;
+          assert.ok(token, 'Deployment credential unavailable');
+          async function management(path, body) {
+            const r=await fetch('https://api.supabase.com/v1/projects/'+ref+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(25000)});
+            if(!r.ok)throw Error('Management request failed ('+r.status+')');
+            return r.json();
+          }
+          const keys=await management('/api-keys?reveal=true');
+          const key=keys.find(k=>k.name==='service_role')?.api_key;
+          assert.ok(key,'Service credential unavailable');
+          async function admin(method) {
+            const r=await fetch('https://'+ref+'.supabase.co/auth/v1/admin/users/'+id,{method,headers:{apikey:key,Authorization:'Bearer '+key},signal:AbortSignal.timeout(25000)});
+            if(method==='GET'&&r.status===404)return null;
+            if(!r.ok)throw Error('Fixture Auth request failed ('+r.status+')');
+            return r.json();
+          }
+          const payload=await admin('GET');
+          if(!payload){console.log('PASS: disposable fixture already removed');process.exit(0);}
+          const user=payload.user||payload;
+          assert.equal(user.id,id);
+          assert.match(user.email,/^ancalagon-core-test-[0-9a-f-]+@example\.invalid$/);
+          assert.equal(user.user_metadata?.display_name,'Disposable core test');
+          assert.equal(user.created_at.slice(0,10),'2026-10-06');
+          const before=await management('/database/query',{query:'select count(*)::int as count from storage.objects where owner_id=$1',parameters:[id]});
+          assert.equal(before[0]?.count,0,'Storage must be cleaned before Auth');
+          await admin('DELETE');
+          await management('/database/query',{query:'delete from public.beta_access where email=$1 and user_id is null',parameters:[user.email]});
+          const after=await management('/database/query',{query:'select exists(select from auth.users where id=$1) as user_remains,exists(select from public.workspaces where owner_id=$1) as workspace_remains,exists(select from auth.sessions where user_id=$1) as session_remains',parameters:[id]});
+          assert.deepEqual(after,[{user_remains:false,workspace_remains:false,session_remains:false}]);
+          console.log('PASS: exactly one disposable fixture, its sessions and workspace removed; storage was already empty. No model or email request.');
+          NODE
