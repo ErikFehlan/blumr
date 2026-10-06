@@ -56,13 +56,29 @@ export function workerExpectations(sql) {
  if(expected.size!==names.length||(sql.match(/create or replace function/gi)||[]).length!==names.length)throw Error('Worker declarations are incomplete or unsupported');
  return expected;
 }
+export function signupExpectations(sql) {
+ const expected=new Map(),names=['before_beta_signup','enforce_beta_signup','manage_beta_access','get_beta_security'];
+ const pattern=/create or replace function public\.(\w+)\(([^)]*)\) returns (jsonb|trigger|void)\s+language plpgsql (stable )?security definer set search_path='' as \$\$([\s\S]*?)\$\$;/g;
+ for(const [,name,args,result,stable,body] of sql.matchAll(pattern)){
+  if(!names.includes(name))throw Error('Unexpected signup routine');
+  const parameters=args?args.split(',').map(arg=>{
+   const p=arg.trim().match(/^(\w+) (jsonb|text|boolean)$/);if(!p)throw Error('Unsupported signup argument');return p;
+  }):[];
+  const key='function:'+name+'('+parameters.map(p=>p[2]).join(',')+')';
+  expected.set(key,{body,language:'plpgsql',result,setof:false,args:parameters.map(p=>p[1]+' '+p[2]).join(', '),defaults:null,
+   admin:['manage_beta_access','get_beta_security'].includes(name),securityDefiner:true,
+   authHook:name==='before_beta_signup',triggerOnly:name==='enforce_beta_signup',volatility:stable?'s':'v'});
+ }
+ if(expected.size!==4||(sql.match(/create or replace function/gi)||[]).length!==4)throw Error('Signup declarations incomplete');
+ return expected;
+}
 export function structuralDifferences(production,stage,expected) {
  const actual=new Map(stage.map(x=>[x.kind+':'+x.name,x]));
  const differences=new Set();
  for(const [key,e] of expected) {
   const r=actual.get(key)?.routine;
-  const permissions=e.admin?(r?.anon_denied===true&&r?.authenticated_allowed===true):(r?.worker_allowed===true&&r?.clients_denied===true);
-  if(!r||r.source!==e.body||r.language!==e.language||r.result!==e.result||r.setof!==e.setof||r.args!==e.args||r.defaults!==e.defaults||r.security_definer!==Boolean(e.admin)||r.volatility!==(e.volatility||'v')||JSON.stringify(r.config)!==JSON.stringify(['search_path=""'])||!permissions)differences.add(key);
+  const permissions=e.authHook?(r?.clients_denied===true&&r?.auth_admin_allowed===true):e.triggerOnly?r?.clients_denied===true:e.admin?(r?.anon_denied===true&&r?.authenticated_allowed===true):(r?.worker_allowed===true&&r?.clients_denied===true);
+  if(!r||r.source!==e.body||r.language!==e.language||r.result!==e.result||r.setof!==e.setof||r.args!==e.args||r.defaults!==e.defaults||r.security_definer!==Boolean(e.securityDefiner??e.admin)||r.volatility!==(e.volatility||'v')||JSON.stringify(r.config)!==JSON.stringify(['search_path=""'])||!permissions)differences.add(key);
  }
  for(const row of production) {
   const key=row.kind+':'+row.name;

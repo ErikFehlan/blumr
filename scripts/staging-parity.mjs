@@ -1,6 +1,6 @@
 // Compare deployment structure only. Never copy production account data into staging.
 import {readFile} from 'node:fs/promises';
-import {capacityExpectations,workerExpectations,guardExpectations,structuralDifferences} from './staging-structure.mjs';
+import {capacityExpectations,workerExpectations,guardExpectations,signupExpectations,structuralDifferences} from './staging-structure.mjs';
 const token=process.env.SUPABASE_ACCESS_TOKEN;
 if(process.env.SUPABASE_PROJECT_REF!=='momfzjmycveqginxmqib'||!token)throw Error('Staging parity requires the isolated staging project');
 async function api(ref,path,body){
@@ -16,6 +16,7 @@ const query=`select 'column' as kind, table_name||'.'||column_name as name,
   'source',p.prosrc,'language',(select lanname from pg_language where oid=p.prolang),'result',p.prorettype::regtype::text,
   'setof',p.proretset,'args',pg_get_function_identity_arguments(p.oid),'defaults',pg_get_expr(p.proargdefaults,0),
   'security_definer',p.prosecdef,'volatility',p.provolatile,'config',p.proconfig,
+  'auth_admin_allowed',has_function_privilege('supabase_auth_admin',p.oid,'execute'),
   'worker_allowed',has_function_privilege('service_role',p.oid,'execute'),
   'anon_denied',not has_function_privilege('anon',p.oid,'execute'),
   'authenticated_allowed',has_function_privilege('authenticated',p.oid,'execute'),
@@ -27,6 +28,7 @@ const [production,stage]=await Promise.all(['zqiqjzxcpznhzjengfff','momfzjmycveq
 const expected=capacityExpectations(await readFile('supabase/migrations/20261005121611_assessment_capacity.sql','utf8'));
 for(const [key,value] of workerExpectations(await readFile('supabase/migrations/20261005133313_durable_worker_recovery.sql','utf8')))expected.set(key,value);
 for(const [key,value] of guardExpectations(await readFile('supabase/migrations/20261005190251_production_readiness_guards.sql','utf8')))expected.set(key,value);
+for(const [key,value] of signupExpectations(await readFile('supabase/patches/open-beta-signup.sql','utf8')))expected.set(key,value);
 const differences=structuralDifferences(production,stage,expected);
 if(differences.length)throw Error('Staging structural differences: '+differences.join(', '));
 const [ledger]=await api('momfzjmycveqginxmqib','/database/query',{query:"select relrowsecurity and not has_table_privilege('anon',oid,'select,insert,update,delete') and not has_table_privilege('authenticated',oid,'select,insert,update,delete') and has_table_privilege('service_role',oid,'select,insert,update,delete') as private from pg_class where oid='public.assessment_worker_attempts'::regclass"});

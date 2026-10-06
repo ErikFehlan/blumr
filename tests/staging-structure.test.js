@@ -53,3 +53,15 @@ test('upload guards reject missing definitions, privilege drift and substituted 
  assert.throws(()=>guardExpectations(sql.replace('security invoker','security definer')));
  assert.throws(()=>guardExpectations(sql.replace('validate_resume_document() returns','unknown_guard() returns')));
 });
+
+test('open signup routines match source, pinned search path and restricted callers',async()=>{
+ const {signupExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/patches/open-beta-signup.sql','utf8'),expected=signupExpectations(sql);
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:false,args:e.args,defaults:null,security_definer:true,volatility:e.volatility,config:['search_path=""'],clients_denied:!e.admin,anon_denied:true,authenticated_allowed:!!e.admin,auth_admin_allowed:e.authHook}}));
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ for(const patch of [{source:'return true;'},{clients_denied:false},{auth_admin_allowed:false},{security_definer:false}]){
+  const changed=structuredClone(stage);Object.assign(changed[0].routine,patch);
+  assert.deepEqual(structuralDifferences([],changed,expected),['function:before_beta_signup(jsonb)']);
+ }
+ assert.throws(()=>signupExpectations(sql.replace('before_beta_signup(event','unknown_signup(event')));
+});

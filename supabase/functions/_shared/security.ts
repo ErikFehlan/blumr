@@ -24,7 +24,7 @@ export async function reserveModelCall(workspace: string, actor: string | null, 
 }
 
 export function securityMessage(code: string) {
-  return code==='beta_access_required' ? 'This account does not have approved beta access.'
+  return code==='beta_access_required' ? 'This account does not have active beta access. Verify your email or contact support.'
     : code==='plan_inactive' ? 'AI processing is unavailable for this team. Contact the team owner.'
     : code==='ai_paused' ? 'AI processing is temporarily paused by the administrator. Your saved work is unchanged.'
     : code==='usage_limit' ? 'The beta AI usage limit has been reached. Try later or contact the administrator. Your saved work is unchanged.'

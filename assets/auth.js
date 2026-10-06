@@ -255,7 +255,7 @@
     submitButton.textContent = creating ? 'Create account' : 'Sign in';
     form.reset();
     showMessage(creating
-      ? 'Beta access requires approval. Use your approved email and a password of at least 12 characters; then verify your email.'
+      ? 'Join the free beta. Create an account with a password of at least 12 characters, then verify your email. No invitation needed.'
       : 'Enter your existing account details.');
   }
 
@@ -290,8 +290,7 @@
         return;
       }
 
-      submitButton.disabled = true;
-      submitButton.textContent = 'Creating account…';
+      setSignInProgress(true, 'Creating account…');
       showMessage('Creating your private workspace…');
       const redirectTo = window.location.origin + window.location.pathname;
       const { data, error } = await requestAuth(() => client.auth.signUp({
@@ -299,12 +298,11 @@
         password,
         options: { data: { display_name: displayName }, emailRedirectTo: redirectTo }
       }));
-      submitButton.disabled = false;
-      submitButton.textContent = 'Create account';
+      setSignInProgress(false);
 
       if (error) {
         reportAuthError('sign_up',error);
-        showMessage(error.code==='unexpected_failure'?'Account creation could not finish. Confirm that this email has beta approval, then try again.':error.message || 'Your account could not be created.', 'error');
+        showMessage(error.code==='unexpected_failure'?'Account creation could not finish. Please try again in a moment.':error.message || 'Your account could not be created.', 'error');
         return;
       }
 
@@ -313,9 +311,10 @@
         showMessage('Account created. Opening your workspace…', 'success');
         showWelcome('Your account and private workspace have been created successfully.');
       } else {
-        showMessage('Account created. Check your email once to confirm it, then sign in with your password.', 'success');
-        showWelcome('Your account was created. Confirm your email once, then return here and sign in with your password.', 'Return to sign in');
         setAuthMode('signin');
+        emailInput.value = email;
+        showMessage('Check your email to confirm your account, then sign in to start your free beta.', 'success');
+        showWelcome('Check your inbox for a confirmation link. Verify your email, then sign in to start using blumr. No administrator approval is needed.', 'Return to sign in');
       }
       return;
     }
