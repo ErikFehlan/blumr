@@ -59,6 +59,7 @@ const dir=path.resolve(__dirname,'..');
   assert.equal(saved.candidateId,'candidate-a');assert.equal(saved.learningScope,'candidate');assert.equal(saved.signalStatus,'candidate_only');
   assert.equal(await page.evaluate(()=>window.savedState.candidates[0].managerScore),7);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'disagreement form overflows mobile');
+  if(await page.locator('#mobileNavToggle').isVisible()&&!await page.locator('.rf-sidebar').evaluate(el=>el.classList.contains('open')))await page.locator('#mobileNavToggle').click();
   await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('[data-candidate-id="candidate-reviewed"]').first().click();
   await page.locator('.rf-workspace-overview > .rf-brief-explanation > summary').click();
   const retained=page.locator('#workspaceAssessmentReasons');await retained.getByText('Requirement-by-requirement assessment',{exact:true}).click();await retained.getByText('Inferred evidence',{exact:true}).waitFor();
