@@ -143,6 +143,7 @@
     const state=candidate.feedbackEvaluation,phase=api.evaluationPhase(candidate);
     wrap.hidden=!state||['applied','ignored'].includes(phase);if(wrap.hidden)return;
     const p=state.proposal,reviewable=api.canReview(candidate);let html;
+    wrap.dataset.replacesAssessment=String(phase==='pending'&&reviewable);
     if(['queued','running','saving'].includes(phase)){
       html=`<h3>${phase==='saving'?'Saving updated assessment…':'Updating assessment from your feedback…'}</h3><p class="rf-sub">You can keep working. The AI proposal will appear here for review.</p>`;
     }else if(phase==='pending'&&reviewable){
@@ -173,7 +174,7 @@
     const readiness=api.readiness(c);
     const overview=api.root.querySelector('.rf-workspace-overview > div');
     const fit=api.root.querySelector('#workspaceFit');if(fit)fit.innerHTML=global.AncalagonIntake?.pending(c)?'':fitHTML(c);
-    const card=api.root.querySelector('.rf-workspace-overview');if(card)card.hidden=!api.root.querySelector('#workspaceIntake').hidden||!api.root.querySelector('#workspaceEvaluation').hidden;
+    const card=api.root.querySelector('.rf-workspace-overview');if(card)card.hidden=!api.root.querySelector('#workspaceIntake').hidden||(!api.root.querySelector('#workspaceEvaluation').hidden&&api.root.querySelector('#workspaceEvaluation').dataset.replacesAssessment==='true');
     if(overview&&global.AncalagonIntake?.pending(c)){
       const failed=c.resumeIntake.phase==='error',ready=c.resumeIntake.phase==='ready';
       overview.querySelector('h3').textContent=failed?'Retry the resume assessment':ready?'Review the screening brief':'Preparing the resume assessment';
