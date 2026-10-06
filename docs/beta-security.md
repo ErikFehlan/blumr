@@ -1,14 +1,14 @@
-# Closed-beta security controls
+# Beta security controls
 
-This release supports a small, approved beta. It is not a penetration-test certification or an unrestricted public launch.
+The beta supports self-service signup with required email verification and private, quota-limited workspaces. See [open beta signup](open-beta-signup.md) for the current admission policy.
 
 ## Access
 
-Open **Admin → Beta access and security**, enter an email, and choose **Approve beta access**. This records approval; it does not send an invitation. The tester uses Create account with that exact email, a password of at least 12 characters, and verifies the confirmation email. Sign-in with an existing password remains compatible.
+Anyone can use Create account with an email address and a password of at least 12 characters, then verify their confirmation email. No administrator invitation is required. **Admin → Users** shows registered accounts and controls suspension/restoration. Sign-in with an existing password remains compatible.
 
 Existing accounts are preserved once at installation. Review that list in Admin. Revocation is stored against the Auth user ID and blocks new workspace/storage requests and AI admission, including requests using an existing JWT. Previously downloaded information and model calls already in flight cannot be recalled. Account deletion still works through the password-confirmed endpoint.
 
-Both an Auth before-create hook and a database trigger enforce approval. User metadata cannot grant access. Administrators are bound to their existing Auth user ID, not a claimed email. Re-running migrations does not restore revoked approval.
+The Auth before-create hook and database trigger allow new email accounts while enforcing explicit suspensions. User metadata cannot grant access. Administrators are bound to their existing Auth user ID, not a claimed email. Re-running migrations does not restore revoked approval.
 
 ## Resource limits
 
@@ -36,13 +36,13 @@ The page pins and integrity-checks its Supabase browser dependency, blocks inlin
 
 The consolidated deployment installs the migration, enables email confirmation and the signup hook, deploys every AI handler, verifies live Auth configuration, and runs disposable account checks before publishing Pages. Older manual backend workflows delegate to this same path.
 
-SQL tests cover approval, identity spoofing, unverified accounts, revoked sessions, storage writes, record limits, and budget caps. A separate PostgreSQL test runs 12 concurrent transactions against 3 available AI calls. Handler tests verify that denied or unavailable budget checks cannot reach the provider. Browser tests exercise approval, revocation and the AI pause control.
+SQL tests cover automatic registration, identity spoofing, unverified accounts, revoked sessions, storage writes, record limits, and budget caps. A separate PostgreSQL test runs 12 concurrent transactions against 3 available AI calls. Handler tests verify that denied or unavailable budget checks cannot reach the provider. Browser tests exercise self-service signup, suspension/restoration and the AI pause control.
 
 Live checks use randomly named synthetic accounts. They verify both public AI routes deny exhausted budgets, non-admins cannot change security controls, and revocation affects an existing session. They do not send confirmation email or call a model. The normal core integration check still exercises a small number of real model calls.
 
 ## Remaining operational checks
 
 - Confirm a custom SMTP provider is configured and test confirmation/recovery delivery with a tester. Supabase's default email service has recipient/delivery restrictions; API tests cannot prove inbox delivery.
-- CAPTCHA is not configured by this release. A provider site key and secret are needed. The deployed signup admission gate instead restricts registration to individually approved emails. Add CAPTCHA before moving to broad self-service signup.
+- Existing Auth rate limits and any CAPTCHA settings are preserved. This change does not configure a new CAPTCHA provider. Monitor public signup volume and confirmation-email delivery.
 - Validate backup recovery and commission an independent security review before a wider launch involving substantial candidate data.
 - Training stays inactive. These changes do not authorize model training or change billing/payment features.
