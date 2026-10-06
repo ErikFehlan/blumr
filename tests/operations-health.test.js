@@ -5,6 +5,7 @@ test('operational alarms detect stale queues, held work, missing schedulers and 
  const backup={conclusion:'success',artifact:true,completed_at:new Date(now-3600000).toISOString()};
  assert.equal(assessHealth(snapshot,backup,now).healthy,true);
  assert.equal(assessHealth({},backup,now).healthy,false);
+ for(const value of [null,'',false,undefined])assert.equal(assessHealth({...snapshot,expired_workers:value},backup,now).healthy,false,'Missing counts must fail closed');
  assert.equal(assessHealth(snapshot,{...backup,completed_at:'invalid'},now).healthy,false);
  for(const key of ['queued_over_15m','failed_last_24h','expired_workers','uncertain_workers','uncertain_direct','client_tables_without_rls','exposed_worker_functions'])assert.equal(assessHealth({...snapshot,[key]:1},backup,now).healthy,false,key);
  for(const changed of [{active_schedulers:1},{private_resumes:false}])assert.equal(assessHealth({...snapshot,...changed},backup,now).healthy,false);

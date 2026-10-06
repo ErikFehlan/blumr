@@ -15,7 +15,7 @@ export async function collect(env,fetcher=fetch,now=Date.now()){
  const verdict=assessHealth(db?.snapshot,db?.backup,now);
  if(settled[0].status==='rejected')verdict.failures.push('production_site_unavailable');
  if(settled[1].status==='rejected')verdict.failures.push('health_endpoint_unavailable');
- return {site_status,site_startup_present,checked_at:now,healthy:verdict.failures.length===0,failures:verdict.failures.toSorted(),alerts_configured:notificationsConfigured(env)};
+ return {site_status,site_startup_present,site_error:settled[0].status==='rejected'?String(settled[0].reason?.message||'unavailable').slice(0,160):null,checked_at:now,healthy:verdict.failures.length===0,failures:verdict.failures.toSorted(),alerts_configured:notificationsConfigured(env)};
 }
 export class MonitorState{
  constructor(ctx,env){this.ctx=ctx;this.env=env;this.running=null;}

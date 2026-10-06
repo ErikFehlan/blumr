@@ -20,6 +20,11 @@ export async function monitor(){
   if(run){const artifacts=await gh('actions/runs/'+run.id+'/artifacts');backup={conclusion:run.conclusion,completed_at:run.updated_at,run_id:run.id,artifact:artifacts.artifacts?.some(a=>!a.expired&&a.size_in_bytes>0&&a.name.startsWith('encrypted-backup-'))===true};}
   if(backup?.artifact&&backup.conclusion==='success')await request(`https://api.supabase.com/v1/projects/${project}/database/query`,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({query:'update operations_private.config set backup=$1::jsonb where id',parameters:[JSON.stringify(backup)]})});
   result.snapshot=db[0];result.backup=backup;Object.assign(result,assessHealth(db[0],backup));
+  try{
+   const heartbeat=await managementFetch('https://blumr-operations.erik-f11.workers.dev/status',{signal:AbortSignal.timeout(20000)});
+   const status=await heartbeat.json();result.independent_monitor=status;
+   if(status.heartbeat_fresh!==true){result.healthy=false;result.failures.push('independent_monitor_heartbeat_missing');}
+  }catch{result.healthy=false;result.failures.push('independent_monitor_unreachable');}
   console.log('OPERATIONS_HEALTH '+JSON.stringify(result));
   if(!result.healthy)throw Error('Operational checks need attention: '+result.failures.join(', '));
  }finally{await mkdir('test-results/operations',{recursive:true});await writeFile('test-results/operations/health.json',JSON.stringify(result,null,2));}

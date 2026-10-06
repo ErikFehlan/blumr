@@ -1,7 +1,7 @@
 export function assessHealth(snapshot,backup,now=Date.now()){
  const failures=[];
  const fields=['queued_over_15m','failed_last_24h','expired_workers','uncertain_workers','uncertain_direct','client_tables_without_rls','exposed_worker_functions','active_schedulers'];
- if(!snapshot||fields.some(k=>snapshot[k]===undefined||!Number.isSafeInteger(Number(snapshot[k]))||Number(snapshot[k])<0)||typeof snapshot.private_resumes!=='boolean')return {healthy:false,failures:['health_evidence_incomplete']};
+ if(!snapshot||fields.some(k=>!(['number','string'].includes(typeof snapshot[k]))||String(snapshot[k]).trim()===''||!Number.isSafeInteger(Number(snapshot[k]))||Number(snapshot[k])<0)||typeof snapshot.private_resumes!=='boolean')return {healthy:false,failures:['health_evidence_incomplete']};
  if(Number(snapshot.failed_last_24h)>0)failures.push('recent_assessment_failures');
  if(Number(snapshot.queued_over_15m)>0)failures.push('assessment_queue_over_15_minutes');
  if(Number(snapshot.expired_workers)>0)failures.push('expired_worker_not_recovered');
