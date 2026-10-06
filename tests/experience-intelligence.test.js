@@ -73,3 +73,10 @@ test('fully answered requirements remove repeated screening questions',async()=>
  const r={screening_questions:['Ask the same thing again?'],criteria_assessment:[{criterion:'Care coordination',status:'supported',evidence_type:'direct',source_ids:['resume-full'],confidence_score:85}]};
  enrichExperience(r,source('Coordinated care referrals.'),{});assert.deepEqual(r.screening_questions,[]);assert.deepEqual(r.verification_priorities,[]);
 });
+
+test('ordinary notes match requirement priority prefixes without a special feedback format',async()=>{
+ const {criterionKey,historyForCriterion}=await api;
+ for(const value of ['Must Have | Financial close','Preferred: Financial close','Required Financial close'])assert.equal(criterionKey(value),'financial close');
+ const history={criterion_key:'financial close',inference_kind:'workflow',confirmed:5,contradicted:1,candidates:6,jobs:2};
+ assert.deepEqual(historyForCriterion([{kind:'automatic learning',inference_history:history}],'Must Have | Financial close','workflow'),history);
+});

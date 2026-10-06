@@ -24,7 +24,7 @@ export function capacityExpectations(sql) {
 }
 export const normalizeStructure=value=>value.replaceAll('\r\n','\n').replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
 export function inferenceExpectations(sql){
- return knowledgeExpectations(sql,['human_sources','validate_predictions','capture_prediction','capture_source','inference_history','capture_job','for_job','get_inference_learning_quality']);
+ return knowledgeExpectations(sql,['criterion_key','human_sources','validate_predictions','capture_prediction','capture_source','inference_history','capture_job','for_job','get_inference_learning_quality']);
 }
 export function knowledgeExpectations(sql,requestedNames){
  const expected=new Map(),names=requestedNames||['normalized','contains_term','role_key','capture_candidate','capture_source','eligible','capture_job','for_job','get_automatic_job_knowledge','get_workspace_job_knowledge','get_assessment_lessons','exclude_automatic_job_knowledge','reassessment_job_input'];

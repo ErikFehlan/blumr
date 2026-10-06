@@ -22,6 +22,11 @@ alter table blumr_knowledge.inference_predictions enable row level security;
 alter table blumr_knowledge.inference_validations enable row level security;
 revoke all on blumr_knowledge.inference_predictions,blumr_knowledge.inference_validations from public,anon,authenticated,service_role;
 
+create or replace function blumr_knowledge.criterion_key(t text) returns text
+language sql immutable set search_path='' as $$
+ select blumr_knowledge.normalized(regexp_replace(coalesce(t,''),'^\s*(must have|required|essential|mandatory|preferred|nice to have)\M\s*([|:–—-]\s*)?','','i'));
+$$;
+
 create or replace function blumr_knowledge.human_sources(p_candidate uuid) returns jsonb
 language sql stable security definer set search_path='' as $$
  select coalesce(jsonb_agg(to_jsonb(s)),'[]'::jsonb) from (
@@ -96,7 +101,7 @@ begin
    or length(row->>'criterion') not between 3 and 300
    or not exists(select from jsonb_array_elements_text(j.criteria) v where v=row->>'criterion') then continue;end if;
   insert into blumr_knowledge.inference_predictions(candidate_id,workspace_id,job_id,criterion_key,criterion,inference_kind,role_key,confidence,version,held_out,prior_sources)
-  values(new.candidate_id,new.workspace_id,new.job_id,blumr_knowledge.normalized(row->>'criterion'),row->>'criterion',row->>'inference_kind',j.role_key,
+  values(new.candidate_id,new.workspace_id,new.job_id,blumr_knowledge.criterion_key(row->>'criterion'),row->>'criterion',row->>'inference_kind',j.role_key,
    (row->>'confidence_score')::integer,'experience-intelligence-v2',(('x'||substr(md5(new.candidate_id::text),1,8))::bit(32)::bigint%5=0),originals)
   on conflict(candidate_id,criterion_key) do nothing;
  end loop;
@@ -132,7 +137,7 @@ language sql stable security definer set search_path='' as $$
  join blumr_knowledge.inference_validations v using(candidate_id,criterion_key)
  join public.jobs original on original.id=p.job_id and original.workspace_id=p.workspace_id and blumr_knowledge.role_key(original.title)=p.role_key
  where d.id=p_job and not p.held_out and v.observed_at>now()-interval '180 days'
- and exists(select from jsonb_array_elements_text(d.criteria) c where blumr_knowledge.normalized(c)=p.criterion_key)
+ and exists(select from jsonb_array_elements_text(d.criteria) c where blumr_knowledge.criterion_key(c)=p.criterion_key)
  group by p.criterion_key,p.inference_kind
  ), qualified as (select *,md5(criterion_key||'|'||inference_kind||'|inference-v2') rule_key from aggregates where candidates>=6 and jobs>=2 and excerpts>=3)
  select coalesce(jsonb_agg(jsonb_build_object(

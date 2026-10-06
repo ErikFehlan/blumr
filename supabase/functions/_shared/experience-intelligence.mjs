@@ -3,7 +3,7 @@ import {evidenceTextRanges} from './source-instructions.mjs';
 import {capabilityWorkflows} from './capability-workflows.mjs';
 
 export const intelligenceVersion='experience-intelligence-v2';
-export const criterionKey=text=>String(text||'').toLowerCase().replace(/[^a-z0-9+#]+/g,' ').trim();
+export const criterionKey=text=>String(text||'').toLowerCase().replace(/^\s*(?:must have|required|essential|mandatory|preferred|nice to have)\b\s*(?:[|:–—-]\s*)?/i,'').replace(/[^a-z0-9+#]+/g,' ').trim();
 const list=v=>Array.isArray(v)?v:[];
 const unique=values=>[...new Set(values)];
 const stop=new Set('must have preferred required experience skills skill ability knowledge strong proven demonstrated with within from that this their they candidate years year minimum relevant working work'.split(' '));
