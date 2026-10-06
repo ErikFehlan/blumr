@@ -2,6 +2,8 @@
 
 New searches automatically receive relevant, source-backed context from previous searches. There are no additional wizard steps, mandatory approvals, learning forms, or background model requests. Optional custom lessons continue to work. The existing human decision about a candidate remains the same.
 
+The newer [experience intelligence layer](experience-intelligence.md) adds open-text inference history for any occupation, independently of the starter catalog.
+
 ## Capture and reuse
 
 Database triggers inspect original manager feedback, screening notes, interview notes and explicit recruiter corrections when they are saved. Generated summaries, candidate scores and interview/pass decisions are not learning evidence. Original recruiter corrections survive a later reassessment wrapper. Edited/deleted sources are re-read; generated interpretations cannot confirm themselves.

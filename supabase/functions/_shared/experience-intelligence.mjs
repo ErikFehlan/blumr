@@ -155,7 +155,7 @@ export function enrichExperience(result,sources,job={},profile=buildExperienceIn
    priority:(must?100:0)+(priority?40:0)+(c.status==='contradicted'?30:c.status==='unknown'?20:10)+(100-c.confidence_score)/10,index};
  }).sort((a,b)=>b.priority-a.priority||a.index-b.index).slice(0,2).map(({priority,index,...q})=>q);
  result.criteria_assessment=rows;result.experience_profile=profile;result.verification_priorities=questions;
- if(questions.length){if(Array.isArray(result.screening_questions))result.screening_questions=questions.map(q=>q.question.slice(0,220));if(Array.isArray(result.questions))result.questions=questions.map(q=>q.question.slice(0,220));}
+ if(rows.length){if(Array.isArray(result.screening_questions))result.screening_questions=questions.map(q=>q.question.slice(0,220));if(Array.isArray(result.questions))result.questions=questions.map(q=>q.question.slice(0,220));}
  if(result.evidence_summary){result.evidence_summary.method=intelligenceVersion;result.evidence_summary.confidence_score=rows.length?Math.round(rows.reduce((n,c)=>n+c.confidence_score,0)/rows.length):0;}
  if(rows.length&&Object.hasOwn(result,'confidence')){const score=result.evidence_summary?.confidence_score||0;result.confidence=score>=80?'high':score>=50?'medium':'low';}
  return result;

@@ -67,3 +67,9 @@ test('optional evidence UI escapes text and needs no extra form or approval',asy
  const html=memory.details({criteria_assessment:[],experience_profile:{career:{episodes:[{}],explicit_employer_groups:[{employer:'<img src=x>',projects:2}]}},verification_priorities:[{question:'<script>bad</script>',reason:'Verify scope'}]});
  assert.match(html,/Most useful to verify next/);assert.doesNotMatch(html,/<script>|<img|<form|<button/);
 });
+
+test('fully answered requirements remove repeated screening questions',async()=>{
+ const {enrichExperience}=await api;
+ const r={screening_questions:['Ask the same thing again?'],criteria_assessment:[{criterion:'Care coordination',status:'supported',evidence_type:'direct',source_ids:['resume-full'],confidence_score:85}]};
+ enrichExperience(r,source('Coordinated care referrals.'),{});assert.deepEqual(r.screening_questions,[]);assert.deepEqual(r.verification_priorities,[]);
+});
