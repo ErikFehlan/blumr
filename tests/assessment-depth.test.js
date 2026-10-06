@@ -3,14 +3,14 @@ const memory=require('../assets/assessment-memory.js');
 const context=require('../assets/context.js');
 const api=import('../supabase/functions/_shared/assessment-depth.mjs');
 const sources=[{id:'feedback-a',kind:'candidate feedback',text:'The candidate only compiled forecasts.'},{id:'criterion-1',kind:'requirement',text:'Forecast ownership'},{id:'lesson-a',kind:'approved learning',text:'Distinguish support from ownership.'}];
-const result=()=>({criteria_assessment:[{criterion:'Forecast ownership',status:'contradicted',reason:'Interview clarified contribution rather than ownership.',source_ids:['feedback-a']}],feedback_impact:{effect:'contradiction',summary:'Direct ownership is no longer supported.',source_ids:['feedback-a']},applied_lessons:[{lesson_id:'lesson-a',application:'Separated compiling inputs from owning the forecast.'}],learning_suggestions:[]});
+const result=()=>({criteria_assessment:[{criterion:'Forecast ownership',status:'contradicted',evidence_type:'contradicted',confidence:'medium',inference_basis:'',reason:'Interview clarified contribution rather than ownership.',source_ids:['feedback-a']}],feedback_impact:{effect:'contradiction',summary:'Direct ownership is no longer supported.',source_ids:['feedback-a']},applied_lessons:[{lesson_id:'lesson-a',application:'Separated compiling inputs from owning the forecast.'}],learning_suggestions:[]});
 test('assessment findings require real sources, complete criteria, and valid learning references',async()=>{
  const {validateDetails}=await api;
  assert.doesNotThrow(()=>validateDetails(result(),sources,{criteria:['Forecast ownership'],suggestions:true}));
  for(const id of ['invented','lesson-a','criterion-1']){const r=result();r.criteria_assessment[0].source_ids=[id];assert.throws(()=>validateDetails(r,sources),/invalid_assessment_details/);}
  const missing=result();missing.criteria_assessment=[];assert.throws(()=>validateDetails(missing,sources,{criteria:['Forecast ownership']}));
  const forged=result();forged.applied_lessons[0].lesson_id='feedback-a';assert.throws(()=>validateDetails(forged,sources));
- const unknown=result();unknown.criteria_assessment[0]={criterion:'Forecast ownership',status:'unknown',reason:'Ownership not yet established.',source_ids:[]};assert.doesNotThrow(()=>validateDetails(unknown,sources));
+ const unknown=result();unknown.criteria_assessment[0]={criterion:'Forecast ownership',status:'unknown',evidence_type:'unknown',confidence:'medium',inference_basis:'',reason:'Ownership not yet established.',source_ids:[]};assert.doesNotThrow(()=>validateDetails(unknown,sources));
 });
 test('learning proposals need feedback or a recruiter correction, not recycled model output',async()=>{
  const {validateDetails}=await api,r=result();r.learning_suggestions=[{kind:'evaluation_method',text:'Distinguish compiling inputs from owning a forecast.',source_ids:['feedback-a']}];

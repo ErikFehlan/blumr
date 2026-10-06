@@ -87,3 +87,16 @@
 #rf-app[data-theme] #teamPlan progress{width:100%;height:10px;accent-color:var(--ui-accent)}
 #rf-app[data-theme] #teamPlan details{margin-bottom:20px}
 @media(max-width:600px){#rf-app[data-theme] .rf-plan-summary{align-items:flex-start;flex-direction:column}}
+
+/* Evidence provenance remains readable across themes and compact viewports. */
+#rf-app .rf-evidence-counts{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+#rf-app .rf-criteria-findings{list-style:none;padding:0;display:grid;gap:14px}
+#rf-app .rf-criteria-findings>li{border:1px solid var(--border,#b8c6bf);border-radius:12px;padding:14px;overflow-wrap:anywhere}
+#rf-app .rf-criteria-findings>li[data-evidence-type="inferred"]{border-inline-start:4px solid #b7791f}
+#rf-app .rf-evidence-meter{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px}
+#rf-app .rf-evidence-meter meter{width:120px;max-width:100%}
+#rf-app .rf-criterion-sources blockquote{margin:8px 0;padding:8px 12px;border-inline-start:3px solid currentColor;white-space:pre-wrap;overflow-wrap:anywhere}
+#rf-app .rf-manager-disagreement{margin:16px 0;padding:14px;border:1px solid var(--border,#b8c6bf);border-radius:12px}
+#rf-app .rf-manager-disagreement label{display:block;margin:12px 0 6px}
+#rf-app .rf-manager-disagreement textarea,#rf-app .rf-manager-disagreement select{width:100%;box-sizing:border-box}
+#rf-app .rf-manager-disagreement button{margin-top:10px;white-space:normal}

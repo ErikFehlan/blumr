@@ -20,7 +20,7 @@ Deno.test('reassessment worker resolves evidence selections and keeps unsupporte
     assert(!support.quote&&!support.source_id&&support.passage_id.enum.length,'model can write quotations');
     const context=JSON.parse(body.input).evaluation_context,source=context.sources.find((s:any)=>s.id==='profile-strength-1');
     const result={jd_score:7,manager_score:7,confidence:'medium',summary:'Manual ownership supported.',jd_reason:'Manual testing supported.',manager_reason:'No new priority.',questions:[],
-     evidence_support:[{passage_id:source.passages[0].id,claim:'Manual ownership without automation authorship.'}],criteria_assessment:[{criterion:'-manual testing required',status:'supported',reason:'Manual ownership is explicit.',source_ids:forged?['criterion-1']:['profile-strength-1']}],
+     evidence_support:[{passage_id:source.passages[0].id,claim:'Manual ownership without automation authorship.'}],criteria_assessment:[{criterion:'-manual testing required',status:'supported',evidence_type:'direct',confidence:'medium',inference_basis:'',reason:'Manual ownership is explicit.',source_ids:forged?['criterion-1']:['profile-strength-1']}],
      feedback_impact:{effect:'confirmation',summary:'No new evidence changes the baseline.',source_ids:['profile-strength-1']},applied_lessons:[],learning_suggestions:[]};
     return json({model:'gpt-5.6-sol',output:[{content:[{type:'output_text',text:JSON.stringify(result)}]}]});
    }
