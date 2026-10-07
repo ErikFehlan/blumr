@@ -5,6 +5,18 @@
  function normalize(value){const result={...defaults};for(const key of Object.keys(result)){if(typeof result[key]==='boolean')result[key]=typeof value?.[key]==='boolean'?value[key]:result[key];else if(typeof value?.[key]==='string')result[key]=value[key];}for(const [key,values] of Object.entries(choices))if(!values.includes(result[key]))result[key]=defaults[key];try{new Intl.DateTimeFormat(undefined,{timeZone:result.time_zone});}catch{result.time_zone='UTC';}return result;}
  function sortCandidates(items,sort){return [...items].sort((a,b)=>{const name=()=>String(a.name).localeCompare(String(b.name));if(sort==='name')return name();if(sort==='newest')return Number(b.createdAt)-Number(a.createdAt)||name();return Number(sort==='jd'?b.jdScore:b.managerScore)-Number(sort==='jd'?a.jdScore:a.managerScore)||name();});}
  function formatDate(value,timeZone,options={dateStyle:'medium',timeStyle:'short'}){if(!value||!Number.isFinite(new Date(value).getTime()))return '';return new Intl.DateTimeFormat(undefined,{...options,timeZone:timeZone||'UTC'}).format(new Date(value));}
+ // Completed assessments are available on demand; only failures interrupt work.
+ function notificationPopupAllowed(notice,preferences){return notice.kind!=='assessments'&&preferences['notify_'+notice.kind]!==false;}
+ function notificationGroups(rows){
+  const groups=[],byJob=new Map();
+  for(const row of rows){
+   const key=row.kind==='assessments'&&!row.read_at?JSON.stringify([row.workspace_id,row.job_id]):null;
+   const group=key&&byJob.get(key);
+   if(group){group.ids.push(row.id);continue;}
+   const item={...row,ids:[row.id]};groups.push(item);if(key)byJob.set(key,item);
+  }
+  return groups.map(group=>group.ids.length>1?{...group,candidate_id:null,message:`${group.ids.length} assessment updates ready to review · ${group.message.split(' · ').slice(1).join(' · ')||'Job'}`} :group);
+ }
  function createSession(api){let saved={...defaults},draft={...defaults},revision=0,loaded=false,busy=false,generation=0,problem='',conflict=false;
   const view=()=>({saved:{...saved},draft:{...draft},loaded,busy,problem,conflict,dirty:JSON.stringify(saved)!==JSON.stringify(draft)});
   const changed=()=>api.changed?.(view());
@@ -14,5 +26,5 @@
   function clear(){generation++;saved={...defaults};draft={...defaults};loaded=false;busy=false;problem='';conflict=false;api.apply(saved);changed();}
   return {view,load,save,edit,clear};
  }
- const api={defaults,normalize,sortCandidates,formatDate,createSession};if(typeof module==='object'&&module.exports)module.exports=api;global.AncalagonSettings=api;
+ const api={defaults,normalize,sortCandidates,formatDate,createSession,notificationPopupAllowed,notificationGroups};if(typeof module==='object'&&module.exports)module.exports=api;global.AncalagonSettings=api;
 })(globalThis);
