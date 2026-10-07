@@ -1,0 +1,181 @@
+[
+  {
+    "name": "intro",
+    "duration": 5,
+    "title": "Three strong resumes.\nOne open role.",
+    "body": "Find the evidence that matters.",
+    "voice": "Three strong resumes. One open role. blumr helps you see who deserves a closer look."
+  },
+  {
+    "name": "01-job",
+    "duration": 7,
+    "chapter": "START WITH THE ROLE",
+    "title": "Give the search\na clear starting point.",
+    "body": "Add the job description. Manager notes are optional.",
+    "tag": "01  /  Define the job",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "Start with the job description. Add manager notes when you have them, or begin with the role itself."
+  },
+  {
+    "name": "02-priorities",
+    "duration": 10,
+    "chapter": "ESTABLISH WHAT MATTERS",
+    "title": "Four steps.\nOne clear search.",
+    "body": "Job Details \u2192 Requirements \u2192 Top 5 Priorities \u2192 Review. Check and edit the suggested criteria.",
+    "tag": "02  /  Review the priorities",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "Move through job details, requirements, top five priorities, and review. Edit the suggestions before saving."
+  },
+  {
+    "name": "03-upload",
+    "duration": 6,
+    "chapter": "BRING IN THE CANDIDATES",
+    "title": "Add the resumes.\nStart the review.",
+    "body": "Upload candidates into the search and review their proposed assessments.",
+    "tag": "03  /  Upload resumes",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "Upload the resumes. Each candidate gets a proposed assessment for you to review."
+  },
+  {
+    "name": "04-review",
+    "duration": 6,
+    "chapter": "KEEP THE RECRUITER IN CONTROL",
+    "title": "Evidence first.\nApproval second.",
+    "body": "Review supported strengths, open questions, and proposed scores before applying them.",
+    "tag": "04  /  Review the assessment",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "Check the strengths, open questions, and proposed scores. Your approval applies the assessment."
+  },
+  {
+    "name": "05-candidates",
+    "duration": 9,
+    "chapter": "SEE THE DIFFERENCES",
+    "title": "Direct evidence.\nTransferable experience.",
+    "body": "Inspect the inference, supporting passage, and question to verify. Confidence measures evidence support, not hiring success.",
+    "tag": "05  /  Compare the candidates",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "Direct and inferred evidence are labeled separately. See why experience may transfer, its confidence, and what to verify before drawing a conclusion."
+  },
+  {
+    "name": "06-evidence",
+    "duration": 9,
+    "chapter": "CHECK THE SOURCE",
+    "title": "See what supports\nthe assessment.",
+    "body": "Click a strength to open the resume and highlight the source passage.",
+    "tag": "06  /  Inspect the evidence",
+    "crop": [
+      837,
+      70,
+      600,
+      650
+    ],
+    "voice": "Click a strength to open the resume. The supporting passage is highlighted, so you can check the evidence and approve, correct, or flag the point."
+  },
+  {
+    "name": "07-feedback",
+    "duration": 9,
+    "chapter": "ADD WHAT YOU LEARN",
+    "title": "New feedback.\nA clearer picture.",
+    "body": "Alex triaged scanner findings. The manager clarifies that Alex did not implement the tools.",
+    "tag": "07  /  Capture feedback",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "Then add what the manager learns. Alex reviewed scanner findings, but did not personally configure the tools or integrate them into delivery pipelines."
+  },
+  {
+    "name": "08-proposal",
+    "duration": 8,
+    "chapter": "REVIEW THE CHANGE",
+    "title": "Understand what\nchanged\u2014and why.",
+    "body": "blumr explains the new evidence and proposes an updated assessment. Current scores wait for approval.",
+    "tag": "08  /  Review the proposal",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "blumr explains how that new evidence changes the assessment. The proposed update stays separate from the current score until you approve it."
+  },
+  {
+    "name": "09-lesson",
+    "duration": 7,
+    "chapter": "MAKE FEEDBACK REUSABLE",
+    "title": "Learning without\nextra steps.",
+    "body": "Eligible patterns from repeated, consistent feedback carry into relevant searches automatically. Custom lessons are optional.",
+    "tag": "09  /  Reuse relevant learning",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "Qualifying patterns from repeated feedback apply automatically to relevant searches. Current requirements take precedence. Custom lessons remain optional."
+  },
+  {
+    "name": "10-shortlist",
+    "duration": 5,
+    "chapter": "FOCUS YOUR NEXT CONVERSATION",
+    "title": "A more informed\nshortlist.",
+    "body": "Review the updated picture and decide who to speak with next.",
+    "tag": "10  /  Choose your next step",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "Return to the candidates with a clearer picture of the experience behind each assessment."
+  },
+  {
+    "name": "11-submittal",
+    "duration": 7,
+    "chapter": "MAKE THE INTRODUCTION",
+    "title": "A concise draft.\nReady for your edit.",
+    "body": "Prepare a short submittal built from the candidate\u2019s supported strengths. Review, edit, and copy.",
+    "tag": "11  /  Prepare the submittal",
+    "crop": [
+      300,
+      90,
+      1120,
+      750
+    ],
+    "voice": "When you are ready, prepare a concise submittal from the candidate\u2019s supported strengths. Review it, make it yours, and copy."
+  },
+  {
+    "name": "outro",
+    "duration": 8,
+    "title": "Less time reviewing resumes.\nMore time engaging\nthe right people.",
+    "body": "Intelligence. Unlocked.",
+    "voice": "blumr. Intelligence. Unlocked. Built by recruiters, for recruiters."
+  }
+]
