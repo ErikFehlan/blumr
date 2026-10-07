@@ -60,7 +60,11 @@ export async function handleCriteria(request:Request){
         ? {job:{title:task.input.title},criteria:source,job_description_sources:passages}
         : {job:{title:task.input.title},job_description_sources:passages};
       const r=await fetchWithRetry('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model,...modelReasoning(model,'reassessment'),store:false,max_output_tokens:legacy?8000:4000,instructions:untrustedInputInstructions+instructions,input:JSON.stringify(input),text:{format:{type:'json_schema',name:legacy?'criteria_refinement':'job_priorities',strict:true,schema}}})},{timeoutMs:90000,maxRetries:2,requestId:`criteria-${task.usage_run_id||task.revision}-${kind}`});
-      if(!r.ok)throw Error(r.status===429?'ai_rate_limit':'ai_unavailable');
+      if(!r.ok){
+        const failure=await r.json().catch(()=>null);
+        if(['credit_balance_exhausted','project_spend_limit_exceeded','organization_spend_limit_exceeded','insufficient_quota'].includes(failure?.error?.code))throw Error('ai_budget_exhausted');
+        throw Error(r.status===429?'ai_rate_limit':'ai_unavailable');
+      }
       const body=await r.json();
       await recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null);
       const text=body.output?.flatMap((o:any)=>o.content||[]).filter((c:any)=>c.type==='output_text').map((c:any)=>c.text).join('');
@@ -87,7 +91,7 @@ export async function handleCriteria(request:Request){
     const applied=await rpc('finish_job_criteria',{p_job:task.job_id,p_revision:task.revision,p_lease:task.lease_id,p_result:{...result,model,generated_at:new Date().toISOString()},p_error:null});
     return response({status:applied?'ready':'superseded',engine:result.engine});
   }catch(error){
-    const allowed=['invalid_priorities','input_too_large','invalid_result','threshold_changed','negation_removed','ai_rate_limit','ai_unavailable'];
+    const allowed=['invalid_priorities','input_too_large','invalid_result','threshold_changed','negation_removed','ai_rate_limit','ai_budget_exhausted','ai_unavailable'];
     const message=error instanceof Error?error.message:'';
     const code=error instanceof SecurityLimit?'usage_limit':allowed.includes(message)?message:'processing_failed';
     if(task)try{await rpc('finish_job_criteria',{p_job:task.job_id,p_revision:task.revision,p_lease:task.lease_id,p_result:null,p_error:code});}catch{/* Lease expiry makes this task eligible for retry. */}

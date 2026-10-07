@@ -95,3 +95,23 @@ Deno.test('intake evaluates saved priorities with candidate sources and returns 
   const result=await response.json();assert(response.ok&&result.hiring_priorities.review_status==='suggested','priority provenance lost');assert(result.priority_assessment[0].status==='supported','finding missing');
  }finally{globalThis.fetch=original;prior===undefined?Deno.env.delete('OPENAI_API_KEY'):Deno.env.set('OPENAI_API_KEY',prior);}
 });
+
+Deno.test('priority generation reports exhausted credits as a billing pause',async()=>{
+ const names=['CRITERIA_WORKER_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY','JOB_INTAKE_ENGINE'],prior=names.map(n=>Deno.env.get(n)),original=globalThis.fetch;
+ let finished:any,calls=0;
+ try{
+  ['worker','https://backend.invalid','service','ai','hybrid'].forEach((v,i)=>Deno.env.set(names[i],v));
+  globalThis.fetch=async(url:RequestInfo|URL,init?:RequestInit)=>{
+   const path=new URL(String(url)).pathname;
+   if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'QA',description:'Manual regression testing and documented defect remediation.',criteria:[]}}]);
+   if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
+   if(path==='/v1/responses'){calls++;return Response.json({error:{code:'credit_balance_exhausted'}},{status:429});}
+   if(path.endsWith('/finish_job_criteria')){finished=JSON.parse(String(init?.body));return json(true);}
+   throw Error('Unexpected request');
+  };
+  const response=await handleCriteria(new Request('https://worker.invalid',{method:'POST',headers:{'x-worker-secret':'worker'},body:'{}'}));
+  assert((await response.json()).code==='ai_budget_exhausted','billing failure mislabeled');
+  assert(finished.p_error==='ai_budget_exhausted'&&finished.p_result===null,'unverified results saved');
+  assert(calls===1,'billing failure retried');
+ }finally{globalThis.fetch=original;names.forEach((n,i)=>prior[i]===undefined?Deno.env.delete(n):Deno.env.set(n,prior[i]!));}
+});
