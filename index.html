@@ -428,7 +428,20 @@
           <fieldset disabled>
             <section class="rf-card" aria-labelledby="profileSettingsHeading"><h3 id="profileSettingsHeading">Profile</h3><p class="rf-sub">Your details and preferences follow your account across devices.</p>
               <div class="rf-formrow"><div><label for="settingsName">Display name</label><input id="settingsName" data-preference="display_name" maxlength="100" autocomplete="name"></div><div><label for="settingsCompany">Company</label><input id="settingsCompany" data-preference="company" maxlength="120" autocomplete="organization"></div></div>
-              <div class="rf-formrow"><div><label for="settingsJobTitle">Job title</label><input id="settingsJobTitle" data-preference="job_title" maxlength="120" autocomplete="organization-title"></div><div><label for="settingsTimeZone">Time zone</label><input id="settingsTimeZone" data-preference="time_zone" list="settingsTimeZones" maxlength="80" required placeholder="America/New_York"><datalist id="settingsTimeZones"></datalist><small>Used for activity dates and save times.</small></div></div>
+              <div class="rf-formrow"><div><label for="settingsJobTitle">Job title</label><input id="settingsJobTitle" data-preference="job_title" maxlength="120" autocomplete="organization-title"></div><div><label for="settingsTimeZone">Time zone</label><select id="settingsTimeZone" data-preference="time_zone" required aria-label="Time zone">
+<option value="America/New_York">Eastern Time (ET)</option>
+<option value="America/Chicago">Central Time (CT)</option>
+<option value="America/Denver">Mountain Time (MT)</option>
+<option value="America/Phoenix">Arizona (no daylight saving)</option>
+<option value="America/Los_Angeles">Pacific Time (PT)</option>
+<option value="America/Anchorage">Alaska Time (AKT)</option>
+<option value="America/Adak">Aleutian Islands (Hawaii–Aleutian Time)</option>
+<option value="Pacific/Honolulu">Hawaii (no daylight saving)</option>
+<option value="America/Puerto_Rico">Puerto Rico &amp; US Virgin Islands (Atlantic Time)</option>
+<option value="Pacific/Guam">Guam &amp; Northern Mariana Islands (Chamorro Time)</option>
+<option value="Pacific/Pago_Pago">American Samoa (Samoa Time)</option>
+<option value="UTC">UTC (Coordinated Universal Time)</option>
+</select><small>Used for activity dates and save times. Daylight saving adjusts automatically where observed.</small></div></div>
             </section>
             <section class="rf-card" aria-labelledby="workflowSettingsHeading"><h3 id="workflowSettingsHeading">Workflow preferences</h3>
               <div class="rf-formrow"><div><label for="settingsStartPage">After signing in, open</label><select id="settingsStartPage" data-preference="start_page"><option value="home">Home</option><option value="job-picker">Job chooser</option><option value="jobs">Jobs</option><option value="learn">Learn blumr</option></select></div><div><label for="settingsCandidateSort">Default candidate sort</label><select id="settingsCandidateSort" data-preference="candidate_sort"><option value="manager">Manager fit: highest first</option><option value="jd">JD fit: highest first</option><option value="newest">Newest first</option><option value="name">Name: A–Z</option></select></div></div>
@@ -493,9 +506,9 @@
           </div>
           <p class="rf-theme-footnote">10 shades of green · 7 dark themes · 3 light themes. Success, warning, and error colors stay consistent.</p>
         </div>
-        <section class="rf-card" id="notificationSettings" aria-labelledby="notificationHeading"><div class="rf-cardhead"><h3 id="notificationHeading" tabindex="-1">Notifications</h3><div class="rf-actions"><button class="rf-btn" type="button" id="refreshNotifications">Refresh</button><button class="rf-btn" type="button" id="markNotificationsRead">Mark all read</button></div></div><p id="notificationStatus" role="status"></p><ul id="notificationList" class="settings-list"></ul><button class="rf-btn" type="button" id="stopOnboardingReminders">Stop onboarding emails</button><p id="onboardingReminderStatus" role="status"></p></section>
+        <section class="rf-card" id="notificationSettings" aria-labelledby="notificationHeading"><details id="notificationDrawer" class="settings-notification-drawer"><summary id="notificationHeading">Notifications <span id="notificationSummary" class="rf-sub">Checking for updates…</span></summary><div class="rf-actions"><button class="rf-btn" type="button" id="refreshNotifications">Refresh</button><button class="rf-btn" type="button" id="markNotificationsRead">Mark all read</button><button class="rf-btn" type="button" id="toggleNotificationHistory" aria-pressed="false">Show history</button></div><p id="notificationStatus" role="status"></p><ul id="notificationList" class="settings-list"></ul></details></section>
         <section class="rf-card" aria-labelledby="helpSettingsHeading"><h3 id="helpSettingsHeading">Help &amp; onboarding</h3><p class="rf-sub">Practice the workflow or find a quick answer.</p><div class="rf-actions"><button class="rf-btn" type="button" id="settingsRestartTutorial">Restart tutorial</button><button class="rf-btn" type="button" id="settingsQuickGuides">Open quick guides</button></div>
-          <div id="guidanceSettings"></div>
+          <div id="guidanceSettings"></div><div class="settings-details"><button class="rf-btn" type="button" id="stopOnboardingReminders">Stop onboarding emails</button><p id="onboardingReminderStatus" role="status"></p></div>
           <details class="settings-details"><summary>Report a problem</summary><p class="rf-sub">Describe what happened and what you expected. Reports go privately to the blumr administrator. Include only the information needed to explain the problem.</p><form id="supportForm" class="rf-form"><div><label for="supportSubject">Subject</label><input id="supportSubject" minlength="3" maxlength="160" required></div><div><label for="supportDescription">What happened?</label><textarea id="supportDescription" minlength="10" maxlength="6000" required></textarea></div><div class="rf-actions"><button class="rf-btn primary" type="submit" id="supportSubmit">Send report</button></div><p id="supportStatus" role="status"></p></form></details>
           <details class="settings-details"><summary>Your problem reports</summary><button class="rf-btn" type="button" id="refreshSupport">Refresh reports</button><ul id="supportHistory" class="settings-list"></ul></details>
         </section>
