@@ -22,3 +22,11 @@ test('unread assessment revisions group by workspace and job without hiding fail
  assert.equal(groups[1].kind,'automation');assert.deepEqual(groups[2].ids,['read']);assert.equal(rows[0].candidate_id,'c');assert.equal(rows[0].ids,undefined);
  assert.equal(notificationGroups([rows[0]])[0].candidate_id,'c');
 });
+test('US timezone options use valid zones with seasonal offsets and Arizona/Hawaii exceptions',()=>{
+ const fs=require('node:fs');const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+ const select=html.match(/<select id="settingsTimeZone"[\s\S]*?<\/select>/)[0];const zones=[...select.matchAll(/value="([^"]+)"/g)].map(match=>match[1]);
+ for(const zone of zones)assert.equal(normalize({time_zone:zone}).time_zone,zone);
+ const hour=(date,zone)=>Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(date)));
+ assert.equal(hour('2026-01-15T18:00:00Z','America/New_York'),13);assert.equal(hour('2026-07-15T18:00:00Z','America/New_York'),14);
+ for(const date of ['2026-01-15T18:00:00Z','2026-07-15T18:00:00Z']){assert.equal(hour(date,'America/Phoenix'),11);assert.equal(hour(date,'Pacific/Honolulu'),8);}
+});

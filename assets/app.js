@@ -889,7 +889,6 @@ function renderJobs(){
         restartTutorial:async()=>{showPage('learn');await tutorial.restart();},quickGuides:()=>{showPage('learn');tutorial.quickGuides();},
         signedOutAfterDeletion:async status=>{window.dispatchEvent(new CustomEvent('ancalagon:auth-cleared'));await window.ancalagonSupabase.auth.signOut({scope:'local'});document.getElementById('authMessage').textContent=status==='complete'?'Your account has been deleted.':'Account deletion is in progress. Your private workspaces are locked while cleanup finishes.';}
       });
-      const zones=['UTC',...(Intl.supportedValuesOf?.('timeZone')||['America/New_York','America/Chicago','America/Denver','America/Los_Angeles'])];root.querySelector('#settingsTimeZones').replaceChildren(...zones.map(zone=>{const option=document.createElement('option');option.value=zone;return option;}));
       root.querySelector('#candidateSort').addEventListener('change',()=>{if(dataReady&&jobs.length)renderCandidates();});
       async function refreshPersonalUsage(){const g=workspaceGeneration;try{const counts=await dataService.loadPersonalUsage();if(g!==workspaceGeneration)return;root.querySelector('#personalUsage').textContent=`${counts.jobs||0} jobs created · ${counts.candidates||0} candidates added · ${counts.ai_completed||0} completed AI operations`;}catch{if(g===workspaceGeneration)root.querySelector('#personalUsage').textContent='Activity could not be loaded. Try Refresh activity.';}}
       root.querySelector('#refreshPersonalUsage').addEventListener('click',refreshPersonalUsage);

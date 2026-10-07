@@ -15,3 +15,5 @@
 @media(max-width:1100px){.settings-personal fieldset{grid-template-columns:1fr}#rf-app .rf-sidebar{padding-bottom:20px}}
 
 @media(max-width:600px){.settings-personal .rf-formrow{grid-template-columns:1fr}.settings-notification{align-items:flex-start}.settings-list button{flex:none}#exportDocuments .rf-btn{max-width:100%;overflow-wrap:anywhere;white-space:normal}#page-backend .rf-cardhead{flex-wrap:wrap}}
+
+.settings-notification-drawer>summary{cursor:pointer;font-size:18px;font-weight:650;padding:4px 0}.settings-notification-drawer>summary .rf-sub{display:inline-block;margin-left:12px;font-size:14px;font-weight:400}.settings-notification-drawer[open]>summary{margin-bottom:16px}.settings-notification-drawer .settings-list{max-height:420px;overflow:auto}
