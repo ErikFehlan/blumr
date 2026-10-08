@@ -55,7 +55,7 @@ await page.locator('#jobForm button[type=submit]').click();
   await page.locator('#homeSearchFlow').waitFor();assert.match(await page.locator('#homeSearchFlow').textContent(),/My first search/);
   assert.equal(await page.locator('#homeSearchFlow ol li').count(),4);
   assert.match(await page.locator('#homeSearchFlow [data-search-action="next"]').textContent(),/Upload resumes/);
-  await page.locator('#workspaceHome [data-home-action="new"]').click();assert.equal(await page.evaluate(()=>document.activeElement.id),'jobDescription');assert.equal(accounts.new.state.jobs.length,1,'starting another job preserves the existing search');
+  await page.locator('#workspaceHome [data-home-action="new"]').click();await page.waitForFunction(()=>document.activeElement.id==='jobDescription');assert.equal(await page.evaluate(()=>document.activeElement.id),'jobDescription');assert.equal(accounts.new.state.jobs.length,1,'starting another job preserves the existing search');
   await context.close();
   ({page,context}=await open('returning'));await page.getByRole('heading',{name:'Pick up where you left off',exact:true}).waitFor();
   assert.equal(await page.locator('[data-home-action="continue"]').count(),0,'existing user gets useful jobs without an invented last visit');
