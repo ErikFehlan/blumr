@@ -115,6 +115,7 @@
 #rf-app #jobForm .rf-quick-start input[type="file"]{max-width:100%}
 
 #rf-app #jobForm [hidden]{display:none!important}
+#rf-app #jobEditor[open]::details-content{content-visibility:visible}
 #rf-app .rf-quick-priorities{padding:12px 0}
 #rf-app .rf-quick-priorities summary{cursor:pointer;color:var(--ui-muted)}
 
