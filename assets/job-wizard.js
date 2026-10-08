@@ -10,6 +10,7 @@
  }
  function create(root,options={}){
   const form=root.querySelector('#jobForm'),q=id=>form.querySelector('#'+id);
+  const editor=form.closest('#jobEditor'),editorBody=editor?.querySelector('.rf-supporting-body'),editorCard=form.closest('.rf-card');
   let quick=false,files=[],scope=null,reading=false,readVersion=0,autoTitle='',draftTimer=null;
   const fields=['jobTitle','jobClient','jobDescription','jobManagerFeedback','jobCriteria','jobKnockouts'];
   const labels=['Job Details','Requirements','Top 5 Priorities','Review'];let step=0,source='',items=[];
@@ -80,6 +81,8 @@
   function selected(){return items.flatMap((item,i)=>{const toggle=form.querySelector('[data-select-priority="'+i+'"]'),value=form.querySelector('[data-priority-title="'+i+'"]')?.value.trim();return toggle?.checked&&value?[{...item,title:value}]:[];});}
   function combinedCriteria(){return [...new Set([...lines(q('jobCriteria').value),...selected().map(item=>(item.requirement_type==='required'?'Must Have | ':'Preferred | ')+item.title)])];}
   function draw(){
+   // Quick start is a direct intake surface; detailed setup keeps its disclosure.
+   if(editorBody){if(quick){editor.before(editorCard);editor.hidden=true;}else{editorBody.append(editorCard);editor.hidden=false;}}
    nav.innerHTML=labels.map((label,i)=>'<li '+(i===step?'aria-current="step"':'')+'><span>'+(i<step?'✓':i+1)+'</span>'+label+'</li>').join('');
    panels.forEach((p,i)=>p.hidden=quick?![0,2].includes(i):i!==step);form.dataset.wizardStep=String(step);form.dataset.quickStart=String(quick);
    quickPanel.hidden=!quick;quickFiles.hidden=!quick;quickPriorities.hidden=!quick;nav.hidden=quick;
