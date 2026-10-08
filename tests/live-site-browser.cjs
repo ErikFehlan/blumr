@@ -38,7 +38,7 @@ let browser,page,stage='setup';
  stage='login';await login(owner);pass('Live password login reaches Home');
  stage='create-job';await page.locator('[data-home-action="new"]').click();
  const jobTitle='Synthetic live QA '+fixture.run.slice(0,8);
- await page.locator('#jobTitle').fill(jobTitle);
+ await page.locator('[data-job-mode]').click();await page.locator('#jobTitle').fill(jobTitle);
  await page.locator('#jobDescription').fill('QA Analyst: own manual regression testing, create test plans, document defects, validate fixes, and use SQL to verify billing data. Collaborate with engineers and product managers.');
  await page.locator('#jobForm [data-job-next]').click();
  await page.locator('#jobCriteria').fill('Manual regression testing\nDefect documentation and remediation\nSQL data validation');

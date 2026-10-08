@@ -52,6 +52,28 @@ insert into app_events(workspace_id,user_id,event_type,session_id)
 select activate_confirmed_usage();
 create temp table first_install as select count(*) n from product_usage_events;
 \ir ../supabase/migrations/20260916120000_accurate_usage.sql
+\ir ../supabase/migrations/20261008192119_activation_funnel.sql
+set role authenticated;
+insert into activation_milestones(user_id,workspace_id,milestone,job_id) values
+ ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000011','assessment_viewed','00000000-0000-0000-0000-000000000021');
+do $$declare report jsonb;begin
+ report:=get_admin_activation_summary();if report->>'views'<>'1' then raise exception 'Assessment view was not counted';end if;
+ begin
+  insert into activation_milestones(user_id,workspace_id,milestone,job_id) values
+  (auth.uid(),'00000000-0000-0000-0000-000000000011','assessment_viewed','00000000-0000-0000-0000-000000000021');
+  raise exception 'Duplicate milestone accepted';exception when unique_violation then null;end;
+ begin
+  insert into activation_milestones(user_id,workspace_id,milestone,job_id) values
+  (auth.uid(),'00000000-0000-0000-0000-000000000011','resume_saved','00000000-0000-0000-0000-000000000099');
+  raise exception 'Unknown job accepted';exception when insufficient_privilege then null;end;
+end$$;
+set test.actor='00000000-0000-0000-0000-000000000002';set test.email='other@example.test';
+do $$begin
+ if exists(select from activation_milestones) then raise exception 'Nonadmin can read milestones';end if;
+ begin perform get_admin_activation_summary();raise exception 'Nonadmin can read report';exception when insufficient_privilege then null;end;
+end$$;
+reset role;
+set test.actor='00000000-0000-0000-0000-000000000001';set test.email='admin@example.test';
 do $$declare r jsonb;u jsonb;begin
  if (select count(*) from product_usage_events)<>(select n from first_install) then raise exception 'Migration duplicated recovered history';end if;
  r:=get_admin_usage_summary();select value into u from jsonb_array_elements(r->'users') where value->>'email'='admin@example.test';
