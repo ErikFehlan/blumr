@@ -55,7 +55,11 @@ await page.locator('#jobForm button[type=submit]').click();
   await page.locator('#homeSearchFlow').waitFor();assert.match(await page.locator('#homeSearchFlow').textContent(),/My first search/);
   assert.equal(await page.locator('#homeSearchFlow ol li').count(),4);
   assert.match(await page.locator('#homeSearchFlow [data-search-action="next"]').textContent(),/Upload resumes/);
-  await page.locator('#workspaceHome [data-home-action="new"]').click();console.log('Quick-start returning state',await page.evaluate(()=>({active:document.activeElement?.id,page:document.querySelector('.rf-page.active')?.id,editor:document.querySelector('#jobEditor').open,form:{...document.querySelector('#jobForm').dataset},descriptionVisible:document.querySelector('#jobDescription').getClientRects().length,descriptionAncestors:[...function*(e){while(e){yield e;e=e.parentElement}}(document.querySelector('#jobDescription'))].map(e=>({tag:e.tagName,id:e.id,hidden:e.hidden,display:getComputedStyle(e).display})),errors:window.debugErrors||[]}))));await page.waitForFunction(()=>document.activeElement.id==='jobDescription');assert.equal(await page.evaluate(()=>document.activeElement.id),'jobDescription');assert.equal(accounts.new.state.jobs.length,1,'starting another job preserves the existing search');
+  await page.locator('#workspaceHome [data-home-action="new"]').click();console.log('Quick-start returning state',await page.evaluate(()=>{
+   const description=document.querySelector('#jobDescription'),ancestors=[];
+   for(let node=description;node;node=node.parentElement)ancestors.push({tag:node.tagName,id:node.id,hidden:node.hidden,display:getComputedStyle(node).display});
+   return {active:document.activeElement?.id,page:document.querySelector('.rf-page.active')?.id,editor:document.querySelector('#jobEditor').open,form:{...document.querySelector('#jobForm').dataset},descriptionVisible:description.getClientRects().length,ancestors,errors:window.debugErrors||[]};
+  }));await page.waitForFunction(()=>document.activeElement.id==='jobDescription');assert.equal(await page.evaluate(()=>document.activeElement.id),'jobDescription');assert.equal(accounts.new.state.jobs.length,1,'starting another job preserves the existing search');
   await context.close();
   ({page,context}=await open('returning'));await page.getByRole('heading',{name:'Pick up where you left off',exact:true}).waitFor();
   assert.equal(await page.locator('[data-home-action="continue"]').count(),0,'existing user gets useful jobs without an invented last visit');
