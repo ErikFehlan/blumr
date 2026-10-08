@@ -430,6 +430,11 @@
       if (error) console.warn('AI usage event was not recorded', error);
     }
 
+    async function recordActivation(milestone,jobId){
+      const {error}=await client.from('activation_milestones').insert({workspace_id:workspaceId,user_id:userId,milestone,job_id:jobId||null});
+      if(error&&error.code!=='23505')throw error;
+    }
+    async function loadActivationSummary(){const {data,error}=await client.rpc('get_admin_activation_summary');if(error)throw error;return data;}
     async function trackEvent(eventType, options = {}) {
       // Saved work and AI results are counted transactionally by the backend.
       if (!['signed_in', 'job_opened'].includes(eventType)) return;
@@ -571,7 +576,7 @@
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
+    return { recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };

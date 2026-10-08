@@ -72,11 +72,13 @@ jobs:
       - name: Install browser test runtime
         timeout-minutes: 4
         run: |
-          npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.8.0
+          npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.8.0 linkedom@0.18.12
       - name: Test recruiter browser journey
         run: |
+          node tests/home-browser.cjs
           node tests/assessment-memory-browser.cjs
           node --test tests/interaction-browser.cjs
+          node tests/quick-start-dom.cjs
           CAPTURE_UI=test-results/presentation node tests/presentation-browser.cjs
           node tests/security-browser.cjs
           node tests/landing-browser.cjs
@@ -86,7 +88,6 @@ jobs:
           node tests/hiring-priorities-browser.cjs
           node tests/resume-intake-browser.cjs
           node tests/streamline-browser.cjs
-          node tests/home-browser.cjs
           node tests/guided-experience-browser.cjs
           CAPTURE_UI=test-results/focus node tests/focus-browser.cjs
           node tests/core-browser.cjs

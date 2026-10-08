@@ -98,7 +98,7 @@
       drafts.set(id,text);candidate.submissionDraft={text,updatedAt:Date.now()};
       button.disabled=true;button.textContent='Saving…';status.textContent='Saving draft…';
       try{
-        await api.flush();drafts.delete(id);status.textContent='Saved draft';api.toast('Submittal draft saved.');
+        await api.flush();drafts.delete(id);status.textContent='Saved draft';api.toast('Submittal draft saved.');api.submittalPrepared?.(candidate);
       }catch(error){
         status.textContent='Not saved — retry';api.toast(error?.message||'Submittal draft was not saved yet. Try again.','error');
       }finally{button.disabled=false;button.textContent='Save submittal';}
@@ -183,7 +183,7 @@
     }
   }
   function refreshEvaluation(){if(!api||!current)return;return preserve(()=>{const candidate=api.candidate(current);if(candidate){renderEvaluation(candidate);refreshIntake();}});}
-  async function copy(){const area=api.root.querySelector('#submissionDraft');if(!area)return;if(!area.value.trim()){api.toast('Add a submittal before copying.','error');return;}try{await navigator.clipboard.writeText(area.value);api.toast('Submittal copied.');api.completeGuidance?.('submission');}catch{area.focus();area.select();api.toast('Select and copy the submittal using your browser.','error');}}
+  async function copy(){const area=api.root.querySelector('#submissionDraft');if(!area)return;if(!area.value.trim()){api.toast('Add a submittal before copying.','error');return;}try{await navigator.clipboard.writeText(area.value);api.toast('Submittal copied.');api.submittalPrepared?.(api.candidate(current));api.completeGuidance?.('submission');}catch{area.focus();area.select();api.toast('Select and copy the submittal using your browser.','error');}}
   async function beforeReview(candidate){
     if(!quickNotes?.pending(candidate.id))return true;
     const saved=await quickNotes.flush(candidate);

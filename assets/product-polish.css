@@ -100,3 +100,25 @@
 #rf-app .rf-manager-disagreement label{display:block;margin:12px 0 6px}
 #rf-app .rf-manager-disagreement textarea,#rf-app .rf-manager-disagreement select{width:100%;box-sizing:border-box}
 #rf-app .rf-manager-disagreement button{margin-top:10px;white-space:normal}
+
+/* Quick start shares the existing job editor and assessment queue. */
+#rf-app .rf-quick-start{display:grid;gap:12px;padding:20px;border:1px solid var(--ui-panel-line);border-radius:16px;background:var(--ui-panel)}
+#rf-app .rf-quick-start[hidden]{display:none}
+#rf-app .rf-quick-start h4{margin:0;font-size:1.25rem}
+#rf-app .rf-quick-drop{border:1px dashed var(--ui-panel-line);border-radius:12px;padding:16px}
+#rf-app .rf-quick-drop.dragging{outline:2px solid var(--ui-accent)}
+#rf-app .rf-quick-file{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:8px 0}
+#rf-app .rf-quick-file span{overflow-wrap:anywhere;min-width:0}
+#rf-app #jobForm[data-quick-start="true"] [data-job-step="0"] h4{display:none}
+#rf-app #jobForm[data-quick-start="true"] [data-job-step="2"]{max-height:320px;overflow:auto}
+#rf-app #jobForm[data-quick-start="true"] [data-job-step="2"] h4{font-size:1rem}
+#rf-app #jobForm .rf-quick-start input[type="file"]{max-width:100%}
+
+#rf-app #jobForm [hidden]{display:none!important}
+#rf-app #jobEditor[hidden]{display:none!important}
+#rf-app .rf-quick-priorities{padding:12px 0}
+#rf-app .rf-quick-priorities summary{cursor:pointer;color:var(--ui-muted)}
+
+#rf-app .rf-admin-activation{display:flex;flex-wrap:wrap;gap:24px}
+#rf-app .rf-admin-activation div{display:grid;gap:6px;min-width:120px}
+#rf-app .rf-admin-activation strong{font-size:24px}

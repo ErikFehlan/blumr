@@ -1,1 +1,1 @@
-module.exports=async page=>{while(await page.locator('#jobForm').getAttribute('data-wizard-step')!=='3')await page.locator('#jobForm [data-job-next]').click();};
+module.exports=async page=>{if(await page.locator('#jobForm').getAttribute('data-quick-start')==='true')await page.locator('[data-job-mode]').click();while(await page.locator('#jobForm').getAttribute('data-wizard-step')!=='3')await page.locator('#jobForm [data-job-next]').click();};

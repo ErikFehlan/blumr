@@ -146,7 +146,7 @@ test('every workspace tab responds across all ten themes; dropdowns, exports, ke
   await navigate(page, 'jobs', true);
   assert.equal(await page.locator('#page-jobs').isVisible(), true);
   await page.locator('#newJobBtn').click();
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'jobTitle');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'jobDescription');
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
     for (const name of ['home', 'jobs', 'candidates', 'pipeline', 'feedback', 'learn']) {

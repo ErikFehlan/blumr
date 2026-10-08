@@ -68,7 +68,7 @@ const empty=()=>({jobs:[],candidates:[],feedback:[],interviewOutcomes:[]});
   await page.screenshot({path:'test-results/tutorial-complete.png',fullPage:true});
   // Practice never changes live jobs, candidates, feedback, or the last real job bookmark.
   assert.equal(liveWrites,0);assert.equal(engineCalls,0);assert.deepEqual(accounts.alpha.state,empty());assert.equal(accounts.alpha.home.last_job_id,undefined);
-  await page.locator('[data-view="complete"] [data-action="new-job"]').click();await page.locator('#page-jobs.active').waitFor();assert.equal(await page.locator('#jobTitle').inputValue(),'');assert.equal(await page.evaluate(()=>document.activeElement.id),'jobTitle');
+  await page.locator('[data-view="complete"] [data-action="new-job"]').click();await page.locator('#page-jobs.active').waitFor();assert.equal(await page.locator('#jobTitle').inputValue(),'');assert.equal(await page.evaluate(()=>document.activeElement.id),'jobDescription');
   await context.close();({page,context}=await open('alpha'));await page.locator('#workspaceHome [data-home-action="learn"]').click();await page.locator('[data-action="start"]').click();assert.equal(await page.locator('#at-draft').inputValue(),'Edited practice summary. Ask which tests Jordan owned.');
   for(const width of [320,390]){await page.setViewportSize({width,height:850});for(const step of [1,2,3,4,5]){await page.locator('[data-step="'+step+'"]').click();await fits(page);}}
   await synced(page);await context.close();
