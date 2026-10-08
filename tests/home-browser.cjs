@@ -57,8 +57,8 @@ await page.locator('#jobForm button[type=submit]').click();
   assert.match(await page.locator('#homeSearchFlow [data-search-action="next"]').textContent(),/Upload resumes/);
   await page.locator('#workspaceHome [data-home-action="new"]').click();console.log('Quick-start returning state',await page.evaluate(()=>{
    const description=document.querySelector('#jobDescription'),ancestors=[];
-   for(let node=description;node;node=node.parentElement)ancestors.push({tag:node.tagName,id:node.id,hidden:node.hidden,display:getComputedStyle(node).display});
-   return {active:document.activeElement?.id,page:document.querySelector('.rf-page.active')?.id,editor:document.querySelector('#jobEditor').open,form:{...document.querySelector('#jobForm').dataset},descriptionVisible:description.getClientRects().length,ancestors,errors:window.debugErrors||[]};
+   for(let node=description;node;node=node.parentElement)ancestors.push({tag:node.tagName,id:node.id,hidden:node.hidden,display:getComputedStyle(node).display,visibility:getComputedStyle(node).visibility,contentVisibility:getComputedStyle(node).contentVisibility,rect:node.getBoundingClientRect().toJSON()});
+   return {active:document.activeElement?.id,page:document.querySelector('.rf-page.active')?.id,editor:document.querySelector('#jobEditor').open,form:{...document.querySelector('#jobForm').dataset},descriptionVisible:description.getClientRects().length,ancestors,detailsContent:getComputedStyle(document.querySelector('#jobEditor'),'::details-content').contentVisibility,body:document.body.className,errors:window.debugErrors||[]};
   }));await page.waitForFunction(()=>document.activeElement.id==='jobDescription');assert.equal(await page.evaluate(()=>document.activeElement.id),'jobDescription');assert.equal(accounts.new.state.jobs.length,1,'starting another job preserves the existing search');
   await context.close();
   ({page,context}=await open('returning'));await page.getByRole('heading',{name:'Pick up where you left off',exact:true}).waitFor();
