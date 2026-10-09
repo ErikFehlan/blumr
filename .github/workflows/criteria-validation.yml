@@ -95,6 +95,8 @@ jobs:
           createdb -h localhost -U postgres beta_security
           psql -h localhost -U postgres -d beta_security -f tests/beta-security.sql
           node tests/security-concurrency.mjs
+          createdb -h localhost -U postgres resume_storage_budget
+          psql -h localhost -U postgres -d resume_storage_budget -f tests/resume-storage-budget.sql
           createdb -h localhost -U postgres readiness_security
           psql -h localhost -U postgres -d readiness_security -f tests/readiness-security.sql
 

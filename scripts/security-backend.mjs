@@ -21,6 +21,7 @@ if(mode==='prepare'){
  }
  // Apply the current admission policy after every historical baseline refresh.
  await api('/database/query','POST',{query:await readFile('supabase/patches/open-beta-signup.sql','utf8')});
+ await api('/database/query','POST',{query:await readFile('supabase/patches/resume-storage-budget.sql','utf8')});
  // Never overwrite unrelated Auth settings or provider secrets.
  await api('/config/auth','PATCH',{
   disable_signup:false,external_email_enabled:true,external_anonymous_users_enabled:false,

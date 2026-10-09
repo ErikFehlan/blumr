@@ -10,7 +10,7 @@ create table auth.users(id uuid primary key,email text unique,raw_user_meta_data
 create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
 create function auth.jwt() returns jsonb language sql stable as $$select jsonb_build_object('sub',auth.uid(),'email',current_setting('test.email',true))$$;
 create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,owner uuid,owner_id text);
+create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,owner uuid,owner_id text,metadata jsonb);
 alter table storage.objects enable row level security;
 create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;
 grant usage on schema auth,storage to authenticated,service_role;
@@ -23,8 +23,10 @@ insert into auth.users(id,email,email_confirmed_at) values
  ('00000000-0000-0000-0000-000000000002','recruiter@example.test',now());
 \ir ../supabase/migrations/20260917200000_beta_security.sql
 \ir ../supabase/patches/open-beta-signup.sql
+\ir ../supabase/patches/resume-storage-budget.sql
 \ir ../supabase/migrations/20260917200000_beta_security.sql
 \ir ../supabase/patches/open-beta-signup.sql
+\ir ../supabase/patches/resume-storage-budget.sql
 grant select,insert,update,delete on public.jobs,public.workspace_members,public.workspaces,storage.objects to authenticated;
 create table test_ids as select owner_id as user_id,id as workspace_id from workspaces;
 grant select on test_ids to authenticated,service_role;
@@ -90,6 +92,7 @@ select manage_beta_access('recruiter@example.test',false);
 reset role;
 \ir ../supabase/migrations/20260917200000_beta_security.sql
 \ir ../supabase/patches/open-beta-signup.sql
+\ir ../supabase/patches/resume-storage-budget.sql
 set test.actor='00000000-0000-0000-0000-000000000002';set role authenticated;
 do $$declare w uuid;begin
  select workspace_id into w from test_ids where user_id=auth.uid();
@@ -106,7 +109,7 @@ select manage_beta_access('recruiter@example.test',true);
 reset role;
 -- Test direct storage writes, missing size metadata, replacement, and capacity release.
 set test.actor='00000000-0000-0000-0000-000000000002';set role authenticated;
-insert into storage.objects(bucket_id,name) select 'resumes',workspace_id::text||'/file-'||n from test_ids cross join generate_series(1,100)n where user_id=auth.uid();
+insert into storage.objects(bucket_id,name,metadata) select 'resumes',workspace_id::text||'/file-'||n,'{"size":1}'::jsonb from test_ids cross join generate_series(1,2000)n where user_id=auth.uid();
 do $$declare w text;begin
  select workspace_id::text into w from test_ids where user_id=auth.uid();
  begin insert into storage.objects(bucket_id,name) values('resumes',w||'/extra');raise exception 'Storage cap bypassed';exception when sqlstate 'PT429' then null;end;
@@ -154,6 +157,7 @@ set test.actor='00000000-0000-0000-0000-000000000001';set role authenticated;
 select manage_beta_access('changed@example.test',false);
 reset role;
 \ir ../supabase/patches/open-beta-signup.sql
+\ir ../supabase/patches/resume-storage-budget.sql
 set test.actor='00000000-0000-0000-0000-000000000004';set role authenticated;
 do $$begin
  if exists(select from jobs) or exists(select from workspace_members) then raise exception 'Suspended user still has access';end if;
