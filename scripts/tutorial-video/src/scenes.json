@@ -10,8 +10,8 @@
     "name": "01-job",
     "duration": 7,
     "chapter": "START WITH THE ROLE",
-    "title": "Give the search\na clear starting point.",
-    "body": "Add the job description. Manager notes are optional.",
+    "title": "Start with the job.\nStay in one place.",
+    "body": "Add the title and description in quick start. Detailed setup is available when you need it.",
     "tag": "01  /  Define the job",
     "crop": [
       300,
@@ -19,14 +19,14 @@
       1120,
       750
     ],
-    "voice": "Start with the job description. Add manager notes when you have them, or begin with the role itself."
+    "voice": "Start with a title and job description. Quick start brings the job and resumes together on one page."
   },
   {
     "name": "02-priorities",
-    "duration": 10,
+    "duration": 7,
     "chapter": "ESTABLISH WHAT MATTERS",
-    "title": "Four steps.\nOne clear search.",
-    "body": "Job Details \u2192 Requirements \u2192 Top 5 Priorities \u2192 Review. Check and edit the suggested criteria.",
+    "title": "Priorities when\nyou need them.",
+    "body": "Suggested priorities are optional. Review and select the ones that matter to this search.",
     "tag": "02  /  Review the priorities",
     "crop": [
       300,
@@ -34,14 +34,14 @@
       1120,
       750
     ],
-    "voice": "Move through job details, requirements, top five priorities, and review. Edit the suggestions before saving."
+    "voice": "Open the suggested priorities if you want to refine the search. Select the criteria that matter, or continue with the description."
   },
   {
     "name": "03-upload",
-    "duration": 6,
+    "duration": 8,
     "chapter": "BRING IN THE CANDIDATES",
-    "title": "Add the resumes.\nStart the review.",
-    "body": "Upload candidates into the search and review their proposed assessments.",
+    "title": "Add resumes.\nStart candidate review.",
+    "body": "Select resumes alongside the job description, then start the review. Assessments prepare as candidates finish.",
     "tag": "03  /  Upload resumes",
     "crop": [
       300,
@@ -49,7 +49,7 @@
       1120,
       750
     ],
-    "voice": "Upload the resumes. Each candidate gets a proposed assessment for you to review."
+    "voice": "Add the resumes before saving the job. Select Start candidate review, and the candidates begin preparing in the background."
   },
   {
     "name": "04-review",
@@ -89,10 +89,10 @@
     "body": "Click a strength to open the resume and highlight the source passage.",
     "tag": "06  /  Inspect the evidence",
     "crop": [
-      837,
-      70,
-      600,
-      650
+      300,
+      90,
+      1120,
+      750
     ],
     "voice": "Click a strength to open the resume. The supporting passage is highlighted, so you can check the evidence and approve, correct, or flag the point."
   },
@@ -115,7 +115,7 @@
     "name": "08-proposal",
     "duration": 8,
     "chapter": "REVIEW THE CHANGE",
-    "title": "Understand what\nchanged\u2014and why.",
+    "title": "Understand what\nchanged—and why.",
     "body": "blumr explains the new evidence and proposes an updated assessment. Current scores wait for approval.",
     "tag": "08  /  Review the proposal",
     "crop": [
@@ -161,7 +161,7 @@
     "duration": 7,
     "chapter": "MAKE THE INTRODUCTION",
     "title": "A concise draft.\nReady for your edit.",
-    "body": "Prepare a short submittal built from the candidate\u2019s supported strengths. Review, edit, and copy.",
+    "body": "Prepare a short submittal built from the candidate’s supported strengths. Review, edit, and copy.",
     "tag": "11  /  Prepare the submittal",
     "crop": [
       300,
@@ -169,7 +169,7 @@
       1120,
       750
     ],
-    "voice": "When you are ready, prepare a concise submittal from the candidate\u2019s supported strengths. Review it, make it yours, and copy."
+    "voice": "When you are ready, prepare a concise submittal from the candidate’s supported strengths. Review it, make it yours, and copy."
   },
   {
     "name": "outro",

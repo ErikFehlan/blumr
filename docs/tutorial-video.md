@@ -1,6 +1,6 @@
 # Website tutorial — October 7, 2026
 
-The public How it works page replaces the September 24 recording with a 96-second walkthrough of the October 7 interface. Source inspected: main commit 7bff857bad6b99e739fa55f0ecb0482a0c01cdd5.
+The October 7 edit of the public How it works page replaces the September 24 recording with a 96-second walkthrough of the October 7 interface. Source inspected: main commit 7bff857bad6b99e739fa55f0ecb0482a0c01cdd5.
 
 This is a silent, caption-led recording of the real local application. All candidates, scores, assessment outputs and historical learning observations are scripted illustrations, labeled in the video and on the page. It is not an AI benchmark. No production account, resume or candidate record is used.
 
@@ -21,3 +21,20 @@ Keep the recording scripts, fixture and storyboard under `scripts/tutorial-video
 The output folders (`captures`, `edit`, `output`) are local work products. Run the recorder, then the renderer. Inspect every scene, the final export and mobile/desktop playback. Replace the dated video URL, poster and page date together. Publish through the normal pull request and release gates.
 
 Review the tutorial whenever job creation, assessment labels, approval behavior, learning controls, navigation or submittal layout changes. Check displayed clicks and captions against the current UI and source; feature names alone are insufficient. Retain the illustration disclosure.
+
+## October 9 refresh — source ready, fresh recording pending
+
+The refresh starts from an empty fictional workspace on the current quick-start surface. It shows adding the title and description, opening optional suggested priorities, adding resumes alongside the job, and selecting **Start candidate review**. Detailed job setup is an optional alternative, rather than the default four-step onboarding path.
+
+Cursor moves now use timed browser animations (350–700 ms), with a brief pause before a click. Scene edits use hard cuts. Footage plays at its original speed; reading time uses a held final frame instead of slow motion or accelerated clicks. Evidence inspection retains the surrounding interface so opening the resume panel is visible.
+
+The recorder removes any old timeline before beginning. A successful capture records the source commit, recording date, and workflow. The renderer rejects failed captures and legacy footage, adjusts scene lengths to preserve every recorded action, and generates matching captions, a voiceover draft, and an export manifest.
+
+No new video has been recorded or published for this refresh. The live page still references the October 7 asset. Browser recording/playback verification is unavailable in the current workspace. Do not swap the website asset until a fresh recording of this source has been inspected.
+
+### Remaining release steps
+
+1. Record using the supported browser recording environment, with the source checkout and isolated fictional fixture. Check that all 11 scenes complete without page errors.
+2. Render with Python 3.12+, Pillow and FFmpeg. Inspect all scene boundaries, cursor paths, text readability, and the evidence panel. Confirm no fade through black and no cursor teleport during visible actions.
+3. Check the displayed workflow against the recorded source commit. Export duration can grow to preserve real actions; use the manifest duration when updating page copy.
+4. Update the video URL, poster, captions, and date together. Verify seeking and desktop/mobile playback, then publish through the normal release gates. Do not relabel older footage as the refreshed workflow.

@@ -16,3 +16,9 @@ learning-data/
 # Private backup working files and Supabase CLI credentials
 .backup/
 supabase/.temp/
+
+# Tutorial recording work products
+scripts/tutorial-video/captures/
+scripts/tutorial-video/edit/
+scripts/tutorial-video/output/
+__pycache__/

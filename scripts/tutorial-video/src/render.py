@@ -4,6 +4,14 @@ import json,subprocess,math,concurrent.futures
 ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'output';OUT.mkdir(exist_ok=True);TMP=ROOT/'edit';TMP.mkdir(exist_ok=True)
 SCENES=json.loads((ROOT/'src/scenes.json').read_text());TL=json.loads((ROOT/'captures/timeline.json').read_text())
 TIMES={x['name']:x for x in TL['timeline']}
+if TL.get('errors'):raise ValueError('Cannot render a failed recording')
+if TL.get('workflow')!='quick-start':raise ValueError('Fresh quick-start capture required; legacy footage is not publishable')
+for scene in SCENES:
+ if scene['name'] not in ('intro','outro'):
+  if scene['name'] not in TIMES:raise ValueError('Missing scene '+scene['name'])
+  tm=TIMES[scene['name']]
+  if tm['end']<=tm['start']:raise ValueError('Invalid scene timing')
+  scene['duration']=math.ceil(max(scene['duration'],tm['end']-tm['start']))
 FONT='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';BOLD='/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 W,H=1920,1080;green='#173F35';muted='#45695E';mint='#EDF6F1';lime='#A9E7BF'
 def font(size,bold=False):return ImageFont.truetype(BOLD if bold else FONT,size)
@@ -72,25 +80,25 @@ def run(scene,index):
  cmd+=['-loop','1','-framerate','30','-i',str(bg)]
  if name in TIMES:
   tm=TIMES[name].copy();x,y,w,h=scene['crop'];
-  if name=='06-evidence':tm['start']=tm['end']-3.6
   span=tm['end']-tm['start']
   cmd+=['-i',str(ROOT/'captures/walkthrough.webm')]
-  filt=f'[1:v]trim=start={tm['start']}:end={tm['end']},setpts=(PTS-STARTPTS)*{dur/span},tpad=stop_mode=clone:stop_duration=1,fps=30,crop={w}:{h}:{x}:{y},scale=1202:748:force_original_aspect_ratio=decrease,pad=1202:748:(ow-iw)/2:(oh-ih)/2:color=0xF7FBF8,setsar=1[v];[0:v][v]overlay=617:202:shortest=1,fade=t=in:st=0:d=0.2,fade=t=out:st={dur-.2}:d=0.2,format=yuv420p[out]'
+  filt=f'[1:v]trim=start={tm['start']}:end={tm['end']},setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration={max(0,dur-span)+1},fps=30,crop={w}:{h}:{x}:{y},scale=1202:748:force_original_aspect_ratio=decrease,pad=1202:748:(ow-iw)/2:(oh-ih)/2:color=0xF7FBF8,setsar=1[v];[0:v][v]overlay=617:202:shortest=1,format=yuv420p[out]'
  else:
-  filt=f'[0:v]fade=t=in:st=0:d=0.45,fade=t=out:st={dur-.35}:d=0.35,format=yuv420p[out]'
+  filt=f'[0:v]format=yuv420p[out]'
  cmd+=['-filter_complex',filt,'-map','[out]','-t',str(dur),'-r','30','-an','-c:v','libx264','-preset','veryfast','-crf','24','-threads','2',str(dest)]
  subprocess.run(cmd,check=True);print('Rendered',name,flush=True)
  return dest
 if __name__=='__main__':
  with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:parts=list(ex.map(lambda x:run(*x),[(s,i) for i,s in enumerate(SCENES)]))
  (TMP/'concat.txt').write_text(''.join("file '"+str(p)+"'\n" for p in parts))
- subprocess.run(['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-y','-f','concat','-safe','0','-i',str(TMP/'concat.txt'),'-c','copy','-movflags','+faststart',str(OUT/'Blumr_Tutorial_20261007.mp4')],check=True)
- elapsed=0;srt=[];script=['# blumr — 96-second product tutorial','', 'Caption-led edit of the real blumr interface, using fictional profiles and scripted sample assessments. No production user data is included.','', 'Voiceover script (not recorded in this version):','']
+ subprocess.run(['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-y','-f','concat','-safe','0','-i',str(TMP/'concat.txt'),'-c','copy','-movflags','+faststart',str(OUT/'Blumr_Tutorial_20261009.mp4')],check=True)
+ elapsed=0;srt=[];script=['# blumr — refreshed product tutorial','', 'Caption-led edit of the real blumr interface, using fictional profiles and scripted sample assessments. No production user data is included.','', 'Voiceover script (not recorded in this version):','']
  for i,s in enumerate(SCENES):
   start=elapsed;elapsed+=s['duration'];ts=lambda t:f'{int(t//3600):02}:{int(t//60)%60:02}:{int(t)%60:02},000'
   caption=s['title'].replace('\n',' ')+' '+s['body'];srt.append(f'{i+1}\n{ts(start)} --> {ts(elapsed)}\n{caption}\n')
   script += [f"## {start:02d}–{elapsed:02d} seconds · {s['name']}",s['voice'],'']
  (OUT/'Blumr_Demo_Captions.srt').write_text('\n'.join(srt));(OUT/'Blumr_Demo_Voiceover.md').write_text('\n'.join(script))
- probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','json',str(OUT/'Blumr_Tutorial_20261007.mp4')]))
+ probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','json',str(OUT/'Blumr_Tutorial_20261009.mp4')]))
  assert abs(float(probe['format']['duration'])-elapsed)<0.05, 'Video duration does not match the storyboard'
+ (OUT/'manifest.json').write_text(json.dumps({'source_sha':TL['source_sha'],'recorded_at':TL['recorded_at'],'duration':elapsed,'workflow':TL['workflow'],'transitions':'hard-cuts','speed':1},indent=2))
  print('COMPLETE',elapsed,'seconds',flush=True)
