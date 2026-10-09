@@ -6,7 +6,7 @@ const root=path.resolve(__dirname,'../../..'),out=path.resolve(__dirname,'../out
  // Exercise the actual marketing-page player against the unpublished export.
  // Only the video URL and duration copy are substituted for this QA run.
  const pageHTML=fs.readFileSync(path.join(root,'how-it-works.html'),'utf8')
-  .replaceAll('assets/blumr-tutorial-20261007.mp4','demo.mp4');
+  .replace(/assets\/blumr-tutorial-\d{8}\.mp4/g,'demo.mp4');
  const server=http.createServer((req,res)=>{
   const name=new URL(req.url,'http://localhost').pathname;
   try{

@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 \ir beta-security.sql
-alter table storage.objects add column metadata jsonb;
+alter table storage.objects add column if not exists metadata jsonb;
 \ir ../supabase/migrations/20261005190251_production_readiness_guards.sql
 \ir ../supabase/migrations/20261005190251_production_readiness_guards.sql
 -- Free only synthetic storage/record quota created by the preceding fixture.
