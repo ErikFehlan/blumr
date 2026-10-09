@@ -8,7 +8,9 @@ migrations.push('20261006174613_automatic_role_knowledge.sql','20261006200406_ro
 migrations.push('20261008192119_activation_funnel.sql');
 // Publish replacement functions atomically; old capacity definitions must never
 // become visible halfway through a repeated deployment.
-const query='begin;\n'+(await Promise.all(migrations.map(name=>readFile('supabase/migrations/'+name,'utf8')))).map(sql=>sql.replace(/^begin;\s*$/gmi,'').replace(/^commit;\s*$/gmi,'')).join('\n')+'\ncommit;';
+const definitions=await Promise.all(migrations.map(name=>readFile('supabase/migrations/'+name,'utf8')));
+definitions.push(await readFile('supabase/patches/assessment-heartbeat-recovery.sql','utf8'));
+const query='begin;\n'+definitions.map(sql=>sql.replace(/^begin;\s*$/gmi,'').replace(/^commit;\s*$/gmi,'')).join('\n')+'\ncommit;';
 const response=await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`,{method:'POST',
  headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
  body:JSON.stringify({query}),signal:AbortSignal.timeout(60000)});

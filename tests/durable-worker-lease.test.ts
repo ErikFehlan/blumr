@@ -53,3 +53,27 @@ Deno.test('a sustained database outage respects the elapsed retry budget and lea
   assert(failure instanceof PersistencePending&&saves===4&&clock<=75000,'Outage was replayed or retries exceeded the time budget');
  }finally{await lease.close();}
 });
+
+Deno.test('one lost heartbeat response does not abort paid work; the next confirmation recovers',async()=>{
+ let heartbeats=0,calls=0,release!:()=>void;
+ const responseReady=new Promise<void>(r=>release=r);
+ const lease=assessmentLease({lease_id:'lease'},async name=>{
+  if(name==='heartbeat_assessment_work'){if(++heartbeats===1)throw Error('database temporarily unavailable');release();}
+  return true;
+ },{intervalMs:5,fetcher:async(_input,init)=>{
+  calls++;await responseReady;assert(!init?.signal?.aborted,'One heartbeat failure aborted the provider');
+  return new Response('{"status":"completed"}');
+ }});
+ try{await lease.provider('https://provider.invalid');assert(heartbeats>=2&&calls===1,'Recovery replayed paid work');}finally{await lease.close();}
+});
+Deno.test('unconfirmed heartbeats stop before the last confirmed lease can expire',async()=>{
+ let clock=0,heartbeats=0,calls=0;
+ const lease=assessmentLease({lease_id:'lease'},async name=>{
+  if(name==='heartbeat_assessment_work'){heartbeats++;clock+=30000;throw Error('database unavailable');}
+  return true;
+ },{intervalMs:5,now:()=>clock,fetcher:async(_input,init)=>{
+  calls++;return await new Promise<Response>((_resolve,reject)=>{init?.signal?.addEventListener('abort',()=>reject(Error('aborted')),{once:true});});
+ }});
+ try{await lease.provider('https://provider.invalid').catch(()=>{});assert(calls===1&&heartbeats===3&&clock===90000,'Heartbeat grace exceeded the lease safety window');}
+ finally{await lease.close();}
+});

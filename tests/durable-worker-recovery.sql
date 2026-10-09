@@ -1,7 +1,9 @@
 \set ON_ERROR_STOP on
 \ir assessment-capacity.sql
 \ir ../supabase/migrations/20261005133313_durable_worker_recovery.sql
+\ir ../supabase/patches/assessment-heartbeat-recovery.sql
 \ir ../supabase/migrations/20261005133313_durable_worker_recovery.sql
+\ir ../supabase/patches/assessment-heartbeat-recovery.sql
 truncate resume_intake_tasks,job_reassessment_tasks,direct_ai_requests,assessment_worker_attempts;
 -- Use real source functions and revision triggers, not stubbed input checks.
 update candidates set role='Resume awaiting analysis' where id in(select id from capacity_candidates where n=1 and g=1);
@@ -54,7 +56,8 @@ do $$declare t resume_intake_tasks;call uuid:=gen_random_uuid();begin
  t:=claim_intake_fixture();perform begin_assessment_provider(t.lease_id,call);
  update jobs set manager_feedback='Updated synthetic priority' where id=t.job_id;
  if active_assessment_count(null)<>1 or jsonb_array_length(claim_assessment_work('intake',null))<>0 then raise exception 'Source edit released running provider capacity';end if;
- if heartbeat_assessment_work(t.lease_id) then raise exception 'Superseded worker renewed';end if;
+ if not heartbeat_assessment_work(t.lease_id) then raise exception 'Source edit aborted an in-flight provider call';end if;
+ if begin_assessment_provider(t.lease_id,gen_random_uuid()) then raise exception 'Source edit allowed a duplicate provider call';end if;
  update assessment_worker_attempts set lease_until=now()-interval '1 second' where lease_id=t.lease_id;
  perform claim_assessment_work('intake',null);
  if (select error_code from resume_intake_tasks where candidate_id=t.candidate_id)<>'provider_outcome_uncertain' then raise exception 'Superseded recovery not visible';end if;
@@ -121,11 +124,28 @@ do $$declare t job_reassessment_tasks;call uuid:=gen_random_uuid();begin
  if not finish_job_reassessment(t.candidate_id,t.revision,t.lease_id,'{"jd_score":8,"manager_score":8,"evidence_ids":[],"context_signature":"synthetic"}') then raise exception 'Reassessment result not saved';end if;
  if (select manager_score from candidates where id=t.candidate_id)<>7 then raise exception 'Worker changed a score without human approval';end if;
 end$$;
+-- Regression for a reassessment whose source changes while its paid call runs.
+do $$declare t job_reassessment_tasks;call uuid:=gen_random_uuid();begin
+ perform claim_assessment_work('reassessment',(select j from capacity_fixtures where n=2));
+ select * into t from job_reassessment_tasks where status='processing' order by candidate_id limit 1;
+ if t.candidate_id is null then raise exception 'Source-edit fixture not claimed';end if;
+ perform begin_assessment_provider(t.lease_id,call);
+ update jobs set manager_feedback='New priority during the provider response' where id=t.job_id;
+ if not heartbeat_assessment_work(t.lease_id) then raise exception 'Reassessment source edit aborted provider';end if;
+ if begin_assessment_provider(t.lease_id,gen_random_uuid()) then raise exception 'Superseded reassessment started twice';end if;
+ perform end_assessment_provider(t.lease_id,call);
+ if heartbeat_assessment_work(t.lease_id) then raise exception 'Settled stale worker kept ownership';end if;
+ if finish_job_reassessment(t.candidate_id,t.revision,t.lease_id,'{"jd_score":9,"manager_score":9,"evidence_ids":[],"context_signature":"synthetic"}') then raise exception 'Stale reassessment was accepted';end if;
+ if (select state from assessment_worker_attempts where lease_id=t.lease_id)<>'closed' then raise exception 'Settled stale reassessment stayed locked';end if;
+ if (select status from job_reassessment_tasks where candidate_id=t.candidate_id)<>'queued' then raise exception 'Latest reassessment did not remain queued';end if;
+ if (select manager_score from candidates where id=t.candidate_id)<>7 then raise exception 'Stale result changed candidate score';end if;
+end$$;
 -- Conservatively adopt an old in-flight worker, including expired leases.
 truncate assessment_worker_attempts;
 update job_reassessment_tasks set status='queued',attempts=0,lease_id=null,lease_until=null;
 update resume_intake_tasks set status='processing',lease_id=gen_random_uuid(),lease_until=now()-interval '1 second';
 \ir ../supabase/migrations/20261005133313_durable_worker_recovery.sql
+\ir ../supabase/patches/assessment-heartbeat-recovery.sql
 do $$declare t resume_intake_tasks;begin
  select * into t from resume_intake_tasks limit 1;
  if not exists(select from assessment_worker_attempts where lease_id=t.lease_id and legacy and provider_pending) then raise exception 'Legacy call not retained';end if;

@@ -7,11 +7,16 @@ export class PersistencePending extends Error {}
 export function assessmentLease(task:{lease_id:string},rpc:RPC,{fetcher=fetch,intervalMs=30000,wait=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms)),now=()=>Date.now()}:{fetcher?:Fetcher,intervalMs?:number,wait?:(ms:number)=>Promise<void>,now?:()=>number}={}) {
  const controller=new AbortController();
  const deadline=setTimeout(()=>controller.abort(),300000);
- let heartbeat:Promise<void>|undefined,disposed=false;
+ let heartbeat:Promise<void>|undefined,disposed=false,lastConfirmedHeartbeat=now();
  const timer=setInterval(()=>{
   if(heartbeat||disposed)return;
   heartbeat=rpc('heartbeat_assessment_work',{p_lease:task.lease_id})
-   .then(ok=>{if(ok!==true)controller.abort();},()=>controller.abort())
+   .then(ok=>{if(ok!==true)controller.abort();else lastConfirmedHeartbeat=now();},()=>{
+    // A brief database outage is not proof of lost ownership. Retain the
+    // running provider call inside the last confirmed two-minute lease;
+    // stop after 90 seconds without confirmation, with a safety margin.
+    if(now()-lastConfirmedHeartbeat>=90000)controller.abort();
+   })
    .finally(()=>{heartbeat=undefined;});
  },intervalMs);
  async function acknowledge(name:string,body:unknown) {
