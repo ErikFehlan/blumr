@@ -82,7 +82,7 @@ const mime={'.js':'application/javascript','.css':'text/css','.html':'text/html'
   await shot('10-shortlist',5,async()=>{await move(page.locator('[data-candidate-id="'+ids['Maya Brooks']+'"]').first());});
   await page.locator('[data-candidate-id="'+ids['Maya Brooks']+'"]').first().click();await page.locator('#workspaceSubmission > summary').click();await scroll('#workspaceSubmission');
   await shot('11-submittal',7,async()=>{await pause(2300);await click(page.locator('#workspaceCopy'));await moveTo(1200,750);});
-  fs.writeFileSync(path.join(out,'timeline.json'),JSON.stringify({timeline,errors,source_sha:require('child_process').execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),recorded_at:new Date().toISOString(),workflow:'quick-start'},null,2));
+  fs.writeFileSync(path.join(out,'timeline.json'),JSON.stringify({timeline,errors,source_sha:process.env.GITHUB_SHA||require('child_process').execFileSync('git',['-c','safe.directory='+root,'rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),recorded_at:new Date().toISOString(),workflow:'quick-start'},null,2));
   if(errors.length)throw Error(errors.join('\n'));
  }catch(e){fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify(await page.evaluate(()=>({state:window.demo?.state,tasks:window.demo?.tasks,contexts:window.demo?.contexts,html:document.querySelector('#workspaceIntake')?.innerHTML})),null,2));await snap('ERROR');console.error(e);process.exitCode=1;}finally{await context.close();const videoPath=await video.path();fs.copyFileSync(videoPath,path.join(out,'walkthrough.webm'));console.log('VIDEO',videoPath);await browser.close();server.close();}
 })();
