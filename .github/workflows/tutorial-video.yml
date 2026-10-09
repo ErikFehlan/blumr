@@ -1,0 +1,51 @@
+name: Record refreshed blumr demo
+on:
+  push:
+    branches: [fix/demo-motion-refresh]
+    paths:
+      - 'scripts/tutorial-video/**'
+      - '.github/workflows/tutorial-video.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tutorial-video-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      options: --ipc=host
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install recording and editing dependencies
+        run: |
+          npm install --no-save --package-lock=false playwright@1.58.2
+          apt-get update -qq
+          apt-get install -y --no-install-recommends ffmpeg python3-pil fonts-dejavu-core
+      - name: Record the current application with fictional data
+        shell: bash
+        run: |
+          mkdir -p scripts/tutorial-video/captures
+          node scripts/tutorial-video/src/record.cjs 2>&1 | tee scripts/tutorial-video/captures/record.log
+      - name: Render the updated demo
+        run: python3 scripts/tutorial-video/src/render.py
+      - name: Verify desktop and mobile playback
+        run: node scripts/tutorial-video/src/playback.cjs
+      - name: Save the review video and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blumr-demo-${{ github.run_id }}
+          path: |
+            scripts/tutorial-video/output/
+            scripts/tutorial-video/captures/
+          retention-days: 14
+          if-no-files-found: warn
