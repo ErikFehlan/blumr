@@ -11,7 +11,7 @@ const mime={'.js':'application/javascript','.css':'text/css','.html':'text/html'
    const file=path.join(root,rel==='/'?'index.html':rel);
    try{res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');res.end(fs.readFileSync(file));}catch{res.writeHead(404);res.end();}
  }).listen(0,'127.0.0.1');
- const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME||'/tmp/chromium',args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
+ const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME||chromium.executablePath(),args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
  const context=await browser.newContext({viewport:{width:1440,height:900},recordVideo:{dir:path.join(out,'raw'),size:{width:1440,height:900}}});const page=await context.newPage();const video=page.video();const t0=Date.now();const timeline=[];page.setDefaultTimeout(15000);
  const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.log('PAGE_ERROR',e.message)});
  await page.route('https://**',r=>r.abort());
