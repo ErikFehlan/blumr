@@ -76,3 +76,17 @@ test('inference learning deployment requires exact private routines and scoped q
  assert.deepEqual(structuralDifferences([],stage,expected),['function:blumr_knowledge.capture_prediction()']);
  assert.throws(()=>inferenceExpectations(sql.replace('capture_prediction()', 'unlisted_routine()')));
 });
+
+test('staging parity validates the deployed heartbeat patch and still rejects its old source or permission drift',async()=>{
+ const {workerExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261005133313_durable_worker_recovery.sql','utf8'),patch=await readFile('supabase/patches/assessment-heartbeat-recovery.sql','utf8');
+ const expected=workerExpectations(sql,patch),original=workerExpectations(sql);
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:e.setof,args:e.args,defaults:e.defaults,security_definer:!!e.admin,volatility:e.volatility,config:['search_path=""'],worker_allowed:true,clients_denied:!e.admin,anon_denied:true,authenticated_allowed:!!e.admin}}));
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ const heartbeat=stage.find(r=>r.name==='heartbeat_assessment_work(uuid)');
+ heartbeat.routine.source=original.get('function:heartbeat_assessment_work(uuid)').body;
+ assert.deepEqual(structuralDifferences([],stage,expected),['function:heartbeat_assessment_work(uuid)']);
+ heartbeat.routine.source=expected.get('function:heartbeat_assessment_work(uuid)').body;heartbeat.routine.clients_denied=false;
+ assert.deepEqual(structuralDifferences([],stage,expected),['function:heartbeat_assessment_work(uuid)']);
+ assert.throws(()=>workerExpectations(sql,patch.replace('heartbeat_assessment_work','unexpected_routine')));
+});

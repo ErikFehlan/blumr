@@ -66,6 +66,7 @@ jobs:
           node scripts/security-live-smoke.mjs
           node scripts/core-live-smoke.mjs
           node scripts/usage-analytics-backend.mjs verify
+          node scripts/demo-analytics-smoke.mjs
       - name: Verify real assessment bursts and adversarial access
         run: node scripts/staging-readiness.mjs run
       - name: Verify readiness fixture cleanup

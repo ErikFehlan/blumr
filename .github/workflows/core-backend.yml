@@ -138,5 +138,6 @@ jobs:
           node scripts/core-live-smoke.mjs
           node scripts/security-live-smoke.mjs
           node scripts/usage-analytics-backend.mjs verify
+          node scripts/demo-analytics-smoke.mjs
       - name: Recover previously failed resume quotations
         run: node scripts/recover-resume-intake.mjs

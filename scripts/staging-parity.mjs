@@ -26,7 +26,7 @@ const query=`select 'column' as kind, table_name||'.'||column_name as name,
  order by kind,name`;
 const [production,stage]=await Promise.all(['zqiqjzxcpznhzjengfff','momfzjmycveqginxmqib'].map(ref=>api(ref,'/database/query',{query})));
 const expected=capacityExpectations(await readFile('supabase/migrations/20261005121611_assessment_capacity.sql','utf8'));
-for(const [key,value] of workerExpectations(await readFile('supabase/migrations/20261005133313_durable_worker_recovery.sql','utf8')))expected.set(key,value);
+for(const [key,value] of workerExpectations(await readFile('supabase/migrations/20261005133313_durable_worker_recovery.sql','utf8'),await readFile('supabase/patches/assessment-heartbeat-recovery.sql','utf8')))expected.set(key,value);
 for(const [key,value] of guardExpectations(await readFile('supabase/migrations/20261005190251_production_readiness_guards.sql','utf8')))expected.set(key,value);
 for(const [key,value] of signupExpectations(await readFile('supabase/patches/open-beta-signup.sql','utf8')))expected.set(key,value);
 for(const [key,value] of knowledgeExpectations(await readFile('supabase/migrations/20261006174613_automatic_role_knowledge.sql','utf8')))expected.set(key,value);
