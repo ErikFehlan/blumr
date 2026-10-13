@@ -1,6 +1,8 @@
 \set ON_ERROR_STOP on
-create role anon;
-create role authenticated;
+do $$begin
+ if not exists(select from pg_roles where rolname='anon') then create role anon;end if;
+ if not exists(select from pg_roles where rolname='authenticated') then create role authenticated;end if;
+end$$;
 create schema auth;
 create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}');
 create function public.is_app_admin() returns boolean language sql stable as $$select current_setting('test.admin',true)='yes'$$;

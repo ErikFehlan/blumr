@@ -14,9 +14,13 @@
   function persist(){session.updated=now();write(sessionStorage,SESSION_KEY,session)}
   function attribution(){write(localStorage,ATTR_KEY,{id:session.id,expires:now()+ATTR_TTL})}
   async function event(type){
-   if(session.sent.includes(type)||pending.has(type))return;
+   if(session.sent.includes(type))return;
+   if(pending.has(type))return pending.get(type);
    persist();
-   const request=(async()=>{for(let attempt=0;attempt<3;attempt++){
+   const request=(async()=>{
+    if(type!=='visit'){await event('visit');if(!session.sent.includes('visit'))return;}
+    if(!['visit','start'].includes(type)){await event('start');if(!session.sent.includes('start'))return;}
+    for(let attempt=0;attempt<3;attempt++){
     try{const ok=await send({session_id:session.id,event_type:type,campaign:session.campaign});if(ok){session.sent.push(type);persist();return}}catch{}
    }})();pending.set(type,request);try{await request}finally{pending.delete(type)}
   }
