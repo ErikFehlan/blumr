@@ -19,7 +19,7 @@ export async function buildPublic({branch,sha,url,key,gate=enforceRelease,direct
   auth=auth.replace(/const SUPABASE_URL = '[^']+';/,"const SUPABASE_URL = '"+url+"';").replace(/const SUPABASE_ANON_KEY = '[^']+';/,"const SUPABASE_ANON_KEY = '"+key+"';");
   if(auth.includes('zqiqjzxcpznhzjengfff'))throw Error('Preview still references production authentication');
   await writeFile(path,auth);
-  for(const name of ['index.html','assets/app.js']){
+  for(const name of ['index.html','how-it-works.html','assets/app.js']){
    const built=directory+'/'+name;const content=(await readFile(built,'utf8')).replaceAll('zqiqjzxcpznhzjengfff','momfzjmycveqginxmqib').replaceAll(productionKey,key);
    if(content.includes('zqiqjzxcpznhzjengfff')||content.includes(productionKey))throw Error('Preview still references production');
    await writeFile(built,content);

@@ -50,6 +50,8 @@ jobs:
           psql -h localhost -U postgres -d hiring_priorities -f tests/hiring-priorities.sql
           createdb -h localhost -U postgres usage_analytics
           psql -h localhost -U postgres -d usage_analytics -f tests/usage-analytics.sql
+          createdb -h localhost -U postgres demo_analytics
+          psql -h localhost -U postgres -d demo_analytics -f tests/demo-analytics.sql
           node tests/usage-migration-contention.mjs
           createdb -h localhost -U postgres feedback_learning
           psql -h localhost -U postgres -d feedback_learning -f tests/learning.sql
