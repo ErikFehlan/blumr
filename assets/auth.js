@@ -296,7 +296,7 @@
       const { data, error } = await requestAuth(() => client.auth.signUp({
         email,
         password,
-        options: { data: { display_name: displayName }, emailRedirectTo: redirectTo }
+        options: { data: { display_name: displayName, ...window.BlumrDemoAnalytics?.tracker?.signupMetadata() }, emailRedirectTo: redirectTo }
       }));
       setSignInProgress(false);
 

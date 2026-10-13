@@ -5,7 +5,7 @@ const migrations=['20260915090000_core_intake.sql','20260916190000_review_confli
 migrations.push('20261005121611_assessment_capacity.sql','20261005133313_durable_worker_recovery.sql');
 migrations.push('20261005190251_production_readiness_guards.sql');
 migrations.push('20261006174613_automatic_role_knowledge.sql','20261006200406_role_neutral_inference_learning.sql');
-migrations.push('20261008192119_activation_funnel.sql');
+migrations.push('20261008192119_activation_funnel.sql','20261013132955_demo_video_analytics.sql');
 // Publish replacement functions atomically; old capacity definitions must never
 // become visible halfway through a repeated deployment.
 const definitions=await Promise.all(migrations.map(name=>readFile('supabase/migrations/'+name,'utf8')));

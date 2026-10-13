@@ -48,10 +48,15 @@ export function guardExpectations(sql){
  if(expected.size!==2||(sql.match(/create or replace function/gi)||[]).length!==2)throw Error('Readiness guards are incomplete');
  return expected;
 }
-export function workerExpectations(sql) {
+export function workerExpectations(sql,heartbeatPatch) {
  const names=['claim_resume_intakes','claim_job_reassessments','active_assessment_count','recover_expired_assessment_work','claim_assessment_work','heartbeat_assessment_work','begin_assessment_provider','end_assessment_provider','release_assessment_work','finish_assessment_work','finish_resume_intake','finish_job_reassessment','get_direct_ai_recovery','recover_direct_ai_request'];
  const expected=new Map();
  const expression=/create or replace function public\.(\w+)\(([^)]*)\)\s+returns\s+(setof\s+)?(?:public\.)?(\w+)\s+language\s+(sql|plpgsql)\s+(?:(volatile|stable)\s+)?security (invoker|definer) set search_path='' as \$\$([\s\S]*?)\$\$;/gi;
+ if(heartbeatPatch){
+  const patch=[...heartbeatPatch.matchAll(expression)],original=[...sql.matchAll(expression)].filter(m=>m[1]==='heartbeat_assessment_work');
+  if(patch.length!==1||patch[0][1]!=='heartbeat_assessment_work'||original.length!==1||(heartbeatPatch.match(/create or replace function/gi)||[]).length!==1)throw Error('Heartbeat patch must replace exactly the existing worker function');
+  sql=sql.replace(original[0][0],()=>patch[0][0]);
+ }
  for(const m of sql.matchAll(expression)) {
   const [,name,args,setof,result,language,volatility,security,body]=m;
   const admin=['get_direct_ai_recovery','recover_direct_ai_request'].includes(name);

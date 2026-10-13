@@ -70,10 +70,16 @@
         root.querySelector('#adminToolsNav').hidden=!adminAccess;
         for(const id of ['adminToolsNav','adminUsageNav','qualityLab'])root.querySelector('#'+id).classList.toggle('rf-hidden',!adminAccess);
         if(!adminAccess){
-          root.querySelector('#adminActivation')?.remove();root.querySelector('#adminUserRows').replaceChildren();root.querySelector('#adminEventBreakdown').replaceChildren();
+          root.querySelector('#adminDemoAnalytics')?.remove();root.querySelector('#adminActivation')?.remove();root.querySelector('#adminUserRows').replaceChildren();root.querySelector('#adminEventBreakdown').replaceChildren();
           for(const id of ['adminAccounts','adminActive7','adminActive30','adminSessions','adminEvents','adminUsageStatus','adminUsageHistory'])root.querySelector('#'+id).textContent='—';
           if(root.querySelector('.rf-page.active')?.id.startsWith('page-admin-'))showPage('backend');
         }
+      }
+      function renderDemoAnalytics(report){
+        let host=root.querySelector('#adminDemoAnalytics');if(!host){host=document.createElement('section');host.id='adminDemoAnalytics';host.className='rf-card';root.querySelector('#adminEventBreakdown').parentElement.before(host);}
+        if(!report){host.innerHTML='<h3>Demo engagement</h3><p class="rf-sub">Demo reporting could not load. Refresh to try again.</p>';return;}
+        const totals=report.totals||{},columns=[['visits','Visits'],['starts','Starts'],['watched_25','25% watched'],['watched_50','50% watched'],['watched_75','75% watched'],['completions','Completed'],['signups','Signups']];
+        host.innerHTML='<h3>Demo engagement</h3><p class="rf-sub">Sessions that visited the demo in the past 30 days. Pausing, replaying and refreshing do not add starts to the same session. Progress measures footage actually played; completion requires reaching the end with at least 98% watched.</p><div class="rf-admin-activation">'+columns.map(([key,label])=>'<div><strong>'+Number(totals[key]||0)+'</strong><span>'+label+'</span></div>').join('')+'</div><div class="rf-tablewrap"><table class="rf-table"><thead><tr><th>Campaign</th>'+columns.map(([,label])=>'<th>'+label+'</th>').join('')+'</tr></thead><tbody>'+(report.campaigns||[]).map(row=>'<tr><td>'+escapeHTML(row.campaign==='unattributed'?'Unattributed':row.campaign)+'</td>'+columns.map(([key])=>'<td>'+Number(row[key]||0)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><p class="rf-sub">'+(report.tracking_started_at?'Tracking since '+escapeHTML(usageDate(report.tracking_started_at))+'. ':'No demo visits recorded yet. ')+'Anonymous sessions are not identified recipients or guaranteed human views. Signups are new accounts attributed to a demo visit within 30 days; email confirmation and product activation are separate. Privacy preferences and blockers may reduce counts.</p>';
       }
       async function loadAdminUsage(){
         const request=++adminRequest;
@@ -82,8 +88,10 @@
           if(button){button.disabled=true;button.textContent='Refreshing…'}
           const report=await dataService.loadAdminAnalytics();
           let activation=null;try{activation=await dataService.loadActivationSummary();}catch{/* Older deployments remain usable while the migration rolls out. */}
+          let demo=null;try{demo=await dataService.loadDemoAnalytics();}catch{}
           if(request!==adminRequest)return;
           setAdminAccess(true);
+          renderDemoAnalytics(demo);
           let funnel=root.querySelector('#adminActivation');if(!funnel){funnel=document.createElement('section');funnel.id='adminActivation';funnel.className='rf-card';root.querySelector('#adminEventBreakdown').parentElement.before(funnel);}
           funnel.innerHTML=activation?'<h3>First useful result</h3><p class="rf-sub">Unique accounts at each milestone. Resume saves, assessment views and submittals are tracked from this release; earlier activity is not reconstructed.</p><div class="rf-admin-activation">'+[['accounts','Signed up'],['jobs','Created a job'],['resumes','Saved a resume'],['views','Viewed an assessment'],['submittals','Prepared a submittal']].map(([key,label])=>'<div><strong>'+Number(activation[key]||0)+'</strong><span>'+label+'</span></div>').join('')+'</div><p class="rf-sub">'+(activation.median_minutes_to_view!=null?'Median signup → assessment viewed: '+Number(activation.median_minutes_to_view).toFixed(1)+' minutes.':'Time to first assessment will appear after a tracked assessment view.')+'</p>':'<h3>First useful result</h3><p class="rf-sub">Activation reporting is not available yet.</p>';
           root.querySelector('#adminUsageStatus').textContent='Updated '+usageDate(report?.generated_at||new Date().toISOString())+'. Refresh to load newer activity.';
