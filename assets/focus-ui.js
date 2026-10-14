@@ -40,7 +40,7 @@
    root.querySelector('#jobGuide').open=false;
    const dashboard=root.querySelector('#page-dashboard'),top=root.querySelector('#dashboardTopCandidates').closest('.rf-card');
    root.querySelector('#jobAssessmentPanel').after(top);top.classList.add('rf-dashboard-shortlist');
-   const groups=['.rf-dashboard-context','.rf-dashboard-overview','.rf-dashboard-bottom','#jobGuide'].map(s=>dashboard.querySelector(s));
+   const groups=['.rf-metrics','.rf-dashboard-context','.rf-dashboard-overview','.rf-dashboard-bottom','#jobGuide'].map(s=>dashboard.querySelector(s));
    disclosure('dashboardDetails','Search details and setup',groups);
    const editor=root.querySelector('#jobForm').closest('.rf-card');
    const jobEditor=disclosure('jobEditor','Create or edit a job',[editor]);jobEditor.classList.add('rf-job-editor');jobEditor.addEventListener('toggle',()=>root.querySelector('#newJobBtn').classList.toggle('primary',!jobEditor.open));
