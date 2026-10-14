@@ -47,3 +47,9 @@ Executed locally: 263 application tests passed; Home, resume intake, recruiter b
 ## Remaining work
 
 Validate the preview against representative real-world resume layouts with the owner before broad release; confirm the internal-account exclusion list; add durable exact repeat-candidate linkage and comparison/submittal events; then measure first assessment completion and repeat uploads after rollout. Later dashboard/comparison/submittal/reminder improvements stay in their planned phases.
+
+## Staging release blocker
+
+The initial PR validation passed the application and browser suites, but the real-provider staging check failed while waiting for job priorities. The scheduler and worker were active; the worker returned `ai_budget_exhausted` on both attempts. Its configured AI provider rejected the requests because of credits or a provider spending limit. The normalized error does not identify which billing limit was reached.
+
+The live check now stops on that explicit budget error, reports safe task metadata for other failures/timeouts, and preserves transient-error recovery. Six regression tests cover these paths. This diagnostic change does not replenish credits, alter spending limits, substitute model output, or count blocked checks as passed. Restore access for the configured provider project and rerun the staging workflow before release.
