@@ -290,8 +290,10 @@
       wrap.querySelector('[data-view-resume]')?.addEventListener('click',()=>void openResume(c));
       wrap.querySelectorAll('[data-assessment-point]').forEach(b=>b.addEventListener('click',()=>void openResume(c,b.dataset.pointKind,Number(b.dataset.pointIndex))));
     }
-    let resumeCleanup=null,resumeReturnFocus=null;
+    let resumeCleanup=null,resumeReturnFocus=null,viewerCleanup=null;
+    global.addEventListener?.('ancalagon:auth-cleared',closeResume);
     function closeResume(){
+      viewerCleanup?.();viewerCleanup=null;
       resumeCleanup?.();resumeCleanup=null;
       const returnTo=resumeReturnFocus;resumeReturnFocus=null;
       const panel=api.root?.querySelector('#resumeEvidencePanel'),backdrop=api.root?.querySelector('#resumeEvidenceBackdrop');
@@ -316,12 +318,12 @@
       const brief=c.resumeIntake?.brief,point=kind?pointText(brief,kind,index):'',evidence=kind?evidenceForPoint(brief,kind,index):null,review=kind?pointReview(c,kind,index):null;
       const backdrop=document.createElement('button');backdrop.type='button';backdrop.id='resumeEvidenceBackdrop';backdrop.className='rf-resume-backdrop';backdrop.setAttribute('aria-label','Close resume');
       const panel=document.createElement('aside');panel.id='resumeEvidencePanel';panel.className='rf-resume-panel';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','resumeEvidenceTitle');
-      panel.innerHTML='<div class="rf-resume-panel-head"><div><span class="rf-kicker">Source document</span><h3 id="resumeEvidenceTitle">'+escape(c.resumeIntake.fileName||'Candidate resume')+'</h3></div><button class="rf-resume-close" type="button" aria-label="Close resume">×</button></div><div class="rf-resume-panel-status">Loading resume…</div>';
+      panel.innerHTML='<div class="rf-resume-panel-head"><div><span class="rf-kicker">Source document</span><h3 id="resumeEvidenceTitle">'+escape(c.resumeIntake?.fileName||'Candidate resume')+'</h3></div><button class="rf-resume-close" type="button" aria-label="Close resume">×</button></div><div class="rf-resume-panel-status">Loading resume…</div>';
       api.root.append(backdrop,panel);backdrop.addEventListener('click',closeResume);panel.querySelector('.rf-resume-close').addEventListener('click',closeResume);
       const onKey=e=>{
         if(e.key==='Escape'){e.preventDefault();closeResume();return;}
         if(e.key!=='Tab')return;
-        const focusable=[...panel.querySelectorAll('button:not(:disabled),textarea,[href],input')].filter(el=>!el.closest('[hidden]'));
+        const focusable=[...panel.querySelectorAll('button:not(:disabled),textarea,[href],input,select,iframe')].filter(el=>!el.closest('[hidden]')&&el.getClientRects().length>0);
         const first=focusable[0],last=focusable[focusable.length-1];
         if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}
         else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}
@@ -331,10 +333,11 @@
       document.addEventListener('keydown',onKey);resumeCleanup=()=>{document.removeEventListener('keydown',onKey);document.body.style.overflow=scrollY;background.forEach(({el,inert})=>el.inert=inert);};
       panel.querySelector('.rf-resume-close').focus({preventScroll:true});
       try{
-        const text=await api.text(c);if(!panel.isConnected)return;
+        let text='';try{text=await api.text(c);}catch{}if(!panel.isConnected)return;
         const hasEvidence=!!evidence?.quote&&!!sourceQuote(text,evidence.quote);
         const reviewHTML=kind?'<section class="rf-point-review"><span class="rf-kicker">'+(kind==='strength'?'Strength':'Concern')+'</span><h4>'+escape(review?.correction||point)+'</h4>'+(hasEvidence?'<p class="rf-supported-label">Supporting evidence found</p>':'<p class="rf-unsupported-label">No clear supporting resume evidence</p>')+'<p class="rf-evidence-meaning">'+(review?.status==='unsupported'?'Recruiter marked this interpretation unsupported.':hasEvidence?'The highlighted passage supports source review. Confirm the interpretation before approving.':'No linked passage supports this point. Verify it in your screen; missing evidence does not establish a missing skill.')+'</p><div class="rf-point-actions"><button class="rf-btn'+(review?.status==='approved'?' selected':'')+'" type="button" data-point-decision="approved">Approve</button><button class="rf-btn'+(review?.status==='corrected'?' selected':'')+'" type="button" data-point-correct>Correct</button><button class="rf-btn'+(review?.status==='unsupported'?' selected':'')+'" type="button" data-point-decision="unsupported">Unsupported</button></div><form class="rf-point-correction" hidden><label for="pointCorrectionText">Correct interpretation</label><textarea id="pointCorrectionText" maxlength="800">'+escape(review?.correction||point)+'</textarea><div class="rf-actions"><button class="rf-btn primary" type="submit">Save correction</button><button class="rf-linkbtn" type="button" data-cancel-correction>Cancel</button></div></form></section>':'';
-        panel.innerHTML='<div class="rf-resume-panel-head"><div><span class="rf-kicker">Source document</span><h3 id="resumeEvidenceTitle">'+escape(c.resumeIntake.fileName||'Candidate resume')+'</h3></div><button class="rf-resume-close" type="button" aria-label="Close resume">×</button></div>'+reviewHTML+'<div class="rf-resume-document" aria-label="Resume text">'+highlightedResume(text,evidence?.quote)+'</div>';
+        panel.innerHTML='<div class="rf-resume-panel-head"><div><span class="rf-kicker">Source document</span><h3 id="resumeEvidenceTitle">'+escape(c.resumeIntake?.fileName||'Candidate resume')+'</h3></div><button class="rf-resume-close" type="button" aria-label="Close resume">×</button></div>'+reviewHTML+'<div class="rf-resume-document" aria-label="Resume text">'+highlightedResume(text||'Extracted text is unavailable. You can still try the original resume.',evidence?.quote)+'</div>';
+        if(global.BlumrResumeViewer)viewerCleanup=global.BlumrResumeViewer.mount({host:panel,textHost:panel.querySelector('.rf-resume-document'),load:()=>api.document?.(c),preferText:!!kind});
         panel.querySelector('.rf-resume-close').addEventListener('click',closeResume);
         panel.querySelector('.rf-resume-close').focus({preventScroll:true});
         panel.querySelectorAll('[data-point-decision]').forEach(b=>b.addEventListener('click',()=>void savePointReview(c,kind,index,b.dataset.pointDecision)));

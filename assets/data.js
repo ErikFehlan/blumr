@@ -526,6 +526,18 @@
       if(error)throw error;
       return (data||[]).sort((a,b)=>epoch(b.created_at)-epoch(a.created_at))[0]?.extracted_text||'';
     }
+    async function loadResumeDocument(candidate) {
+      // Look up the original through the signed-in workspace, never a URL supplied by a candidate.
+      const {data,error}=await client.from('candidate_documents').select('id,storage_path,file_name,mime_type,created_at')
+        .eq('workspace_id',workspaceId).eq('job_id',candidate.jobId).eq('candidate_id',candidate.id);
+      if(error)throw error;
+      const document=(data||[]).sort((a,b)=>epoch(b.created_at)-epoch(a.created_at))[0];
+      if(!document)return null;
+      const prefix=`${workspaceId}/${candidate.jobId}/${candidate.id}/`;
+      if(!document.storage_path?.startsWith(prefix)||!/^[^/\\%?#]+$/.test(document.storage_path.slice(prefix.length))||document.storage_path.split('/').some(part=>part==='..'||part==='.'))throw Error('Invalid resume location');
+      const blob=await downloadResume(document.storage_path);
+      return {blob,fileName:document.file_name,mimeType:document.mime_type};
+    }
     async function uploadResume(candidate, file, extractedText) {
       return monitored('storage','upload','resume_upload',async()=>{
       const extension=String(file.name||'').split('.').pop().toLowerCase();
@@ -577,7 +589,7 @@
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, workspaceId };
+    return { loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, loadResumeDocument, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };

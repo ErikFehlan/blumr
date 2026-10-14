@@ -92,7 +92,7 @@
   };
   const jobRows=otherJobs.slice(0,5).map(j=>{
    const count=m.candidateCounts.get(j.id)||0,progress=status(j);
-   return `<li><button type="button" class="rf-home-job" data-home-action="job" data-job="${esc(j.id)}"><span class="rf-home-job-copy"><strong>${esc(j.title)}</strong><small>${count} candidate${count===1?'':'s'}</small></span><span class="rf-home-job-status" data-tone="${progress.tone}">${progress.label}</span><span class="rf-home-job-arrow" aria-hidden="true">→</span></button></li>`;
+   return `<li><button type="button" class="rf-home-job" data-home-action="job" data-job="${esc(j.id)}"><span class="rf-home-job-copy"><strong>${esc(j.title)}</strong><small>${count} candidate${count===1?'':'s'}</small></span><span class="rf-home-job-status" data-tone="${progress.tone}">${progress.label}</span><span class="rf-home-job-arrow" aria-hidden="true">→</span></button><button type="button" class="rf-btn rf-home-upload" data-home-action="upload" data-job="${esc(j.id)}" aria-label="Add candidates to ${esc(j.title)}">Add candidates</button></li>`;
   }).join('');
   const busyIds=new Set([...m.attention,...m.ready,...m.working].map(c=>c.id));
   const submittals= m.recent.flatMap(j=>(m.submittals||[]).filter(c=>c.jobId===j.id&&!busyIds.has(c.id)));
@@ -104,6 +104,7 @@
    ${m.problem?`<div class="rf-home-notice" role="status">${esc(m.problem)} ${action('Retry sync','retry')}</div>`:''}
    ${activationHTML}
    ${priorityHTML}
+   ${featuredJobId?`<div class="rf-repeat-search"><span>Continue evaluating for <strong>${esc(m.recent.find(j=>j.id===featuredJobId)?.title||'this job')}</strong></span>${action('Add candidates','upload',featuredJobId)}</div>`:''}
    ${workflow?`<section id="homeSearchFlow" class="rf-search-flow" aria-label="Next step for your search">${priority.length?workflow.replace(/class="rf-btn primary"/g,'class="rf-btn"'):workflow}</section>`:''}
    <div class="rf-home-panels">
     <section class="rf-home-new" aria-labelledby="homeNewJobTitle"><div><span class="rf-home-new-icon" aria-hidden="true">+</span><h2 id="homeNewJobTitle">New job</h2><p>Add a job description to start a new search.</p></div>${action('Create job →','new','','',!workflow&&!priority.length)}</section>

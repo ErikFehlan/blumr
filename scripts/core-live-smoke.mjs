@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import {checkInferenceLearning} from './inference-learning-smoke.mjs';
 import {checkAutomaticKnowledge} from './automatic-knowledge-smoke.mjs';
+import {waitForLiveTask} from './live-task-check.mjs';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {prepare as prepareReassessment} from '../supabase/functions/reassess-job/logic.mjs';
 const token=process.env.SUPABASE_ACCESS_TOKEN?.trim(),ref=process.env.SUPABASE_PROJECT_REF?.trim();
@@ -43,13 +44,9 @@ try{
  await req('/rest/v1/jobs',owner.access,'POST',{id:job,workspace_id:owner.workspace,title:'Synthetic core QA',description:'Manual regression testing and documented defect remediation.',criteria:['Must Have | manual regression testing'],created_by:owner.id});
  // Wait for JD-only generation before adding evidence, then use the same
  // reviewed priorities for intake and every subsequent reassessment.
- let priorityTask;
- for(let i=0;i<360;i++){
-  priorityTask=(await req('/rest/v1/job_criteria_tasks?job_id=eq.'+job,owner.access)).data[0];
-  if(priorityTask?.priority_suggestions)break;
-  if(priorityTask?.status==='failed')throw Error('Live hiring priorities exhausted retries ('+priorityTask.error_code+').');
-  await new Promise(resolve=>setTimeout(resolve,500));
- }
+ const priorityTask=await waitForLiveTask({label:'Live hiring priorities',maxPolls:360,
+  readTask:async()=>(await req('/rest/v1/job_criteria_tasks?job_id=eq.'+job,owner.access)).data[0],
+  ready:task=>!!task?.priority_suggestions});
  const suggested=priorityTask?.priority_suggestions?.items;
  assert.ok(suggested?.length>0&&suggested.length<=5,'Job priorities were not generated');
  for(const item of suggested)assert.ok('Manual regression testing and documented defect remediation.'.includes(item.source_quote),'Priority source was not exact');
@@ -105,13 +102,8 @@ try{
   assert.ok([401,403].includes(blocked.status),'Anonymous AI route accepted a request');
  }
  // No browser is open. The database dispatch and scheduler must produce output.
- let task;
- for(let i=0;i<480;i++){
-  const rows=await req('/rest/v1/resume_intake_tasks?candidate_id=eq.'+candidate,owner.access);task=rows.data[0];
-  if(task?.status==='ready')break;
-  if(task?.status==='failed')throw Error('Live intake exhausted its automatic retries ('+task.error_code+').');
-  await new Promise(resolve=>setTimeout(resolve,500));
- }
+ const task=await waitForLiveTask({label:'Live resume intake',
+  readTask:async()=>(await req('/rest/v1/resume_intake_tasks?candidate_id=eq.'+candidate,owner.access)).data[0]});
  assert.equal(task?.status,'ready','Intake did not finish without a browser');
  console.log('SYNTHETIC_INTAKE_METRIC '+JSON.stringify({document_to_ready_ms:Math.round(performance.now()-intakeStarted),attempts:task.attempts}));
  assert.equal(task.result.priority_assessment?.length,suggested.length,'Intake omitted shared priorities');
@@ -132,13 +124,8 @@ try{
  const criteria=['-manual testing experience strongly required','-test automation authorship preferred','-cloud security experience preferred','-5+ years of QA testing experience'];
  await req('/rest/v1/jobs?id=eq.'+job,owner.access,'PATCH',{criteria});
  await req('/rest/v1/manager_feedback?id=eq.'+note,owner.access,'PATCH',{feedback_text:'The candidate confirmed personal ownership of manual regression testing, but did not write automated tests. No evidence about cloud security or years of experience was gathered.'});
- let reassessment;
- for(let i=0;i<480;i++){
-  reassessment=(await req('/rest/v1/job_reassessment_tasks?candidate_id=eq.'+candidate,owner.access)).data[0];
-  if(reassessment?.status==='ready')break;
-  if(reassessment?.status==='failed')throw Error('Live reassessment exhausted retries ('+reassessment.error_code+').');
-  await new Promise(resolve=>setTimeout(resolve,500));
- }
+ const reassessment=await waitForLiveTask({label:'Live reassessment',
+  readTask:async()=>(await req('/rest/v1/job_reassessment_tasks?candidate_id=eq.'+candidate,owner.access)).data[0]});
  assert.equal(reassessment?.status,'ready','Durable reassessment did not finish');
  assert.equal(reassessment.result.priority_assessment?.length,suggested.length,'Reassessment omitted shared priorities');
  assert.ok(reassessment.result.model?.startsWith('gpt-5.6-sol'),'Reassessment did not use Sol');

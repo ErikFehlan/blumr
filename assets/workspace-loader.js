@@ -5,7 +5,7 @@
     'assets/job-intake-code.js?v=20261002-guided-experience',
     'assets/job-wizard.js?v=20261008-quick-start',
     'assets/hiring-priorities.js?v=20260924-priorities',
-    'assets/data.js?v=20261013-demo-analytics',
+    'assets/data.js?v=20261014-repeat-resume',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20260917-concise',
     'assets/evidence.js?v=20260911-quick-feedback',
@@ -18,14 +18,15 @@
     'assets/idempotency.js?v=20260930-idempotency',
     'assets/upload-validation.js?v=20261005-upload-guards',
     'assets/pdf-text.js?v=20260915-intake',
-    'assets/resume-intake.js?v=20261002-legacy-doc-text-first',
+    'assets/resume-viewer.js?v=20261014-repeat-resume',
+    'assets/resume-intake.js?v=20261014-repeat-resume',
     'assets/resume-remote.js?v=20260917-security',
     'assets/job-review.js?v=20260923-verification',
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
     'assets/candidate-workspace.js?v=20261008-quick-start',
     'assets/criteria-automation.js?v=20261002-guided-experience',
-    'assets/home.js?v=20261008-quick-start',
+    'assets/home.js?v=20261014-repeat-resume',
     'assets/focus-ui.js?v=20260918-blumr',
     'assets/recruiter-workflow.js?v=20260915-phase2',
     'assets/tutorial.js?v=20260915-tutorial',
@@ -35,7 +36,7 @@
     'assets/settings-ui.js?v=20261002-guided-experience',
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
-    'assets/app.js?v=20261013-demo-analytics'
+    'assets/app.js?v=20261014-repeat-resume'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
