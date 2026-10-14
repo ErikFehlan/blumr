@@ -110,6 +110,7 @@ jobs:
           name: ui-review
           path: |
             test-results/decisions-*.png
+            test-results/feedback-impact-*.png
             test-results/presentation-*.png
             test-results/tutorial-*.png
             test-results/focus-*.png

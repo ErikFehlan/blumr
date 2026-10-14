@@ -56,7 +56,12 @@ do $$begin if onboarding_reminder_target('00000000-0000-0000-0000-000000000002')
 set role authenticated;select save_user_settings('{"notify_assessments":true}',1);reset role;
 update resume_intake_tasks set updated_at=now();
 do $$begin if onboarding_reminder_target('00000000-0000-0000-0000-000000000002') is not null then raise exception 'Fresh work emailed';end if;end$$;
-update resume_intake_tasks set updated_at=now()-interval '2 days';update jobs set status='closed';
+update resume_intake_tasks set updated_at=now()-interval '2 days';
+update candidates set stage='Rejected';
+do $$begin if onboarding_reminder_target('00000000-0000-0000-0000-000000000002') is not null then raise exception 'Finished candidate emailed';end if;end$$;
+set role authenticated;
+do $$begin if exists(select from jsonb_array_elements(get_actionable_notifications(current_setting('test.retention_workspace')::uuid)) r where r->>'actionable'='true') then raise exception 'Finished candidate counted as unfinished work';end if;end$$;
+reset role;update candidates set stage='Sourced';update jobs set status='closed';
 do $$begin if onboarding_reminder_target('00000000-0000-0000-0000-000000000002') is not null then raise exception 'Closed search emailed';end if;end$$;
 update jobs set status='active';
 set role authenticated;select opt_out_onboarding_reminders();reset role;

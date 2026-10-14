@@ -6,7 +6,8 @@ language plpgsql stable security definer set search_path='' as $$
 begin
  if auth.uid() is null or not public.is_workspace_member(p_workspace) then raise exception 'Workspace unavailable' using errcode='42501';end if;
  return coalesce((select jsonb_agg(to_jsonb(n)||jsonb_build_object('actionable',
-  j.status='active' and case n.kind when 'assessments' then coalesce(s.notify_assessments,true) when 'uploads' then coalesce(s.notify_uploads,true) else coalesce(s.notify_automation,true) end
+  j.status='active' and (n.candidate_id is null or exists(select 1 from public.candidates c where c.id=n.candidate_id and c.workspace_id=p_workspace and c.job_id=n.job_id and c.stage not in ('Rejected','Withdrew','Hired')))
+  and case n.kind when 'assessments' then coalesce(s.notify_assessments,true) when 'uploads' then coalesce(s.notify_uploads,true) else coalesce(s.notify_automation,true) end
   and (exists(select 1 from public.resume_intake_tasks t where t.workspace_id=p_workspace and t.job_id=n.job_id and t.candidate_id=n.candidate_id and t.status in ('ready','failed') and n.event_key='resume_intake_tasks:'||t.candidate_id||':'||t.revision||':'||t.status)
    or exists(select 1 from public.job_reassessment_tasks t where t.workspace_id=p_workspace and t.job_id=n.job_id and t.candidate_id=n.candidate_id and t.status in ('ready','failed') and n.event_key='job_reassessment_tasks:'||t.candidate_id||':'||t.revision||':'||t.status)
    or exists(select 1 from public.job_criteria_tasks t where t.workspace_id=p_workspace and t.job_id=n.job_id and t.status='failed' and n.event_key='job_criteria_tasks:'||t.job_id||':'||t.revision||':'||t.status))) order by n.created_at desc)
@@ -28,7 +29,8 @@ language sql stable security definer set search_path='' as $$
  ), work as (
   select r.workspace_id,r.job_id,min(r.updated_at) waiting_since,count(distinct r.candidate_id) ready_count,
    case when count(distinct r.candidate_id)=1 then min(r.candidate_id::text)::uuid else null end candidate_id
-  from ready r join public.workspace_members m on m.workspace_id=r.workspace_id and m.user_id=p_user
+  from ready r join public.candidates c on c.id=r.candidate_id and c.workspace_id=r.workspace_id and c.job_id=r.job_id and c.stage not in ('Rejected','Withdrew','Hired')
+  join public.workspace_members m on m.workspace_id=r.workspace_id and m.user_id=p_user
   join public.jobs j on j.id=r.job_id and j.workspace_id=r.workspace_id and j.status='active'
   left join public.user_settings s on s.user_id=p_user
   where r.updated_at<=now()-interval '24 hours' and coalesce(s.notify_assessments,true)
