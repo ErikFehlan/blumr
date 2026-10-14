@@ -15,6 +15,7 @@ create table if not exists public.retention_events (
 );
 create index if not exists retention_user_time on public.retention_events(user_id,occurred_at);
 create index if not exists retention_workspace on public.retention_events(workspace_id);
+create index if not exists resume_intake_usage_run on public.resume_intake_tasks(usage_run_id);
 create table if not exists public.retention_tracking_state (
  singleton boolean primary key default true check(singleton),started_at timestamptz not null default clock_timestamp()
 );
@@ -41,12 +42,12 @@ begin
  if new.recovered or new.user_id is null then return new;end if;
  if new.event_type='resume_uploaded' then
   select job_id,candidate_id,id into j,c,d from public.candidate_documents
-   where 'candidate_documents:'||id=new.source_key and workspace_id=new.workspace_id;
+   where id=substring(new.source_key from '^candidate_documents:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$')::uuid and workspace_id=new.workspace_id;
  elsif new.event_type='resume_analysis_completed' then
   select t.job_id,t.candidate_id,doc.id into j,c,d from public.resume_intake_tasks t
-   join public.candidate_documents doc on doc.id::text=t.input->>'document_id'
+   join public.candidate_documents doc on doc.id=substring(t.input->>'document_id' from '^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$')::uuid
     and doc.candidate_id=t.candidate_id and doc.job_id=t.job_id and doc.workspace_id=t.workspace_id
-   where 'resume_intake_tasks:'||t.usage_run_id||':resume_analysis_completed'=new.source_key and t.workspace_id=new.workspace_id;
+   where t.usage_run_id=substring(new.source_key from '^resume_intake_tasks:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):resume_analysis_completed$')::uuid and t.workspace_id=new.workspace_id;
  else return new;
  end if;
  if c is not null then
