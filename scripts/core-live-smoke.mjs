@@ -137,6 +137,14 @@ try{
  assert.equal(afterReassessment.manager_score,restored.data[0].manager_score,'Unapproved reassessment changed Manager Fit');
  assert.equal(afterReassessment.jd_score,restored.data[0].jd_score,'Unapproved reassessment changed JD Fit');
  console.log('PASS: durable reassessment, exact requirements, unknown evidence, source quotations, and unchanged scores before approval.');
+ const retention=(await req('/rest/v1/retention_events?select=event_type,candidate_ids,document_id&workspace_id=eq.'+owner.workspace+'&job_id=eq.'+job+'&candidate_ids=cs.{'+candidate+'}',service)).data;
+ for(const kind of ['resume_uploaded','assessment_completed','submittal_saved'])assert.equal(retention.filter(event=>event.event_type===kind).length,1,'Missing or duplicated live retention evidence: '+kind);
+ assert.ok(retention.find(event=>event.event_type==='assessment_completed').document_id,'Completion lost its original document identity');
+ for(const access of [owner.access,other.access]){
+  assert.equal((await req('/rest/v1/retention_events?select=id&workspace_id=eq.'+owner.workspace,access,'GET',undefined,false)).ok,false,'Private retention ledger exposed');
+  assert.equal((await req('/rest/v1/rpc/get_admin_retention_summary',access,'POST',{},false)).ok,false,'Nonadmin retention report exposed');
+ }
+ console.log('PASS: actual worker completion and unchanged saved draft have durable retention identity; both regular accounts are denied private analytics.');
  console.log('PASS: real password accounts, separate workspaces, record/document isolation, protected AI routes, background intake, grounded quotes, atomic approval and persistence.');
 }finally{
  for(const user of users){

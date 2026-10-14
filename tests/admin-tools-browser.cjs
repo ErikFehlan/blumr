@@ -5,6 +5,7 @@ const resources=Object.fromEntries([...sql.matchAll(/\('([a-z]+)', \$resource\$(
 const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.txt',pkg:'package.json',env:'.env.example'};
 (async()=>{
  let betaAccounts=[{email:'tester@example.test',approved:true,registered:true,email_verified:true,active:true,status:'active'}],aiPaused=false,recovered=false,workerRecovered=false;
+ let retentionFailure=false,cohortFailure=false,cohort='unreviewed';
  let revoked=false,failTools=false,holdTools=false,held=null,downloads=0,failUsage=false,usageCalls=0;
  const server=http.createServer(async(req,res)=>{
   if(req.url.startsWith('/rpc/')){
@@ -16,6 +17,11 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
    if(op==='security'){res.end(JSON.stringify({accounts:betaAccounts,limits:{ai_paused:aiPaused,global_day:1000,workspace_day:200,workspace_minute:20},today:{calls:4}}));return;}
    if(op==='access'){betaAccounts=[{email:input.email,approved:input.approved,registered:true,email_verified:true,active:input.approved,status:input.approved?'active':'suspended'}];res.end('{}');return;}
    if(op==='pause'){aiPaused=input.paused;res.end('{}');return;}
+   if(op==='retention'){
+    if(retentionFailure){res.statusCode=503;res.end(JSON.stringify({message:'Retention unavailable'}));return;}
+    res.end(JSON.stringify({generated_at:'2026-10-14T12:00:00Z',tracking_started_at:'2026-10-01T00:00:00Z',cohorts:[{cohort:'external',accounts:2,activated:2,second_assessment:1,median_hours_to_second:24,eligible_7d:2,returned_7d:1,comparison_return_7d:1,submittal_return_7d:1},{cohort,accounts:1}],accounts:[{id:'review-me',email:'review@example.test',cohort},{id:'admin',email:'admin@example.test',cohort:'internal',locked:true}]}));return;
+   }
+   if(op==='cohort'){if(cohortFailure){res.statusCode=503;res.end(JSON.stringify({message:'Save unavailable'}));return;}assert.equal(input.user,'review-me');cohort=input.cohort;res.end('{}');return;}
    if(op==='usage'){
     usageCalls++;if(failUsage){res.statusCode=503;res.end(JSON.stringify({message:'Temporary outage'}));return;}
     res.end(JSON.stringify({generated_at:'2026-09-16T12:00:00Z',tracking_started_at:'2026-09-16T11:00:00Z',totals:{accounts:2},users:[{email:'admin@example.test',jobs_created:2,candidates_added:3,ai_completed:7,resumes_analyzed:1,feedback_saved:4,outcomes_saved:1}],event_breakdown:{resume_analysis_completed:1,candidate_reassessment_completed:6}}));return;
@@ -47,7 +53,7 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
    await page.route('**/assets/data.js*',route=>route.fulfill({contentType:'application/javascript',body:''}));
    await page.addInitScript(user=>{
     const rpc=async(op,input)=>{const response=await fetch('/rpc/'+op,{method:'POST',headers:{'X-Test-Account':user},body:JSON.stringify(input||{})});const result=await response.json();if(!response.ok)throw Object.assign(Error(result.message),{code:result.code});return result;};
-    window.AncalagonData={create:()=>({load:async()=>({jobs:[],candidates:[],feedback:[],interviewOutcomes:[]}),loadHome:async()=>null,visitHome:async()=>{},loadHomeReviews:async()=>[],loadJobReassessments:async()=>[],trackEvent:async()=>{},schedule:()=>{},flush:async()=>{},loadBetaSecurity:()=>rpc('security'),manageBetaAccess:(email,approved)=>rpc('access',{email,approved}),pauseAI:paused=>rpc('pause',{paused}),loadAdminAnalytics:()=>rpc('usage'),loadSystemHealth:()=>rpc('health'),loadDirectAIRecovery:()=>rpc('recovery'),recoverDirectAIRequest:(claim,note,verified)=>rpc('recover',{claim,note,verified}),recordReliabilityEvent:async()=>{},isAppAdmin:()=>rpc('is-admin'),loadAdminTools:()=>rpc('tools'),loadAdminStarterFile:(file,model,project)=>rpc('download',{file,model,project})})};
+    window.AncalagonData={create:()=>({load:async()=>({jobs:[],candidates:[],feedback:[],interviewOutcomes:[]}),loadHome:async()=>null,visitHome:async()=>{},loadHomeReviews:async()=>[],loadJobReassessments:async()=>[],trackEvent:async()=>{},schedule:()=>{},flush:async()=>{},loadBetaSecurity:()=>rpc('security'),manageBetaAccess:(email,approved)=>rpc('access',{email,approved}),pauseAI:paused=>rpc('pause',{paused}),loadRetentionSummary:()=>rpc('retention'),saveRetentionCohort:(user,cohort)=>rpc('cohort',{user,cohort}),loadAdminAnalytics:()=>rpc('usage'),loadSystemHealth:()=>rpc('health'),loadDirectAIRecovery:()=>rpc('recovery'),recoverDirectAIRequest:(claim,note,verified)=>rpc('recover',{claim,note,verified}),recordReliabilityEvent:async()=>{},isAppAdmin:()=>rpc('is-admin'),loadAdminTools:()=>rpc('tools'),loadAdminStarterFile:(file,model,project)=>rpc('download',{file,model,project})})};
     // Owning a workspace or setting user metadata never grants application-admin rights.
     window.ancalagonAuth={session:{user:{id:user,user_metadata:{role:'admin',admin:true}}},workspace:{id:user,role:'owner'}};
    },user);
@@ -68,6 +74,18 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
   assert.equal(await page.locator('#adminUserRows tr td').nth(6).textContent(),'7','All AI operations must be shown, not just resumes');
   assert.match(await page.locator('#adminUsageStatus').textContent(),/^Updated /);
   assert.match(await page.locator('#adminUsageHistory').textContent(),/cannot be fully reconstructed/);
+  const retention=page.locator('#adminRetention');await retention.getByRole('heading',{name:'Recruiter retention',exact:true}).waitFor();
+  assert.match(await retention.textContent(),/1 \/ 2 \(50%\)/);assert.match(await retention.textContent(),/Not mature yet/);
+  assert.equal(await retention.locator('details').first().evaluate(e=>e.open),false);
+  await retention.getByText('Review account cohorts',{exact:true}).click();await retention.locator('select[data-retention-user="review-me"]').selectOption('internal');
+  cohortFailure=true;await retention.getByRole('button',{name:'Save cohort',exact:true}).click();await retention.getByText('Cohort was not saved. Try again.',{exact:true}).waitFor();assert.equal(cohort,'unreviewed');
+  cohortFailure=false;await retention.getByRole('button',{name:'Save cohort',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#adminRetention select')?.value==='internal');assert.equal(cohort,'internal');
+  retentionFailure=true;await page.locator('#refreshAdminUsage').click();await retention.getByText(/Retention reporting could not refresh/).waitFor();assert.match(await retention.textContent(),/1 \/ 2 \(50%\)/);
+  retentionFailure=false;await page.locator('#refreshAdminUsage').click();await retention.getByText(/^Updated /).waitFor();
+  if(process.env.CAPTURE_UI){fs.mkdirSync('test-results',{recursive:true});await retention.screenshot({path:'test-results/retention-analytics-desktop.png'});}
+  await page.setViewportSize({width:390,height:844});await retention.getByText('Review account cohorts',{exact:true}).click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Retention report fits mobile');
+  if(process.env.CAPTURE_UI)await page.screenshot({path:'test-results/retention-analytics-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
   const beforeFocus=usageCalls;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   assert.equal(usageCalls,beforeFocus,'Window focus should not refresh analytics');
   failUsage=true;await page.locator('#refreshAdminUsage').click();await page.getByText('Could not refresh usage. Previously loaded numbers may be out of date. Try Refresh again.',{exact:true}).waitFor();
@@ -115,7 +133,7 @@ const names={server:'server.ts',schema:'schema.sql',prompt:'evaluation-prompt.tx
   await page.setViewportSize({width:1440,height:1000});
   await page.locator('#saveHybridSettings').click();await page.getByText('Connection updated for this session.',{exact:true}).waitFor();
   revoked=true;await page.locator('#downloadServer').click();await page.locator('#page-backend.active').waitFor();
-  assert.equal(await page.locator('#patternFunctionUrl,#downloadServer').count(),0);assert.equal(await page.locator('#adminToolsNav').isVisible(),false);assert.equal(downloads,5);
+  assert.equal(await page.locator('#patternFunctionUrl,#downloadServer,#adminRetention').count(),0);assert.equal(await page.locator('#adminToolsNav').isVisible(),false);assert.equal(downloads,5);
   revoked=false;await page.reload();await page.locator('#adminToolsNav').waitFor({state:'visible'});
   failTools=true;await page.locator('#adminToolsNav').click();await page.getByRole('button',{name:'Retry',exact:true}).waitFor();
   assert.equal(await page.locator('#patternFunctionUrl').count(),0);

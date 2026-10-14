@@ -59,6 +59,7 @@ jobs:
           node --check assets/feedback.js
           node --check assets/job-review.js
           node --check assets/feedback-impact.js
+          node --check assets/retention-analytics.js
           node --check assets/doc-to-text.js
           node --check assets/resume-intake.js
           node --check assets/resume-viewer.js
@@ -101,7 +102,7 @@ jobs:
           node tests/core-browser.cjs
           CAPTURE_UI=test-results/recruiter node tests/recruiter-browser.cjs
           node tests/tutorial-browser.cjs
-          node tests/admin-tools-browser.cjs
+          CAPTURE_UI=1 node tests/admin-tools-browser.cjs
 
       - name: Save UI review screenshots
         if: always()

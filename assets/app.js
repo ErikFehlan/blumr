@@ -70,7 +70,7 @@
         root.querySelector('#adminToolsNav').hidden=!adminAccess;
         for(const id of ['adminToolsNav','adminUsageNav','qualityLab'])root.querySelector('#'+id).classList.toggle('rf-hidden',!adminAccess);
         if(!adminAccess){
-          root.querySelector('#adminDemoAnalytics')?.remove();root.querySelector('#adminActivation')?.remove();root.querySelector('#adminUserRows').replaceChildren();root.querySelector('#adminEventBreakdown').replaceChildren();
+          root.querySelector('#adminRetention')?.remove();root.querySelector('#adminDemoAnalytics')?.remove();root.querySelector('#adminActivation')?.remove();root.querySelector('#adminUserRows').replaceChildren();root.querySelector('#adminEventBreakdown').replaceChildren();
           for(const id of ['adminAccounts','adminActive7','adminActive30','adminSessions','adminEvents','adminUsageStatus','adminUsageHistory'])root.querySelector('#'+id).textContent='—';
           if(root.querySelector('.rf-page.active')?.id.startsWith('page-admin-'))showPage('backend');
         }
@@ -89,9 +89,12 @@
           const report=await dataService.loadAdminAnalytics();
           let activation=null;try{activation=await dataService.loadActivationSummary();}catch{/* Older deployments remain usable while the migration rolls out. */}
           let demo=null;try{demo=await dataService.loadDemoAnalytics();}catch{}
+          const retentionService=dataService;let retention=null;try{retention=await retentionService.loadRetentionSummary?.();}catch(error){if(['42501','PGRST301'].includes(error?.code))throw error;}
           if(request!==adminRequest)return;
           setAdminAccess(true);
           renderDemoAnalytics(demo);
+          let retentionHost=root.querySelector('#adminRetention');if(!retentionHost){retentionHost=document.createElement('section');retentionHost.id='adminRetention';retentionHost.className='rf-card';root.querySelector('#adminUsageStatus').after(retentionHost);}
+          window.BlumrRetention.render(retentionHost,retention,{saveCohort:(user,cohort)=>retentionService.saveRetentionCohort(user,cohort),refresh:loadAdminUsage,onDenied:()=>setAdminAccess(false)});
           let funnel=root.querySelector('#adminActivation');if(!funnel){funnel=document.createElement('section');funnel.id='adminActivation';funnel.className='rf-card';root.querySelector('#adminEventBreakdown').parentElement.before(funnel);}
           funnel.innerHTML=activation?'<h3>First useful result</h3><p class="rf-sub">Unique accounts at each milestone. Resume saves, assessment views and submittals are tracked from this release; earlier activity is not reconstructed.</p><div class="rf-admin-activation">'+[['accounts','Signed up'],['jobs','Created a job'],['resumes','Saved a resume'],['views','Viewed an assessment'],['submittals','Prepared a submittal']].map(([key,label])=>'<div><strong>'+Number(activation[key]||0)+'</strong><span>'+label+'</span></div>').join('')+'</div><p class="rf-sub">'+(activation.median_minutes_to_view!=null?'Median signup → assessment viewed: '+Number(activation.median_minutes_to_view).toFixed(1)+' minutes.':'Time to first assessment will appear after a tracked assessment view.')+'</p>':'<h3>First useful result</h3><p class="rf-sub">Activation reporting is not available yet.</p>';
           root.querySelector('#adminUsageStatus').textContent='Updated '+usageDate(report?.generated_at||new Date().toISOString())+'. Refresh to load newer activity.';
@@ -329,6 +332,7 @@
       function renderComparison(){
         const selected=window.BlumrDecisions.selection(compareFields().map(s=>s.value).filter(Boolean),candidates,activeJobId).map(id=>candidateForRef(id));
         root.querySelector('#compareResults').innerHTML=window.BlumrDecisions.comparisonHTML(activeJob(),selected,{signature:c=>window.AncalagonContext.signature(evaluationContext(c)),risks:knockoutRisks,outcome:c=>interviewOutcomes.filter(o=>o.jobId===activeJobId&&(o.candidateId?o.candidateId===c.id:o.candidate===c.short)).at(-1)?.decision});
+        if(dataReady&&selected.length>=2&&root.querySelector('#page-compare.active')&&document.visibilityState==='visible')void dataService?.recordComparison?.(activeJobId,selected.map(c=>c.id),analyticsSessionId).catch(()=>{});
       }
       function openComparison(ids=[]){
         const chosen=window.BlumrDecisions.selection(ids,candidates,activeJobId);

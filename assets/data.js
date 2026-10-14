@@ -457,6 +457,15 @@
     }
 
     async function loadDemoAnalytics(){return settingsRPC('get_admin_demo_summary');}
+    const loadRetentionSummary=()=>settingsRPC('get_admin_retention_summary');
+    const saveRetentionCohort=(user,cohort)=>settingsRPC('set_retention_cohort',{p_user:user,p_cohort:cohort});
+    const comparisonRequests=new Map();
+    function recordComparison(job,candidates,session){
+      const ids=[...new Set(candidates)].sort();if(ids.length<2||ids.length>4)return Promise.resolve();
+      const key=JSON.stringify([job,ids,session]);if(comparisonRequests.has(key))return comparisonRequests.get(key);
+      const request=settingsRPC('record_retention_comparison',{p_job:job,p_candidates:ids,p_session:session}).catch(error=>{comparisonRequests.delete(key);throw error;});
+      comparisonRequests.set(key,request);if(comparisonRequests.size>200)comparisonRequests.delete(comparisonRequests.keys().next().value);return request;
+    }
     async function loadAdminAnalytics() {
       const { data, error } = await client.rpc('get_admin_usage_summary');
       if (error) throw error;
@@ -589,7 +598,7 @@
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, loadResumeDocument, workspaceId };
+    return { loadRetentionSummary, saveRetentionCohort, recordComparison, loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, loadResumeDocument, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };

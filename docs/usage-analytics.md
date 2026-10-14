@@ -23,3 +23,5 @@ Deployment installs compatible recording first, deploys the server-writing handl
 The first migration recovers record creation and retained task/direct-AI results. Historical background work is attributed to the record creator when its original initiator is unknown. Deleted records, overwritten task versions, and old telemetry that was never persisted cannot be reconstructed. The dashboard states this limitation and the confirmed-tracking start date. Reapplying the migration does not re-import or duplicate history.
 
 Verification covers rolled-back saves, uploads and manual candidates, retry idempotency, worker completions without an open browser, collaborator attribution, date windows, completed/failed separation, permission boundaries, deletion retention, and repeated migration deployment.
+
+The separate Recruiter retention section uses explicitly reviewed external cohorts, durable distinct-candidate completions, later-day saved work and mature 7/30-day denominators. Its comparison figures are browser observations. See [Stage 5 measurement definitions](retention-phase-5.md); the original all-account usage totals retain their existing meaning.
