@@ -6,7 +6,8 @@ const clone = x => JSON.parse(JSON.stringify(x));
 function fixture() {
   const rows = {jobs:[{id:'job',workspace_id:'workspace',title:'QA Analyst',criteria:[],created_at:'2026-01-01',updated_at:'2026-01-01'}]};
   const calls=[]; let fail=false,lose=false,rpcHandler;
-  const client={rpc:(name,args)=>rpcHandler(name,args),from(table){let operation='select',payload,filters=[];const q={
+  const downloads=[];
+  const client={storage:{from(bucket){return {download:async path=>{downloads.push({bucket,path});return {data:'original-bytes',error:null};}};}},rpc:(name,args)=>rpcHandler(name,args),from(table){let operation='select',payload,filters=[];const q={
     select(){return q},eq(k,v){filters.push([k,v]);return q},is(k,v){return q.eq(k,v)},
     insert(v){operation='insert';payload=v;return q},update(v){operation='update';payload=v;return q},delete(){operation='delete';return q},
     then(resolve,reject){return Promise.resolve().then(()=>{
@@ -24,8 +25,26 @@ function fixture() {
   const context={window:{location:{pathname:'/'}},console,setTimeout,clearTimeout,crypto:require('node:crypto').webcrypto};
   vm.runInNewContext(fs.readFileSync('assets/data.js','utf8'),context);
   const service=context.window.AncalagonData.create({client,workspace:{id:'workspace'},session:{user:{id:'user'}}});
-  return {service,rows,calls,setRpc(handler){rpcHandler=handler},failNext(){fail=true},loseNextInsert(){lose=true}};
+  return {service,rows,calls,downloads,setRpc(handler){rpcHandler=handler},failNext(){fail=true},loseNextInsert(){lose=true}};
 }
+test('resume originals resolve only within the workspace, job and candidate; newest upload wins',async()=>{
+ const f=fixture(),row={workspace_id:'workspace',job_id:'job',candidate_id:'candidate',file_name:'Resume.pdf',mime_type:'application/pdf'};
+ f.rows.candidate_documents=[{...row,storage_path:'workspace/job/candidate/old.pdf',created_at:'2026-01-01'},
+  {...row,storage_path:'workspace/job/candidate/new.pdf',created_at:'2026-02-01'},
+  {...row,workspace_id:'other',storage_path:'other/job/candidate/private.pdf',created_at:'2026-03-01'},
+  {...row,job_id:'other-job',storage_path:'workspace/other-job/candidate/private.pdf',created_at:'2026-03-01'},
+  {...row,candidate_id:'other-person',storage_path:'workspace/job/other-person/private.pdf',created_at:'2026-03-01'}];
+ const result=await f.service.loadResumeDocument({id:'candidate',jobId:'job'});
+ assert.equal(result.blob,'original-bytes');assert.equal(result.fileName,'Resume.pdf');
+ assert.deepEqual(f.downloads,[{bucket:'resumes',path:'workspace/job/candidate/new.pdf'}]);
+ assert.equal(await f.service.loadResumeDocument({id:'missing',jobId:'job'}),null);assert.equal(f.downloads.length,1);
+});
+test('resume metadata cannot redirect a download to another candidate or a traversal path',async()=>{
+ for(const path of ['workspace/job/other/file.pdf','https://attacker.invalid/file.pdf','workspace/job/candidate/../file.pdf']){
+  const f=fixture();f.rows.candidate_documents=[{workspace_id:'workspace',job_id:'job',candidate_id:'candidate',storage_path:path}];
+  await assert.rejects(f.service.loadResumeDocument({id:'candidate',jobId:'job'}),/Invalid resume location/);assert.equal(f.downloads.length,0);
+ }
+});
 test('navigation telemetry recovers a lost response without double counting; save clicks are excluded',async()=>{
  const f=fixture();f.loseNextInsert();
  await f.service.trackEvent('signed_in',{sessionId:'session'});

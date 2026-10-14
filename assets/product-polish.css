@@ -122,3 +122,16 @@
 #rf-app .rf-admin-activation{display:flex;flex-wrap:wrap;gap:24px}
 #rf-app .rf-admin-activation div{display:grid;gap:6px;min-width:120px}
 #rf-app .rf-admin-activation strong{font-size:24px}
+/* Continue an existing search without recreating its requirements. */
+#rf-app .rf-repeat-search{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;margin-bottom:18px;border:1px solid var(--ui-line);border-radius:14px;background:var(--ui-panel);font-size:14px}
+#rf-app .rf-home-job-list li{display:flex;align-items:center;gap:8px}#rf-app .rf-home-job-list .rf-home-job{flex:1;min-width:0}#rf-app .rf-home-upload{flex-shrink:0;margin-right:4px}
+#rf-app[data-theme] .rf-resume-panel.rf-resume-expanded{width:min(1200px,96vw)}
+#rf-app .rf-resume-toolbar{display:flex;flex-wrap:wrap;gap:8px;padding:12px 18px 0;flex-shrink:0}#rf-app .rf-resume-toolbar [aria-pressed="true"]{border-color:var(--ui-accent,var(--rf-blue));box-shadow:inset 0 0 0 1px var(--ui-accent,var(--rf-blue))}
+#rf-app .rf-resume-viewer-status{font-size:12px;line-height:1.5;padding:0 18px;margin:10px 0 0;color:var(--ui-muted);flex-shrink:0}
+#rf-app .rf-resume-original{display:flex;flex-direction:column;flex:1;min-height:120px;overflow:hidden;margin:12px 18px 18px;border-radius:10px;background:#e8edf2}
+#rf-app .rf-resume-original[hidden],#rf-app .rf-resume-document[hidden],#rf-app .rf-resume-toolbar [hidden]{display:none}
+#rf-app .rf-pdf-controls{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;padding:10px;flex-shrink:0;background:var(--ui-panel);font-size:12px}#rf-app .rf-pdf-controls select{max-width:110px;color:var(--ui-text);background:var(--ui-panel);border:1px solid var(--ui-line);padding:6px;border-radius:6px}
+#rf-app .rf-pdf-canvas{overflow:auto;flex:1;min-height:0;padding:16px}#rf-app .rf-pdf-canvas canvas{display:block;margin:0 auto;box-shadow:0 2px 12px #152c4120}
+#rf-app .rf-word-preview{border:0;width:100%;height:100%;min-height:240px;flex:1;background:#e8edf2}
+@media(max-width:600px){#rf-app .rf-repeat-search{align-items:flex-start;flex-direction:column}#rf-app .rf-home-job-list li{flex-wrap:wrap;padding-bottom:10px}#rf-app .rf-home-job-list .rf-home-job{flex-basis:100%}#rf-app .rf-home-upload{margin-left:4px}#rf-app[data-theme] .rf-resume-panel.rf-resume-expanded{width:100%}#rf-app .rf-resume-original{margin:12px}#rf-app .rf-pdf-controls .rf-btn{padding:6px 8px;font-size:11px}}
+#rf-app .rf-pdf-controls .rf-select{width:110px;flex:0 0 110px}#rf-app .rf-pdf-controls .rf-select-button{min-height:36px;padding:8px 12px}
