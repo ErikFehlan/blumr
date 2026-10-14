@@ -4,6 +4,7 @@ create table candidate_documents(id uuid primary key default gen_random_uuid(),w
  foreign key(candidate_id,job_id,workspace_id) references candidates(id,job_id,workspace_id) on delete cascade);
 \ir ../supabase/migrations/20260915090000_core_intake.sql
 \ir review-conflicts.sql
+\ir ../supabase/migrations/20261014174000_assessment_save_versions.sql
 insert into jobs(id,workspace_id,title,description) values('00000000-0000-0000-0000-000000000111','00000000-0000-0000-0000-000000000001','Core QA','Hands-on manual testing');
 insert into candidates(id,job_id,workspace_id,role) values
  ('00000000-0000-0000-0000-000000000121','00000000-0000-0000-0000-000000000111','00000000-0000-0000-0000-000000000001','Resume awaiting analysis'),
@@ -65,11 +66,30 @@ do $$declare result jsonb;rev text;begin
  result:=review_resume_intake('00000000-0000-0000-0000-000000000121',rev,'approve');
  if (result#>>'{candidate,manager_score}')::numeric<>8.5 or (result#>>'{candidate,resume_jd_score}')::numeric<>8 then raise exception 'Approval not atomic';end if;
  if result#>>'{assessment,evidence,submission_draft,text}'<>'Preserve draft' then raise exception 'Draft lost';end if;
+ if result#>>'{assessment,updated_at}' is null then raise exception 'Approval omitted assessment version';end if;
  if (select status from resume_intake_tasks where candidate_id='00000000-0000-0000-0000-000000000121')<>'approved' then raise exception 'Approval requeued intake';end if;
  result:=review_resume_intake('00000000-0000-0000-0000-000000000121',rev,'approve');
  if (result#>>'{candidate,manager_score}')::numeric<>8.5 then raise exception 'Lost approval response could not recover';end if;
 end$$;
 reset role;
+-- Save after approval with a compact version guard, preserving all AI evidence.
+create temp table assessment_before as
+ select id,updated_at,evidence from candidate_assessments where candidate_id='00000000-0000-0000-0000-000000000121';
+update candidate_assessments a set evidence=jsonb_set(a.evidence,'{submission_draft}', '{"text":"Saved after approval"}')
+ from assessment_before b where a.id=b.id and a.updated_at=b.updated_at;
+do $$declare affected integer;begin
+ if exists(select 1 from candidate_assessments a join assessment_before b using(id) where a.updated_at<=b.updated_at) then raise exception 'Assessment version did not advance';end if;
+ update candidate_assessments a set evidence='{}' from assessment_before b where a.id=b.id and a.updated_at=b.updated_at;
+ get diagnostics affected=row_count;
+ if affected<>0 then raise exception 'Stale tab overwrote saved assessment';end if;
+ if not exists(select 1 from candidate_assessments a join assessment_before b using(id) where a.evidence->'resume_intake'=b.evidence->'resume_intake' and a.evidence#>>'{submission_draft,text}'='Saved after approval') then raise exception 'Draft save lost approved evidence';end if;
+end$$;
+create temp table assessment_version_before_redeploy as select id,updated_at from candidate_assessments;
+\ir ../supabase/migrations/20261014174000_assessment_save_versions.sql
+do $$begin
+ if exists(select 1 from candidate_assessments a join assessment_version_before_redeploy b using(id) where a.updated_at<>b.updated_at) then raise exception 'Redeploy invalidated assessment versions';end if;
+end$$;
+
 -- Recover only the pre-release, unreviewed legacy verification failure.
 update resume_intake_tasks set status='failed',error_code='verification_failed',attempts=3,updated_at='2026-09-15T16:00:00Z'
  where candidate_id='00000000-0000-0000-0000-000000000122';

@@ -55,7 +55,7 @@
         query('interview_outcomes', 'id,job_id,candidate_id,interview_stage,decision,positives,concerns,notes,previous_pipeline_stage,source_updated_at,created_at,updated_at'),
         query('candidate_benchmarks', 'job_id,candidate_id'),
         query('screening_insights', 'id,job_id,candidate_id,can_do_job,culture_working_style_fit,notes,resulting_jd_score,resulting_manager_score,assessment_summary,assessment_source,source_updated_at,created_at,previous_jd_score,previous_manager_score'),
-        query('candidate_assessments', 'id,job_id,candidate_id,assessment_type,evidence,created_at'),
+        query('candidate_assessments', 'id,job_id,candidate_id,assessment_type,evidence,created_at,updated_at'),
         query('job_criteria_tasks','job_id,priority_suggestions,priority_review,priority_version')
       ]);
       const benchmarkIds = new Set(benchmarkRows.map(row => row.candidate_id));

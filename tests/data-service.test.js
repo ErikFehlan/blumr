@@ -7,13 +7,13 @@ function fixture() {
   const rows = {jobs:[{id:'job',workspace_id:'workspace',title:'QA Analyst',criteria:[],created_at:'2026-01-01',updated_at:'2026-01-01'}]};
   const calls=[]; let fail=false,lose=false,rpcHandler;
   const downloads=[];
-  const client={storage:{from(bucket){return {download:async path=>{downloads.push({bucket,path});return {data:'original-bytes',error:null};}};}},rpc:(name,args)=>rpcHandler(name,args),from(table){let operation='select',payload,filters=[];const q={
-    select(){return q},eq(k,v){filters.push([k,v]);return q},is(k,v){return q.eq(k,v)},
+  const client={storage:{from(bucket){return {download:async path=>{downloads.push({bucket,path});return {data:'original-bytes',error:null};}};}},rpc:(name,args)=>rpcHandler(name,args),from(table){let operation='select',payload,filters=[],columns='*';const q={
+    select(value='*'){columns=value;return q},eq(k,v){filters.push([k,v]);return q},is(k,v){return q.eq(k,v)},
     insert(v){operation='insert';payload=v;return q},update(v){operation='update';payload=v;return q},delete(){operation='delete';return q},
     then(resolve,reject){return Promise.resolve().then(()=>{
       rows[table] ||= [];
       const matching=rows[table].filter(row=>filters.every(([k,v])=>typeof row[k]==='object'&&row[k]!==null?JSON.stringify(row[k])===v:row[k]===v));
-      if(operation==='select')return {data:clone(matching),error:null};
+      if(operation==='select')return {data:clone(columns==='*'?matching:matching.map(row=>Object.fromEntries(columns.split(',').filter(k=>k in row).map(k=>[k,row[k]])))),error:null};
       calls.push({table,operation,payload,filters});
       if(fail){fail=false;return {data:null,error:new Error('network unavailable')}}
       if(operation==='insert'){if(rows[table].some(r=>(r.id&&r.id===payload.id)||(r.event_id&&r.event_id===payload.event_id)))return {data:null,error:{code:'23505'}};const row=clone(payload);rows[table].push(row);if(lose){lose=false;return {data:null,error:new Error('Response lost after commit')}}return {data:[row],error:null}}
@@ -143,6 +143,39 @@ test('stale backend approval returns PT409 once without changing the score or bl
  state.candidates[0].submissionDraft={text:'Still editable after conflict',updatedAt:1};
  await f.service.flush(state);assert.equal(f.service.hasPendingChanges(),false);assert.equal(calls,1);
  const restored=await f.service.load();assert.equal(restored.candidates[0].managerScore,7);assert.equal(restored.candidates[0].submissionDraft.text,'Still editable after conflict');
+});
+
+test('large approved assessments save with compact version guards before and after reload',async()=>{
+ const f=fixture(),state=await f.service.load();
+ state.candidates.push({id:'c',jobId:'job',name:'Test',short:'Test',strengths:[],concerns:[],tags:[],jdScore:7,managerScore:7,resumeIntake:{phase:'processing'}});
+ await f.service.flush(state);
+ const largeEvidence='Synthetic resume evidence. '.repeat(2000);
+ f.setRpc(async(name)=>{
+  assert.equal(name,'review_resume_intake');
+  const row=f.rows.candidates[0],assessment=f.rows.candidate_assessments[0];
+  assessment.updated_at='2026-10-14T17:18:07.602492+00:00';
+  assessment.evidence.resume_intake={phase:'ready',brief:{resume_evidence:[{quote:largeEvidence}]}};
+  return {data:{status:'approved',candidate:clone(row),assessment:clone(assessment)},error:null};
+ });
+ await f.service.reviewResumeIntake('c','revision',state);
+ state.candidates[0].submissionDraft={text:'Saved after approval',updatedAt:1};
+ await f.service.flush(state);
+ const compactGuard=()=>{
+  const call=f.calls.findLast(c=>c.table==='candidate_assessments'&&c.operation==='update');
+  assert.deepEqual(call.filters.map(([key])=>key),['workspace_id','id','updated_at']);
+  assert.ok(new URLSearchParams(call.filters).toString().length<200);
+ };
+ compactGuard();
+ const restored=await f.service.load();
+ restored.candidates[0].submissionDraft={text:'Saved after reload',updatedAt:2};
+ await f.service.flush(restored);compactGuard();
+ assert.equal(f.rows.candidate_assessments[0].evidence.submission_draft.text,'Saved after reload');
+ assert.equal(f.rows.candidate_assessments[0].evidence.resume_intake.brief.resume_evidence[0].quote,largeEvidence);
+ f.rows.candidate_assessments[0].updated_at='2026-10-14T17:18:08.000001+00:00';
+ f.rows.candidate_assessments[0].evidence.submission_draft.text='Newer draft from another tab';
+ restored.candidates[0].submissionDraft.text='Stale edit';
+ await assert.rejects(f.service.flush(restored),e=>e.code==='SAVE_CONFLICT');
+ assert.equal(f.rows.candidate_assessments[0].evidence.submission_draft.text,'Newer draft from another tab');
 });
 
 test('source timestamps stay consistent with worker context after database update timestamps change',async()=>{
