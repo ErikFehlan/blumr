@@ -105,7 +105,10 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
  await page.locator('#workspaceSubmission > summary').click();const draft='Synthetic submittal: manual regression testing and documented defect remediation.';
  await page.locator('#submissionDraft').fill(draft);await page.locator('#saveSubmissionDraft').click();
  const last=candidateIds.at(-1);
- await poll(async()=> (await api(owner,'candidate_assessments?select=evidence&candidate_id=eq.'+last)).some(a=>a.evidence?.submission_draft?.text===draft),'Submittal draft was not persisted');
+ await poll(async()=>{
+  if((await page.locator('#submissionDraftStatus').textContent()).startsWith('Not saved'))throw Error('Submittal draft save failed: '+await page.locator('#saveDetails').textContent());
+  return (await api(owner,'candidate_assessments?select=evidence&candidate_id=eq.'+last)).some(a=>a.evidence?.submission_draft?.text===draft);
+ },'Submittal draft was not persisted');
  stage='feedback';await nav('feedback');await page.locator('#feedbackText').fill('Synthetic feedback: demonstrated ownership of regression coverage; clarify the SQL work they personally completed.');
  await page.locator('#feedbackSubmitBtn').click();await page.locator('#feedbackList [data-accept-interpretation]').first().waitFor({timeout:180000});
  const feedback=await api(owner,'manager_feedback?select=id,feedback_text&job_id=eq.'+job.id);assert.equal(feedback.length,1);assert.match(feedback[0].feedback_text,/Synthetic feedback/);
