@@ -5,12 +5,12 @@
     'assets/job-intake-code.js?v=20261002-guided-experience',
     'assets/job-wizard.js?v=20261008-quick-start',
     'assets/hiring-priorities.js?v=20260924-priorities',
-    'assets/data.js?v=20261014-repeat-resume',
+    'assets/data.js?v=20261014-feedback',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20261014-decisions',
     'assets/evidence.js?v=20260911-quick-feedback',
     'assets/context.js?v=20261006-role-neutral',
-    'assets/assessment-memory.js?v=20261006-role-neutral',
+    'assets/assessment-memory.js?v=20261014-feedback',
     'assets/scoring.js?v=20260911-quick-feedback',
     'assets/quality.js?v=20260915-core',
     'assets/quality-ui.js?v=20260918-blumr',
@@ -21,7 +21,8 @@
     'assets/resume-viewer.js?v=20261014-repeat-resume',
     'assets/resume-intake.js?v=20261014-repeat-resume',
     'assets/resume-remote.js?v=20260917-security',
-    'assets/job-review.js?v=20260923-verification',
+    'assets/feedback-impact.js?v=20261014-feedback',
+    'assets/job-review.js?v=20261014-feedback',
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
     'assets/candidate-workspace.js?v=20261014-decisions',
@@ -33,11 +34,11 @@
     'assets/tutorial.js?v=20260915-tutorial',
     'assets/tutorial-ui.js?v=20260915-settings',
     'assets/admin-tools.js?v=20261002-guided-experience',
-    'assets/settings.js?v=20260915-settings',
-    'assets/settings-ui.js?v=20261002-guided-experience',
+    'assets/settings.js?v=20261014-feedback',
+    'assets/settings-ui.js?v=20261014-feedback',
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
-    'assets/app.js?v=20261014-decisions'
+    'assets/app.js?v=20261014-feedback'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;

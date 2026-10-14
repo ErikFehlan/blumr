@@ -30,3 +30,10 @@ test('US timezone options use valid zones with seasonal offsets and Arizona/Hawa
  assert.equal(hour('2026-01-15T18:00:00Z','America/New_York'),13);assert.equal(hour('2026-07-15T18:00:00Z','America/New_York'),14);
  for(const date of ['2026-01-15T18:00:00Z','2026-07-15T18:00:00Z']){assert.equal(hour(date,'America/Phoenix'),11);assert.equal(hour(date,'Pacific/Honolulu'),8);}
 });
+
+test('completed work stays out of unread groups and repeated failures consolidate by job',()=>{
+ const {notificationGroups,notificationPopupAllowed}=require('../assets/settings.js');
+ const notice={workspace_id:'w',job_id:'j',kind:'uploads',read_at:null,message:'A resume assessment needs attention · QA'};
+ const groups=notificationGroups([{...notice,id:'1',actionable:true},{...notice,id:'2',actionable:true},{...notice,id:'old',actionable:false}]);
+ assert.equal(groups.length,2);assert.deepEqual(groups[0].ids,['1','2']);assert.match(groups[0].message,/2 resume assessments need attention/);assert.equal(groups[1].actionable,false);assert.equal(notificationPopupAllowed(groups[1],defaults),false);
+});

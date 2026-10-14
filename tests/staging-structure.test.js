@@ -90,3 +90,14 @@ test('staging parity validates the deployed heartbeat patch and still rejects it
  assert.deepEqual(structuralDifferences([],stage,expected),['function:heartbeat_assessment_work(uuid)']);
  assert.throws(()=>workerExpectations(sql,patch.replace('heartbeat_assessment_work','unexpected_routine')));
 });
+
+test('retention routines require exact source and distinct member versus worker permissions',async()=>{
+ const {retentionExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261014192401_retention_feedback_reminders.sql','utf8'),expected=retentionExpectations(sql);
+ assert.equal(expected.size,3);
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:e.setof,args:e.args,defaults:e.defaults,security_definer:true,volatility:e.volatility,config:['search_path=""'],worker_allowed:true,clients_denied:!e.admin,anon_denied:true,authenticated_allowed:e.admin}}));
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ const target=stage.find(r=>r.name==='onboarding_reminder_target(uuid)');target.routine.clients_denied=false;
+ assert.deepEqual(structuralDifferences([],stage,expected),['function:onboarding_reminder_target(uuid)']);
+ assert.throws(()=>retentionExpectations(sql.replace('onboarding_step(p_user','unknown_step(p_user')));
+});

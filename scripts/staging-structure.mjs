@@ -23,6 +23,11 @@ export function capacityExpectations(sql) {
  return expected;
 }
 export const normalizeStructure=value=>value.replaceAll('\r\n','\n').replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
+export function retentionExpectations(sql){
+ const expected=knowledgeExpectations(sql,['get_actionable_notifications','onboarding_reminder_target','onboarding_step']);
+ for(const [key,value] of expected)value.admin=key==='function:get_actionable_notifications(uuid)';
+ return expected;
+}
 export function inferenceExpectations(sql){
  return knowledgeExpectations(sql,['criterion_key','human_sources','validate_predictions','capture_prediction','capture_source','inference_history','capture_job','for_job','get_inference_learning_quality']);
 }

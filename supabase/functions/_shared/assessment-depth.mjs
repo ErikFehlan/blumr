@@ -96,7 +96,11 @@ export function attachEvidenceConfidence(result,sources){
    inference_kind:c.evidence_type==='inferred'?(hint?.kind||'responsibility'):'none'};
  });
  result.criteria_assessment=findings;
- result.applied_lessons=(result.applied_lessons||[]).map(l=>({...l,automatic:byId.get(l.lesson_id)?.kind==='automatic learning'}));
+ // Snapshot only validated server-selected sources; never display model-written
+ // quotations or resolve an old result against feedback edited after approval.
+ const snapshot=id=>{const source=byId.get(id);return source?{source_id:id,kind:source.kind,quote:String(source.text||'').slice(0,1200)+(String(source.text||'').length>1200?'…':'')}:null;};
+ result.feedback_impact={...result.feedback_impact,sources:(result.feedback_impact?.source_ids||[]).map(snapshot).filter(Boolean)};
+ result.applied_lessons=(result.applied_lessons||[]).map(l=>({...l,automatic:byId.get(l.lesson_id)?.kind==='automatic learning',source:snapshot(l.lesson_id)}));
  const counts={direct:0,inferred:0,unknown:0,contradicted:0};findings.forEach(c=>counts[c.evidence_type]++);
  result.evidence_summary={...counts,total:findings.length,confidence_score:findings.length?Math.round(findings.reduce((n,c)=>n+c.confidence_score,0)/findings.length):0,method:'evidence-support-v1',calibrated:false};
  if(findings.length&&Object.hasOwn(result,'confidence')){const score=result.evidence_summary.confidence_score;result.confidence=score>=80?'high':score>=50?'medium':'low';}

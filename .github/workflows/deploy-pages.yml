@@ -58,6 +58,7 @@ jobs:
           node --check assets/context.js
           node --check assets/feedback.js
           node --check assets/job-review.js
+          node --check assets/feedback-impact.js
           node --check assets/doc-to-text.js
           node --check assets/resume-intake.js
           node --check assets/resume-viewer.js
@@ -81,6 +82,7 @@ jobs:
           node tests/home-browser.cjs
           CAPTURE_UI=1 node tests/decision-workspace-browser.cjs
           node tests/assessment-memory-browser.cjs
+          node tests/feedback-impact-browser.cjs
           node --test tests/interaction-browser.cjs
           node tests/quick-start-dom.cjs
           CAPTURE_UI=test-results/presentation node tests/presentation-browser.cjs

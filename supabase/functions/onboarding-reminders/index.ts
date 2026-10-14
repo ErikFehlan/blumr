@@ -1,11 +1,6 @@
 import {brandedEmail} from '../_shared/email-template.mjs';
-const content={
- create_job:{subject:'Create your first job in blumr',heading:'Start with a job',body:'Add a role you are working on to see how blumr can help you evaluate candidates.',button:'Open blumr',path:'/'},
- add_candidate:{subject:'Add your first candidates to blumr',heading:'Your job is ready',body:'Add a resume to see strengths, concerns, and evidence against your role.',button:'Open blumr',path:'/'},
- review_assessment:{subject:'Review your first assessment in blumr',heading:'Your assessment is ready',body:'Check the evidence, make corrections if needed, and approve your assessment.',button:'Open blumr',path:'/'}
-} as const;
-type Step=keyof typeof content;
-const escapeHtml=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+import {reminderContent} from '../_shared/reminder-content.mjs';
+type Step='create_job'|'add_candidate'|'review_assessment';
 Deno.serve(async request=>{
  const origin=request.headers.get('origin')||'';
  const allowedOrigin=['https://blumr.io','https://blumr.pages.dev','https://erikfehlan.github.io'].includes(origin)||/^https:\/\/[a-z0-9-]+\.blumr\.pages\.dev$/.test(origin);
@@ -48,17 +43,20 @@ Deno.serve(async request=>{
   }
   let sent=0,failed=0;
   for(const row of claimed){
-   const item=content[row.step];if(!item)continue;
-   if(!await rpc('can_send_onboarding_reminder',{p_user:row.user_id,p_week:row.week_start,p_step:row.step})){
+   const target=await rpc('onboarding_reminder_target',{p_user:row.user_id});
+   const item=target?.step===row.step?reminderContent(target):null;
+   // Recheck opt-out and unfinished work after preparing the destination and
+   // immediately before contacting the provider.
+   if(!item||!await rpc('can_send_onboarding_reminder',{p_user:row.user_id,p_week:row.week_start,p_step:row.step})){
     await rpc('finish_onboarding_reminder',{p_user:row.user_id,p_week:row.week_start,p_provider:null,p_sent:false});
     failed++;continue;
    }
-   const url='https://blumr.io'+item.path;
+   const url=item.url;
    const html=brandedEmail({...item,url,footer:'To stop onboarding reminders, open blumr Settings and turn them off.'});
    const plain=`${item.heading}\n\n${item.body}\n\n${item.button}: ${url}\n\nTo stop onboarding reminders, open blumr Settings and turn them off.`;
    let providerId:string|null=null,success=false;const started=performance.now();
    try{
-    const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${resend}`,'Content-Type':'application/json','Idempotency-Key':`onboarding-${row.user_id}-${row.week_start}`},body:JSON.stringify({from:'blumr <hello@blumr.io>',to:[row.email],subject:item.subject,html,text:plain})});
+    const response=await fetch('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(20000),headers:{Authorization:`Bearer ${resend}`,'Content-Type':'application/json','Idempotency-Key':`onboarding-${row.user_id}-${row.week_start}`},body:JSON.stringify({from:'blumr <hello@blumr.io>',to:[row.email],subject:item.subject,html,text:plain})});
     if(!response.ok)throw Object.assign(Error('Email provider unavailable'),{code:`http_${response.status}`});
     providerId=(await response.json()).id;success=true;sent++;
    }catch(error){failed++;void logReliability('email','onboarding_email_send','error',(error as {code?:string})?.code||'email_failed',performance.now()-started,{manual:!suppliedSecret});}
