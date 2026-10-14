@@ -49,12 +49,17 @@
     // Never turn a mixed/negative observation into praise by trimming its caveat.
     // Free-form internal feedback is deliberately not copied to a client draft.
     const seen=new Set();
-    return (candidate.strengths||[]).map(evidence).map(e=>clean(e.claim)).filter(claim=>{
+    return (candidate.strengths||[]).map(evidence).filter(e=>supportedPoint(candidate,e)).map(e=>clean(e.claim)).filter(claim=>{
       const key=claim.toLowerCase();
       if(!claim||seen.has(key)||caution.test(claim)||/\b(?:confirm|verify|concern|gap|needs? clarification|may|might|could|potentially|possibly|appears|seems|suggests)\b/i.test(claim))return false;
       seen.add(key);return true;
     }).map(claim=>segments(claim)[0]).filter(claim=>words(claim).length<=26).slice(0,5);
   }
-  const api={brief,evidence,excerpt,evidenceHTML,sellingPoints,words,clean};
+  function supportedPoint(candidate,point){
+    const source=candidate.resumeIntake;
+    return !(source?.brief?.resume_evidence||[]).some((e,i)=>source.evidenceReviews?.['strength-'+i]?.status==='unsupported'&&
+      ((e.claim&&clean(e.claim)===clean(point.claim))||(e.quote&&e.quote===point.quote)));
+  }
+  const api={brief,evidence,excerpt,evidenceHTML,sellingPoints,supportedPoint,words,clean};
   if(typeof module!=='undefined')module.exports=api;global.AncalagonPresentation=api;
 })(typeof window==='undefined'?globalThis:window);

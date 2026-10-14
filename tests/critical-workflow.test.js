@@ -44,10 +44,10 @@ test('assessment correction is saved before a reassessment is queued',()=>{
 });
 
 test('submittal draft reports saved only after a confirmed flush',()=>{
-  const handler=sliceBetween(workspace,"wrap.querySelector('#saveSubmissionDraft').addEventListener('click',async()=>","wrap.querySelector('#workspaceCopy')");
+  const handler=sliceBetween(workspace,'async function saveSubmission(', 'async function copy()');
   const flush=handler.indexOf('await api.flush()');
   assert.ok(flush>=0,'submittal save does not confirm persistence');
   assert.ok(handler.indexOf("drafts.delete(id)")>flush,'draft is cleared before persistence');
-  assert.ok(handler.indexOf("status.textContent='Saved draft'")>flush,'submittal reports saved before persistence');
-  assert.match(handler,/catch\(error\).*Not saved — retry/s,'submittal failure is not recoverable');
+  assert.ok(handler.indexOf("'Saved draft'")>flush,'submittal reports saved before persistence');
+  assert.match(handler,/catch\(error\).*Not saved — your edits are retained/s,'submittal failure is not recoverable');
 });
