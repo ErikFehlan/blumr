@@ -54,6 +54,7 @@
       if(action)wrap.querySelectorAll('[data-job-review]').forEach(b=>{if(b.dataset.jobReview===action&&!b.disabled)b.focus({preventScroll:true});});
     }
     function render(){
+      api.impactChanged?.();
       const wrap=api.root.querySelector('#jobAssessmentUpdates'),status=api.root.querySelector('#jobReviewSummary'),panel=api.root.querySelector('#jobAssessmentPanel');
       if(!wrap||!status||!panel)return;
       const job=api.job(),error=errors.get(job?.id),loaded=jobs.has(job?.id);

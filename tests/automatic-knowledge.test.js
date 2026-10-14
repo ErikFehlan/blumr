@@ -16,7 +16,7 @@ test('automatic job context requires no candidate action and never becomes candi
  assert.deepEqual(schema.properties.applied_lessons.items.properties.lesson_id.enum,[id]);
  assert.ok(schema.properties.criteria_assessment.items.anyOf.every(f=>!f.properties.source_ids.items.enum?.includes(id)));
  const result={criteria_assessment:[{criterion:'Kafka',status:'partial',evidence_type:'inferred',confidence:'medium',reason:'Related messaging work.',inference_basis:'Messaging concepts transfer; Kafka needs verification.',source_ids:['resume-1']}],feedback_impact:{effect:'initial',summary:'Current source evidence assessed.',source_ids:[]},applied_lessons:[{lesson_id:id,application:'Checked adjacent messaging experience.'}]};
- const r=validateDetails(result,sources);assert.equal(r.applied_lessons[0].automatic,true);assert.match(memory.details(r),/Automatic context/);
+ const r=validateDetails(result,sources);assert.equal(r.applied_lessons[0].automatic,true);assert.match(memory.details(r),/Historical context/);
  assert.ok(r.criteria_assessment[0].confidence_score<=70);
  result.criteria_assessment[0].source_ids=[id];assert.throws(()=>validateDetails(result,sources),e=>e.validationIssue==='memory_as_evidence');
  const {validatePriorityAssessment}=await import('../supabase/functions/_shared/priority-assessment.mjs');

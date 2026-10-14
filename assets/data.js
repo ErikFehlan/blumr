@@ -570,7 +570,7 @@
     async function settingsRPC(name,args) {const {data,error}=await client.rpc(name,args);if(error)throw error;return data;}
     const loadSettings=()=>settingsRPC('get_user_settings');
     const saveSettings=(settings,revision)=>settingsRPC('save_user_settings',{p_settings:settings,p_revision:revision});
-    async function loadNotifications(){const {data,error}=await client.from('user_notifications').select('*').eq('user_id',userId).eq('workspace_id',workspaceId).order('created_at',{ascending:false}).limit(50);if(error)throw error;return data||[];}
+    async function loadNotifications(){const {data,error}=await client.rpc('get_actionable_notifications',{p_workspace:workspaceId});if(error)throw error;return data||[];}
     const markNotificationsRead=ids=>settingsRPC('mark_notifications_read',{p_ids:ids});
     async function loadSupportRequests(admin=false){if(admin)return settingsRPC('get_admin_support_requests');let query=client.from('support_requests').select('*');if(!admin)query=query.eq('user_id',userId);const {data,error}=await query.order('created_at',{ascending:false}).limit(50);if(error)throw error;return data||[];}
     const submitSupportRequest=(id,subject,description)=>settingsRPC('submit_support_request',{p_id:id,p_subject:subject,p_description:description});

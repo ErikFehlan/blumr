@@ -623,7 +623,11 @@
         update:(...args)=>dataService.updateAssessmentLesson(...args),refreshAssessments:()=>jobReview.refresh(),
         changed:()=>window.AncalagonWorkspace?.refreshEvaluation(),toast:showToast
       });
+      const feedbackImpact=window.BlumrFeedbackImpact.create({root,job:activeJob,candidates:()=>candidates,
+        scope:()=>dataReady?JSON.stringify([window.ancalagonAuth?.session?.user?.id,window.ancalagonAuth?.workspace?.id,activeJobId]):'',
+        open:id=>{const c=candidateForRef(id);if(c?.jobId===activeJobId)openDetail(id);}});
       const jobReview=window.AncalagonJobReview.create({
+        impactChanged:()=>feedbackImpact.render(),
         root,bindLessons:wrap=>assessmentMemory.bind(wrap),beforeReview:prepareAssessmentReview,next:advanceAfterReview,job:activeJob,candidates:()=>candidates,renderIntake:(c,wrap)=>intake.renderCandidate(c,wrap),context:c=>evaluationContext(c,jobs.find(j=>j.id===c.jobId)),
         ready:()=>dataReady&&!!dataService?.loadJobReassessments,
         load:async id=>{await assessmentMemory.refresh();return dataService.loadJobReassessments(id);},
@@ -898,6 +902,16 @@ function renderJobs(){
         if(action==='upload'){homeOpen(job,null,'candidates');openAddCandidate();}
       });
       function renderInitialState(){root.querySelector('#learnWelcome').classList.toggle('rf-hidden',jobs.length>0);renderJobs();renderJobPicker();if(jobs.length){loadActiveJobWeights();recalibrateAll();renderFeedback();renderOutcomes();}showPage(dataReady?personalPreferences.start_page:'home')}
+      function openReminderLink(){
+        const params=new URLSearchParams(window.location.search),action=params.get('action');
+        if(!['review','upload'].includes(action))return;
+        const job=jobs.find(j=>j.id===params.get('job')),candidate=candidates.find(c=>c.id===params.get('candidate')&&c.jobId===job?.id);
+        if(params.get('workspace')!==window.ancalagonAuth?.workspace?.id||!job||job.status==='closed'){showPage('home');showToast('This search is no longer available. Your current work is on Home.');}
+        else if(action==='upload'){homeOpen(job.id,null,'candidates');}
+        else {homeOpen(job.id,candidate?.id||null);jobReview.render();if(!candidate)root.querySelector('#jobAssessmentPanel').open=true;void jobReview.refresh();}
+        for(const key of ['workspace','job','candidate','action'])params.delete(key);
+        history.replaceState(null,'',window.location.pathname+(params.size?'?'+params.toString():'')+window.location.hash);
+      }
       async function initializeWorkspace(auth){
         if(dataReady||workspaceLoading||!auth?.session||!auth?.workspace)return;
         workspaceLoading=true;
@@ -922,7 +936,7 @@ function renderJobs(){
             hybridState.analyses=Object.fromEntries(remote.jobs.filter(job=>job.patternAnalysis).map(job=>[job.id,job.patternAnalysis]));
           }
           dataReady=true;
-          renderInitialState();void home.load();void tutorial.load();void guidance.load();setSyncStatus('saved');candidateAutomation.resume(candidates);intake.resume();
+          renderInitialState();openReminderLink();void home.load();void tutorial.load();void guidance.load();setSyncStatus('saved');candidateAutomation.resume(candidates);intake.resume();
         }catch(error){
           recordReliability('database','supabase','workspace_load','error',error?.code||error?.name||'load_failed',performance.now()-workspaceLoadStarted);
           console.error('Workspace initialization failed',error);
@@ -1135,7 +1149,7 @@ function renderJobs(){
         }
       });
       window.addEventListener('ancalagon:auth-ready',event=>initializeWorkspace(event.detail),{once:true});
-      window.addEventListener('ancalagon:auth-cleared',()=>{activationRecorded.clear();delete root.querySelector('#jobForm').dataset.saving;jobWizard.scope(null);root.querySelector('#jobForm').reset();root.querySelector('#resumeUploadRecovery')?.remove();window.BlumrHiringPriorities?.clear(root);assessmentMemory.clear();workspaceGeneration++;dataReady=false;workspaceLoading=false;adminRequest++;setAdminAccess(false);settings?.clear();jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;home?.dispose();tutorial?.dispose();guidance?.dispose();root.querySelectorAll('.rf-guidance-slot,#guidanceSettings').forEach(el=>{el.replaceChildren();delete el.dataset.guidanceMarkup;delete el.dataset.markup;});root.querySelector('#personalUsage').textContent='';});
+      window.addEventListener('ancalagon:auth-cleared',()=>{activationRecorded.clear();delete root.querySelector('#jobForm').dataset.saving;jobWizard.scope(null);root.querySelector('#jobForm').reset();root.querySelector('#resumeUploadRecovery')?.remove();window.BlumrHiringPriorities?.clear(root);assessmentMemory.clear();workspaceGeneration++;dataReady=false;feedbackImpact.render();workspaceLoading=false;adminRequest++;setAdminAccess(false);settings?.clear();jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;home?.dispose();tutorial?.dispose();guidance?.dispose();root.querySelectorAll('.rf-guidance-slot,#guidanceSettings').forEach(el=>{el.replaceChildren();delete el.dataset.guidanceMarkup;delete el.dataset.markup;});root.querySelector('#personalUsage').textContent='';});
       document.documentElement.dataset.blumrReady='true';
       window.dispatchEvent(new CustomEvent('blumr:ui-ready'));
       if(window.ancalagonAuth?.session)initializeWorkspace(window.ancalagonAuth);

@@ -105,8 +105,10 @@
 
     if (error) throw error;
     if (!data?.length) {const {data:deleting}=await client.rpc('get_account_deletion_status');throw new Error(deleting===true?'Account deletion is in progress. Your private workspaces are locked while cleanup finishes.':'This account does not have active beta access. Contact the administrator.');}
-    const preferred=localStorage.getItem('blumr:workspace:'+userId);
+    const linkedWorkspace=new URLSearchParams(window.location.search).get('workspace');
+    const preferred=data.some(item=>item.workspace_id===linkedWorkspace)?linkedWorkspace:localStorage.getItem('blumr:workspace:'+userId);
     const selected=data.find(item=>item.workspace_id===preferred)||data[0];
+    if(selected.workspace_id===linkedWorkspace)localStorage.setItem('blumr:workspace:'+userId,linkedWorkspace);
     const relatedWorkspace = Array.isArray(selected.workspaces)
       ? selected.workspaces[0]
       : selected.workspaces;

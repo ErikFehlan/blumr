@@ -38,6 +38,8 @@ jobs:
           PGPASSWORD: postgres
         run: |
           psql -h localhost -U postgres -d postgres -f tests/criteria-queue.sql
+          createdb -h localhost -U postgres retention_reminders
+          psql -h localhost -U postgres -d retention_reminders -f tests/retention-reminders.sql
           createdb -h localhost -U postgres core_intake
           psql -h localhost -U postgres -d core_intake -f tests/core-intake.sql
           createdb -h localhost -U postgres assessment_memory

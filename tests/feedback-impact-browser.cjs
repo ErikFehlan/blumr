@@ -1,0 +1,52 @@
+const {chromium}=require('playwright'),fs=require('node:fs'),http=require('node:http'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');
+(async()=>{
+ const server=http.createServer((req,res)=>{const file=path.join(root,req.url.split('?')[0]==='/'?'index.html':req.url.split('?')[0]);try{res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));}catch{res.writeHead(404);res.end();}}).listen(0,'127.0.0.1');
+ let browser;
+ try{
+  browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME});const page=await browser.newPage({viewport:{width:1440,height:1050}}),errors=[];page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message));
+  await page.route('https://**',r=>r.abort());
+  await page.route('**/assets/auth.js*',r=>r.fulfill({contentType:'application/javascript',body:"document.body.classList.remove('rf-auth-pending');document.getElementById('authGate').style.display='none';"}));
+  await page.route('**/assets/data.js*',r=>r.fulfill({contentType:'application/javascript',body:''}));
+  await page.addInitScript(()=>{
+   const description='Own release test plans. Investigate defects. Collaborate with engineering. Build API tests. Communicate release risks.';
+   const titles=['Release testing ownership','Defect investigation','Engineering collaboration','API test automation','Release risk communication'];
+   const items=titles.map((title,i)=>({id:'p'+i,title,reason:'The role includes '+title.toLowerCase()+'.',question:'Describe your personal ownership of '+title.toLowerCase()+'.',source_quote:description.split('. ')[i],requirement_type:i===3?'preferred':'required'}));
+   const job=(id,title)=>({id,title,client:'Northstar Labs',description,criteria:[],weights:[],knockouts:[],status:'active',hiringPriorities:{source_title:title,source_description:description,items},createdAt:1,updatedAt:1});
+   const candidate=(id,name,role,score)=>({id,jobId:'job-a',name,short:name,role,stage:'Screened',jdScore:score,resumeJDScore:score,managerScore:score,originalManagerScore:score,rec:'Consider',signal:'Release testing ownership',strengths:['Owned release test plans. — Resume: “Owned test plans for monthly releases.”','Coordinated defect investigations with engineering.'],concerns:['Confirm API automation ownership.'],tags:[],screeningQuestions:[],createdAt:1,updatedAt:1,aiReview:{verdict:'Accurate',correctedScore:score,createdAt:1,assessment:{hiring_priorities:{items},priority_assessment:items.map((p,i)=>({priority_id:p.id,status:i===0?'supported':i===3?'unknown':'partial',reason:i===0?'Owned test plans for monthly releases.':i===3?'Automation ownership is not established.':'Related experience is documented; clarify the extent of ownership.',source_ids:i===0?['saved-quote']:[],question:i===0?'':p.question})),resume_evidence:[{source_id:'saved-quote',claim:'Owned release test plans.',quote:'Owned test plans for monthly releases.'}]}}});
+   const one=candidate('one','Alex Morgan','QA Engineer',8.1),two=candidate('two','Alex Morgan','Test Analyst',7.6),three=candidate('three','Jordan Lee','Quality Lead',7.2);two.submissionDraft={text:'Existing draft for the second Alex.',updatedAt:1};three.aiReview.contextSignature='older context';
+   const ready={...candidate('ready','Sam Rivera','QA Analyst',0),aiReview:null,stage:'Sourced',resumeIntake:{phase:'ready',fileName:'Sam.pdf',brief:{resume_evidence:[],concerns:[],screening_questions:[]}}};
+   window.fixture=JSON.parse(sessionStorage.getItem('decision-fixture')||'null')||{jobs:[job('job-a','Senior QA Engineer'),job('job-b','Platform Engineer')],candidates:[one,two,three,ready,{...candidate('foreign','Casey Kim','Platform Engineer',8),jobId:'job-b'}],feedback:[],interviewOutcomes:[]};
+   const clone=x=>JSON.parse(JSON.stringify(x));window.saved=clone(window.fixture);window.copied='';window.flushes=0;
+   const persist=s=>{window.saved=clone(s);sessionStorage.setItem('decision-fixture',JSON.stringify(window.saved));};
+   Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copied=text;}}});
+   window.AncalagonData={create:()=>({load:async()=>window.fixture,loadHome:async()=>({last_job_id:'job-a',last_page:'dashboard'}),visitHome:async()=>{},saveHome:async()=>{},loadHomeReviews:async()=>[{candidate_id:'ready',job_id:'job-a',status:'ready',source:'intake'}],loadCriteriaTask:async id=>{const j=window.fixture.jobs.find(j=>j.id===id);return {job_id:id,revision:'r1',input:{title:j.title,description:j.description,criteria:[],knockouts:[],manager_notes:''},status:'ready',result:{criteria:[]},priority_version:1,priority_suggestions:{title:j.title,description:j.description,items},priority_review:null};},loadJobReassessments:async()=>[],loadAdminAnalytics:async()=>{throw Error('not admin');},trackEvent:async()=>{},schedule:(s,e,status)=>{persist(s);status('saved');},flush:async s=>{window.flushes++;if(window.holdSave)await new Promise(r=>window.releaseSave=r);if(window.failSave)throw Error('Synthetic save unavailable');persist(s);}})};
+   window.ancalagonAuth={session:{user:{id:'test',user_metadata:{display_name:'Erik'}},access_token:'test'},workspace:{id:'test'}};
+  });
+  const navigate=async name=>{if(await page.locator('#mobileNavToggle').isVisible())await page.locator('#mobileNavToggle').click();await page.locator('.rf-nav [data-page="'+name+'"]').click();};
+  await page.addInitScript(()=>{
+   const fresh=(candidate,unchanged=false)=>{const at=Number(sessionStorage.getItem('impact-version')||100);candidate.aiReview={...candidate.aiReview,source:'hybrid_reevaluation',createdAt:at,correctedScore:candidate.managerScore,correctedJDScore:candidate.jdScore,
+    history:[{source:'job_reassessment',appliedAt:at,previousScore:unchanged?candidate.managerScore:7,newScore:candidate.managerScore,previousJDScore:candidate.jdScore,newJDScore:candidate.jdScore,previousRecommendation:candidate.rec,newRecommendation:candidate.rec}],
+    assessment:{...candidate.aiReview.assessment,feedback_impact:{effect:'priority_change',summary:'Hands-on testing ownership now carries more weight.',source_ids:['feedback-1'],sources:[{source_id:'feedback-1',kind:'candidate feedback',quote:'The hiring manager confirmed personal ownership of release testing.'}]},applied_lessons:[{lesson_id:'lesson-1',application:'Checked personal ownership against the resume.',source:{source_id:'lesson-1',kind:'approved learning',quote:'Distinguish ownership from team exposure.'}}]}};};
+   fresh(window.fixture.candidates[0]);fresh(window.fixture.candidates[1],true);fresh(window.fixture.candidates.at(-1));
+  });
+  const url='http://127.0.0.1:'+server.address().port;
+  await page.goto(url);await page.locator('#page-home.active').waitFor();await navigate('dashboard');
+  const detail=page.locator('#feedbackImpact > details');await detail.waitFor();assert.equal(await detail.evaluate(e=>e.open),false);assert.ok((await detail.boundingBox()).height<55,'compact single-line default');
+  await detail.locator(':scope > summary').click();assert.match(await detail.textContent(),/1 assessment changed · 1 unchanged/);assert.doesNotMatch(await detail.textContent(),/Casey Kim/);
+  await detail.locator('li details').first().locator('summary').click();assert.match(await detail.textContent(),/The hiring manager confirmed/);assert.match(await detail.textContent(),/Distinguish ownership/);
+  await page.waitForTimeout(900);assert.equal(await detail.evaluate(e=>e.open),true,'polling preserves expansion');
+  fs.mkdirSync('test-results',{recursive:true});await page.locator('#page-dashboard').screenshot({path:'test-results/feedback-impact-desktop.png'});
+  await detail.locator('[data-impact-candidate="two"]').click();assert.equal(await page.locator('#reviewCandidateId').inputValue(),'two','duplicate display names open by id');await navigate('dashboard');
+  await page.locator('#globalJobSelect').selectOption('job-b');assert.equal(await detail.evaluate(e=>e.open),false);await detail.locator(':scope > summary').click();assert.match(await detail.textContent(),/Casey Kim/);assert.doesNotMatch(await detail.textContent(),/Alex Morgan/);await page.locator('#globalJobSelect').selectOption('job-a');
+  for(const theme of ['tech','light'])for(const width of [390,320]){
+   await page.evaluate(t=>document.querySelector('#rf-app').dataset.theme=t,theme);await page.setViewportSize({width,height:844});if(!await detail.evaluate(e=>e.open))await detail.locator(':scope > summary').click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'fits '+theme+' '+width);
+   if(width===390)await page.locator('#feedbackImpact').screenshot({path:'test-results/feedback-impact-'+theme+'-mobile.png'});
+  }
+  await detail.locator('[data-impact-dismiss]').click();assert.equal(await page.locator('#feedbackImpact').isVisible(),false);await page.reload();await page.locator('#page-home.active').waitFor();await navigate('dashboard');assert.equal(await page.locator('#feedbackImpact').isVisible(),false,'dismissal survives reload');
+  await page.evaluate(()=>sessionStorage.setItem('impact-version','200'));await page.reload();await page.locator('#page-home.active').waitFor();await navigate('dashboard');await detail.waitFor();assert.equal(await detail.evaluate(e=>e.open),false,'a later saved approval resurfaces collapsed');
+  await page.goto(url+'/?workspace=test&job=job-a&candidate=two&action=review');await page.locator('#page-detail.active').waitFor();assert.equal(await page.locator('#reviewCandidateId').inputValue(),'two');assert.equal(new URL(page.url()).search,'','consumed link does not hijack later navigation');
+  await page.goto(url+'/?workspace=foreign&job=job-a&candidate=two&action=review');await page.locator('#page-home.active').waitFor();assert.equal(await page.locator('#page-detail').evaluate(e=>e.classList.contains('active')),false,'foreign link never opens private content');
+  assert.deepEqual(errors,[]);console.log('PASS: compact default, saved sources, unchanged scores, candidate-ID links, job scope, dismissal/reload/new approval, desktop/mobile themes, and reminder links.');
+ }finally{await browser?.close();server.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

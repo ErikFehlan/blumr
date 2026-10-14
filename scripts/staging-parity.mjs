@@ -1,6 +1,6 @@
 // Compare deployment structure only. Never copy production account data into staging.
 import {readFile} from 'node:fs/promises';
-import {capacityExpectations,workerExpectations,guardExpectations,signupExpectations,knowledgeExpectations,inferenceExpectations,structuralDifferences} from './staging-structure.mjs';
+import {capacityExpectations,workerExpectations,guardExpectations,signupExpectations,knowledgeExpectations,inferenceExpectations,retentionExpectations,structuralDifferences} from './staging-structure.mjs';
 const token=process.env.SUPABASE_ACCESS_TOKEN;
 if(process.env.SUPABASE_PROJECT_REF!=='momfzjmycveqginxmqib'||!token)throw Error('Staging parity requires the isolated staging project');
 async function api(ref,path,body){
@@ -31,6 +31,7 @@ for(const [key,value] of guardExpectations(await readFile('supabase/migrations/2
 for(const [key,value] of signupExpectations(await readFile('supabase/patches/open-beta-signup.sql','utf8')))expected.set(key,value);
 for(const [key,value] of knowledgeExpectations(await readFile('supabase/migrations/20261006174613_automatic_role_knowledge.sql','utf8')))expected.set(key,value);
 for(const [key,value] of inferenceExpectations(await readFile('supabase/migrations/20261006200406_role_neutral_inference_learning.sql','utf8')))expected.set(key,value);
+for(const [key,value] of retentionExpectations(await readFile('supabase/migrations/20261014192401_retention_feedback_reminders.sql','utf8')))expected.set(key,value);
 const differences=structuralDifferences(production,stage,expected);
 if(differences.length)throw Error('Staging structural differences: '+differences.join(', '));
 const [knowledge]=await api('momfzjmycveqginxmqib','/database/query',{query:`select

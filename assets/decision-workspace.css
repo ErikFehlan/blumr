@@ -111,3 +111,14 @@
 @media(max-width:850px){.rf-compare-scroll-hint{display:block}}
 #workspaceSubmission{scroll-margin-top:90px}
 @media(max-width:560px){#workspaceSubmission{scroll-margin-top:145px}}
+
+/* Quiet, opt-in explanation next to the shortlist. */
+#feedbackImpact { margin: 8px 0 14px; }
+.rf-feedback-impact { font-size: 13px; color: var(--ui-muted, #aebbd0); }
+.rf-feedback-impact > summary { cursor: pointer; width: fit-content; padding: 7px 0; }
+.rf-impact-toggle { color: var(--ui-text, #e8eef8); text-decoration: underline; text-underline-offset: 3px; }
+.rf-impact-body { border-left: 2px solid var(--ui-line, #38455b); padding: 0 14px 8px; max-width: 760px; overflow-wrap: anywhere; }
+.rf-impact-body ul { list-style: none; padding: 0; margin: 10px 0; }
+.rf-impact-body li + li { border-top: 1px solid var(--ui-line, #38455b); padding-top: 12px; margin-top: 12px; }
+.rf-impact-body p { margin: 7px 0; }
+.rf-impact-body blockquote { margin: 12px 0; padding-left: 12px; border-left: 2px solid var(--ui-line, #38455b); }
