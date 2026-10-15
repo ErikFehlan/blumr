@@ -140,7 +140,7 @@
     throw lastError;
   }
   function create(api){
-    const files=new Map(),queue=new Set(),reviewing=new Set();let running=false,extracting=false;
+    const files=new Map(),queue=new Set(),reviewing=new Set(),reveal=global.BlumrExperience?.createReveal();let running=false,extracting=false;
     const valid=c=>api.candidates().includes(c)&&!!api.job(c.jobId)&&api.job(c.jobId).status!=='closed';
     const context=c=>api.context(c);
     const remote=api.requestRemote?global.AncalagonRemoteIntake.create({...api,valid,changed:c=>changed(c)}):null;
@@ -189,7 +189,7 @@
       }catch(e){
         if(candidate&&valid(candidate)){set(candidate,'error',e.message||'Resume intake could not finish.');try{await api.persist();}catch{}}
         uploadProblem((candidate?.resumeIntake?.stored?'Your resume is saved. ':'')+(e.message||'The resume could not be uploaded. Select it again to retry.'));if(options.silent)throw e;api.toast(e.message||'Resume intake could not finish.','error');
-      }finally{extracting=false;status('Upload a resume to create a candidate and prepare a screening brief automatically.');}
+      }finally{extracting=false;status('Add the resumes. We’ll prepare the evidence and proposed scores for your review.');}
     }
     function uploadProblem(message){
       const note=api.root?.querySelector('#resumeUploadNote');if(!note)return;
@@ -235,7 +235,7 @@
             Object.assign(c,{name:result.name==='Candidate'?c.name:result.name,short:result.name==='Candidate'?c.name:result.name,role:result.role,
               signal:result.primary_signal,strengths:result.resume_evidence.map(e=>e.claim+' — Resume: “'+e.quote+'”'),concerns:result.concerns,tags:result.tags,screeningQuestions:result.screening_questions,updatedAt:Date.now()});
             Object.assign(c.resumeIntake,{brief:result,signature,phase:'ready',updatedAt:Date.now(),error:''});
-            await api.persist();changed(c);api.track('resume_analyzed');api.toast('Assessment ready for your review: '+c.short+'.');break;
+            await api.persist();changed(c);api.track('resume_analyzed');break;
           }
         }catch(e){if(valid(c)&&pending(c)){set(c,'error',e.message||'Assessment unavailable. Your resume is saved.');try{await api.persist();}catch{}}}
       }}finally{running=false;}
@@ -270,13 +270,13 @@
         if(useRemote()){
           if(!c.resumeIntake.remoteRevision)throw Error('The latest assessment is still loading. Try again shortly.');
           await api.reviewRemote(c.id,c.resumeIntake.remoteRevision);
-          approved=true;api.toast('Assessment approved and saved.');return true;
+          approved=true;api.toast('Assessment saved. Review complete.');return true;
         }
         const now=Date.now();c.resumeIntake.reviewedAt=now;
         Object.assign(c,{jdScore:brief.score,resumeJDScore:brief.score,originalManagerScore:brief.manager_score,managerScore:brief.manager_score,rec:api.recommendation(brief.manager_score),
           aiReview:{source:'resume_intake',verdict:'Needs Adjustment',correctedScore:brief.manager_score,correctedJDScore:brief.score,notes:brief.manager_reason,createdAt:now,reasons:['Resume assessment reviewed'],evidenceReviews:c.resumeIntake.evidenceReviews||{}}});
         c.aiReview.contextSignature=api.signature(api.fullContext(c));await api.persist();
-        approved=true;api.toast('Assessment approved and added to rankings.');
+        approved=true;api.toast('Assessment saved. Review complete.');
       }catch(e){Object.assign(c,before);delete c.resumeIntake.reviewedAt;api.toast(e.message||'Approval could not be saved. Try again.','error');}
       finally{reviewing.delete(c.id);if(approved)api.reviewed?.(c);changed(c);if(useRemote()&&approved&&next)api.next?.(c);}
       if(approved&&next)api.next?.(c);
@@ -370,7 +370,7 @@
       }
       else{
         html+='<div class="rf-cardhead"><h3>'+(wrap.id==='workspaceIntake'?'Resume assessment':escape(c.short))+'</h3><div class="rf-actions"><button class="rf-btn" type="button" data-view-resume>View resume</button><span class="rf-pill '+(needsReview?'rf-amber':'rf-green')+'">'+(needsReview?'Ready for your review':'Reviewed')+'</span></div></div><p>'+escape(prose.brief(brief.primary_signal,35))+'</p>';
-        if(needsReview)html+='<div class="rf-fit-cards" aria-label="Proposed assessment scores"><div class="rf-brief-score"><span>Proposed JD Fit</span><strong>'+brief.score.toFixed(1)+'<small> / 10</small></strong><p>Against job requirements</p></div><div class="rf-brief-score"><span>Proposed Manager Fit</span><strong>'+brief.manager_score.toFixed(1)+'<small> / 10</small></strong><p>Against manager priorities</p></div></div>';
+        if(needsReview)html+=global.BlumrExperience?.render(brief,{stale,evidenceReviews:state.evidenceReviews})||'<div class="rf-fit-cards" aria-label="Proposed assessment scores"><div class="rf-brief-score"><span>Proposed JD Fit</span><strong>'+brief.score.toFixed(1)+'<small> / 10</small></strong><p>Against job requirements</p></div><div class="rf-brief-score"><span>Proposed Manager Fit</span><strong>'+brief.manager_score.toFixed(1)+'<small> / 10</small></strong><p>Against manager priorities</p></div></div>';
         html+='<div class="rf-point-groups"><section><h4>Strengths</h4><div class="rf-assessment-points">'+brief.resume_evidence.slice(0,3).map((_,i)=>pointHTML(c,brief,'strength',i)).join('')+(brief.resume_evidence.length?'':'<p class="rf-sub">No supporting job-related evidence was confirmed.</p>')+'</div></section><section><h4>Concerns to clarify</h4><div class="rf-assessment-points">'+brief.concerns.slice(0,2).map((_,i)=>pointHTML(c,brief,'concern',i)).join('')+(brief.concerns.length?'':'<p class="rf-sub">No concerns were identified from the resume.</p>')+'</div></section></div><details><summary>Why these scores?</summary><p class="rf-sub"><strong>JD Fit:</strong> '+escape(prose.brief(brief.jd_reason,30))+'</p><p class="rf-sub"><strong>Manager Fit:</strong> '+escape(prose.brief(brief.manager_reason,30))+'</p></details>';
         html+=global.BlumrAssessmentMemory?.details(brief)||'';
         if(brief.name==='Candidate'||brief.role==='Role not stated')html+='<p class="rf-note">The resume did not clearly identify the name or professional role. Verify these details during screening.</p>';
@@ -385,6 +385,11 @@
       }
       // Keep evidence expanded across intake status refreshes.
       if(wrap.dataset.markup!==html||wrap.dataset.candidate!==c.id){const expanded=wrap.dataset.candidate===c.id?[...wrap.querySelectorAll('details')].map(el=>el.open):[];wrap.innerHTML=html;wrap.dataset.markup=html;wrap.dataset.candidate=c.id;wrap.querySelectorAll('details').forEach((el,i)=>el.open=expanded[i]||false);bind(wrap,c);}
+      if(reveal&&needsReview&&state.phase==='ready'&&!stale){
+        const visible=wrap.id==='workspaceIntake'&&!!wrap.closest('.rf-page.active')&&global.document?.visibilityState!=='hidden';
+        const key=JSON.stringify([api.workspace(),c.jobId,c.id,state.remoteRevision||state.signature]);
+        reveal(wrap.querySelector('.rf-fit-moment'),key,{visible,reduced:api.root?.dataset.reduceMotion==='true'||global.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
+      }
     }
     function render(){
       if(api.renderQueue){api.renderQueue();return;}

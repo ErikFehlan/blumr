@@ -548,7 +548,7 @@
         if(window.AncalagonWorkspace.hasPendingNotes(candidate.id))return;
         const list=activeCandidates().filter(c=>c.id!==candidate.id&&activeJob()?.status!=='closed'&&(window.AncalagonIntake.pending(c)?c.resumeIntake.phase==='ready'&&c.resumeIntake.signature===window.AncalagonContext.signature(intakeContext(c)):jobReview.canReview(c)||candidateAutomation.canReview(c)));
         if(list.length){openDetail(list[0].id);root.querySelector('#detailName').focus({preventScroll:true});}
-        else{showPage('candidates');showToast('No more ready assessments for this job.');}
+        else{showPage('candidates');showToast('You’re all caught up on ready assessments for this job.');}
       }
       function intakeContext(c){
         const neutral={...c,role:'',signal:'',tags:[],strengths:[],concerns:[],resumeJDScore:0,resumeIntake:null};
@@ -599,6 +599,7 @@
       const batch=window.AncalagonRecruiter.createBatch({job:activeJob,workspace:()=>window.ancalagonAuth?.workspace?.id,
         upload:(file,options)=>intake.upload(file,options),release:id=>intake.releaseFile(id),toast:showToast,changed:renderRecruiterQueue});
       function renderRecruiterQueue(){
+        const uploadContext=root.querySelector('#resumeUploadContext');if(uploadContext)uploadContext.textContent=activeJob()?'For '+activeJob().title:'Choose an open job to get started.';
         renderSearchFlow();
         window.AncalagonRecruiter.renderBatch(root.querySelector('#resumeBatch'),batch.view(),activeJobId,candidates);
         const host=root.querySelector('#resumeIntakeStatus'),q=window.AncalagonRecruiter.queue(candidates,activeJob(),c=>jobReview.canReview(c)||candidateAutomation.canReview(c));
@@ -1096,7 +1097,7 @@ function renderJobs(){
         try{
           await flushCriticalState();
           delete form.dataset.pendingCandidate;form.reset();
-          root.querySelector('#resumeUploadNote').textContent='Upload a text-based PDF, DOC, DOCX, or TXT resume. blumr extracts the text locally, sends the text—not the file—to the configured hybrid engine, and auto-fills the profile.';
+          root.querySelector('#resumeUploadNote').textContent='Add the resumes. We’ll prepare the evidence and proposed scores for your review.';
           closeAddCandidate();openDetail(candidate.id);
           showToast('Candidate added to the active job.');trackProductEvent('candidate_added');
         }catch(error){

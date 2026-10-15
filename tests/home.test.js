@@ -55,4 +55,6 @@ test('attention queue prioritizes recovery, review, screened submittals and empt
  assert.ok(html.indexOf('Prepare submittal')<html.indexOf('Add candidates'));
  assert.doesNotMatch(html,/Already sent|Closed candidate/);
  assert.equal((html.match(/class="rf-btn primary"/g)||[]).length,1);
+ assert.ok(html.indexOf('rf-priority-queue')<html.indexOf('rf-work-summary'),'next action precedes the statistics');
+ assert.match(html,/rf-priority-lead[\s\S]*data-candidate="failed"/);
 });

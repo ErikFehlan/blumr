@@ -34,6 +34,15 @@ test('one upload saves a candidate and source, then proposes scores without appl
  await f.flow.approve(c);assert.equal(c.jdScore,8);assert.equal(c.managerScore,8.7);assert.equal(intake.pending(c),false);
  const count=f.calls.length;await f.flow.upload(f.file);assert.equal(f.candidates.length,1);assert.equal(f.calls.length,count);
 });
+test('background completion is quiet and review acknowledgement follows a successful save',async()=>{
+ const f=fixture(),messages=[];f.api.toast=(message,type)=>messages.push({message,type});
+ const c=await f.flow.upload(f.file);await until(()=>c.resumeIntake.phase==='ready');
+ assert.ok(messages.every(x=>!x.message.startsWith('Assessment ready')));
+ f.failSave();await f.flow.approve(c);
+ assert.ok(messages.every(x=>x.message!=='Assessment saved. Review complete.'));
+ await f.flow.approve(c);
+ assert.equal(messages.filter(x=>x.message==='Assessment saved. Review complete.').length,1);
+});
 test('content identity prevents duplicate resumes in a job and permits the same person on another job',async()=>{
  const a=await intake.identity('w','a',text),same=await intake.identity('w','a',text.replaceAll('\n',' ')),b=await intake.identity('w','b',text);
  assert.equal(a.id,same.id);assert.notEqual(a.id,b.id);
