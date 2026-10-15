@@ -33,10 +33,10 @@ const root=path.resolve(__dirname,'..');
   const url='http://127.0.0.1:'+server.address().port;
   await page.goto(url);await page.locator('#page-home.active').waitFor();await navigate('dashboard');
   const detail=page.locator('#feedbackImpact > details');await detail.waitFor();assert.equal(await detail.evaluate(e=>e.open),false);assert.ok((await detail.boundingBox()).height<55,'compact single-line default');
-  await detail.locator(':scope > summary').click();assert.match(await detail.textContent(),/1 assessment changed · 1 unchanged/);assert.doesNotMatch(await detail.textContent(),/Casey Kim/);
+  assert.match(await detail.locator(':scope > summary').textContent(),/1 changed · 1 unchanged/);await detail.locator(':scope > summary').click();assert.match(await detail.textContent(),/1 assessment changed · 1 unchanged/);assert.doesNotMatch(await detail.textContent(),/Casey Kim/);
   await detail.locator('li details').first().locator('summary').click();assert.match(await detail.textContent(),/The hiring manager confirmed/);assert.match(await detail.textContent(),/Distinguish ownership/);
   await page.waitForTimeout(900);assert.equal(await detail.evaluate(e=>e.open),true,'polling preserves expansion');
-  fs.mkdirSync('test-results',{recursive:true});await page.locator('#page-dashboard').screenshot({path:'test-results/feedback-impact-desktop.png'});
+  assert.equal(await detail.locator('[data-changed="true"]').count(),1);assert.equal(await detail.locator('[data-changed="false"]').count(),1);await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await detail.locator('.rf-impact-body').evaluate(e=>getComputedStyle(e).animationName),'none');fs.mkdirSync('test-results',{recursive:true});await page.locator('#page-dashboard').screenshot({path:'test-results/feedback-impact-desktop.png'});
   await detail.locator('[data-impact-candidate="two"]').click();assert.equal(await page.locator('#reviewCandidateId').inputValue(),'two','duplicate display names open by id');await navigate('dashboard');
   await page.locator('#globalJobSelect').selectOption('job-b');assert.equal(await detail.evaluate(e=>e.open),false);await detail.locator(':scope > summary').click();assert.match(await detail.textContent(),/Casey Kim/);assert.doesNotMatch(await detail.textContent(),/Alex Morgan/);await page.locator('#globalJobSelect').selectOption('job-a');
   for(const theme of ['tech','light'])for(const width of [390,320]){
