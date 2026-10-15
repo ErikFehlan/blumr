@@ -83,6 +83,7 @@ jobs:
         run: |
           node tests/home-browser.cjs
           CAPTURE_UI=1 node tests/decision-workspace-browser.cjs
+          CAPTURE_UI=test-results/recruiter node tests/recruiter-browser.cjs
           node tests/assessment-memory-browser.cjs
           node tests/feedback-impact-browser.cjs
           node --test tests/interaction-browser.cjs
@@ -101,7 +102,6 @@ jobs:
           node tests/guided-experience-browser.cjs
           CAPTURE_UI=test-results/focus node tests/focus-browser.cjs
           node tests/core-browser.cjs
-          CAPTURE_UI=test-results/recruiter node tests/recruiter-browser.cjs
           node tests/tutorial-browser.cjs
           CAPTURE_UI=1 node tests/admin-tools-browser.cjs
 

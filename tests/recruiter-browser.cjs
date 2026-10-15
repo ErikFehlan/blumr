@@ -1,6 +1,7 @@
 const {chromium}=require('playwright'),fs=require('node:fs'),http=require('node:http'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');
 (async()=>{
+ if(process.env.CAPTURE_UI)fs.mkdirSync(path.dirname(process.env.CAPTURE_UI),{recursive:true});
  const server=http.createServer((req,res)=>{const name=req.url.split('?')[0],file=path.join(root,name==='/'?'index.html':name);try{res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));}catch{res.writeHead(404);res.end();}}).listen(0,'127.0.0.1');
  let browser;
  try{
@@ -35,6 +36,8 @@ const root=path.resolve(__dirname,'..');
   });
   await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();
   assert.equal(await page.locator('#resumeUploadContext').textContent(),'For QA Analyst');
+  assert.equal(await page.locator('#resumeUploadContext').isVisible(),true,'the active search is visible next to upload');
+  if(process.env.CAPTURE_UI)await page.locator('#addCandidatePanel').screenshot({path:process.env.CAPTURE_UI+'-upload.png',animations:'disabled'});
   const resume=(name,filename=name+'.txt')=>({name:filename,mimeType:'text/plain',buffer:Buffer.from(name+'\nQA Analyst\nOwned manual regression testing for billing systems and documented defects.')});
   await page.locator('#resumeUpload').setInputFiles([resume('Alex Example'),resume('Sam Example','Retry.txt'),resume('Alex Example','Duplicate.txt'),resume('Taylor Example')]);
   await page.waitForFunction(()=>window.testState.candidates.length===3&&Object.keys(window.testDocs).length===2);
