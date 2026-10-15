@@ -65,6 +65,7 @@ const root=path.resolve(__dirname,'..');
    for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:1000});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'result fits '+theme+' '+width);
+    if(width>360){const tops=await page.locator('#workspaceIntake .rf-fit-moment .rf-brief-score strong').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().top));assert.ok(Math.abs(tops[0]-tops[1])<1,'paired scores align at '+width+'px');}
     if(process.env.CAPTURE_UI&&width!==320)await page.locator('#workspaceIntake').screenshot({path:process.env.CAPTURE_UI+'-fit-'+theme+'-'+width+'.png',animations:'disabled'});
    }
   }
