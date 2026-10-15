@@ -47,8 +47,8 @@ const root=path.resolve(__dirname,'..');
   assert.match(await page.locator('#resumeIntakeStatus').textContent(),/3 ready to review/);
   if(process.env.CAPTURE_UI)await page.screenshot({path:process.env.CAPTURE_UI+'-ready.png',fullPage:true});
   await page.locator('[data-queue-open]').click();
-  await page.locator('.rf-fit-moment[data-fit-tone="awesome"]').waitFor();
-  assert.match(await page.locator('.rf-fit-moment').textContent(),/Awesome fit.*Proposed JD Fit.*9.2.*Proposed Manager Fit.*8.5/);
+  await page.locator('#workspaceIntake .rf-fit-moment[data-fit-tone="awesome"]').waitFor();
+  assert.match(await page.locator('#workspaceIntake .rf-fit-moment').textContent(),/Awesome fit.*Proposed JD Fit.*9.2.*Proposed Manager Fit.*8.5/);
   await page.waitForFunction(()=>!document.querySelector('.rf-fit-enter'));
   await page.locator('#workspaceNote').fill('A draft to preserve during assessment refresh.');
   await page.evaluate(()=>window.AncalagonWorkspace.refreshIntake());
@@ -86,7 +86,7 @@ const root=path.resolve(__dirname,'..');
   const names=[];
   for(let n=0;n<3;n++){
    await page.locator('#workspaceIntake [data-intake-next]').waitFor();names.push(await page.locator('#detailName').textContent());
-   assert.equal(await page.locator('.rf-fit-moment h4').textContent(),names.at(-1)==='Alex Example'?'Awesome fit':names.at(-1)==='Taylor Example'?'We’re getting there':'Good fit!');
+   assert.equal(await page.locator('#workspaceIntake .rf-fit-moment h4').textContent(),names.at(-1)==='Alex Example'?'Awesome fit':names.at(-1)==='Taylor Example'?'We’re getting there':'Good fit!');
    await page.locator('#workspaceIntake [data-intake-next]').click();
    await page.waitForFunction(n=>window.testState.candidates.filter(c=>c.aiReview).length===n,n+1);
   }
