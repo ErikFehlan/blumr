@@ -100,7 +100,18 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
   const after=(await api(owner,'candidates?select=manager_score,resume_jd_score&id=eq.'+id))[0];
   assert.equal(Number(after.manager_score),Number(task.result.manager_score));assert.equal(Number(after.resume_jd_score),Number(task.result.score));
   pass(`${doc.label} upload, ${doc.ocr?'both image-only pages recognized':'text extraction'}, real AI assessment, grounded evidence and explicit approval`);
+  await page.locator('[data-workspace-view-resume]').click();await page.locator('#resumeEvidencePanel').waitFor();
+  const [original]=await Promise.all([page.waitForEvent('download'),page.getByRole('link',{name:'Download original',exact:true}).click()]);
+  assert.deepEqual(await fs.readFile(await original.path()),doc.buffer,'Original download changed uploaded bytes');
+  const forbidden=await fetch(fixture.base+'/storage/v1/object/authenticated/resumes/'+saved.storage_path,{headers:{apikey:fixture.anon,Authorization:'Bearer '+other.access},signal:AbortSignal.timeout(20000)});
+  assert.ok([400,401,403,404].includes(forbidden.status),'Another account downloaded the original resume');
+  await page.keyboard.press('Escape');pass(doc.label+' original download matches uploaded bytes and denies the other account');
+
  }
+ stage='comparison';await nav('compare');await page.locator('#compare1').selectOption(candidateIds[0]);await page.locator('#compare2').selectOption(candidateIds[1]);
+ await page.locator('#compareResults .rf-decision-table').waitFor();
+ assert.equal(await page.locator('#compareResults [data-decision-action="review"]').count(),2);pass('Live comparison opens the two selected candidates');
+ await nav('candidates');await page.locator(`[data-candidate-id="${candidateIds.at(-1)}"]`).click();
  stage='submittal';
  await page.locator('#workspaceSubmission > summary').click();const draft='Synthetic submittal: manual regression testing and documented defect remediation.';
  await page.locator('#submissionDraft').fill(draft);await page.locator('#saveSubmissionDraft').click();
@@ -109,6 +120,7 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
   if((await page.locator('#submissionDraftStatus').textContent()).startsWith('Not saved'))throw Error('Submittal draft save failed: '+await page.locator('#saveDetails').textContent());
   return (await api(owner,'candidate_assessments?select=evidence&candidate_id=eq.'+last)).some(a=>a.evidence?.submission_draft?.text===draft);
  },'Submittal draft was not persisted');
+ await fs.writeFile(output+'/retention-context.json',JSON.stringify({run:fixture.run,user:owner.id,workspace:owner.workspace,job:job.id,candidates:candidateIds}));
  stage='feedback';await nav('feedback');await page.locator('#feedbackText').fill('Synthetic feedback: demonstrated ownership of regression coverage; clarify the SQL work they personally completed.');
  await page.locator('#feedbackSubmitBtn').click();await page.locator('#feedbackList [data-accept-interpretation]').first().waitFor({timeout:180000});
  const feedback=await api(owner,'manager_feedback?select=id,feedback_text&job_id=eq.'+job.id);assert.equal(feedback.length,1);assert.match(feedback[0].feedback_text,/Synthetic feedback/);

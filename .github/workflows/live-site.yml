@@ -98,6 +98,14 @@ jobs:
         if: steps.release.outputs.ready == 'true'
         timeout-minutes: 12
         run: node tests/live-site-browser.cjs
+      - name: Verify saved retention evidence from the live recruiter journey
+        id: retention
+        if: steps.journey.outcome == 'success'
+        timeout-minutes: 2
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: node scripts/retention-live-check.mjs
       - name: Remove temporary accounts and documents
         id: cleanup
         if: always() && steps.fixtures.outcome != 'skipped' && steps.fixtures.outcome != ''
@@ -124,14 +132,16 @@ jobs:
           DIRECT: ${{ steps.direct_check.outcome }}
           RECOVERY: ${{ steps.recovery.outcome }}
           CLEANUP: ${{ steps.cleanup.outcome }}
+          RETENTION: ${{ steps.retention.outcome }}
         run: |
           node --input-type=module <<'JS'
           import {appendFile,readFile} from 'node:fs/promises';
-          const passed=process.env.READY==='true'&&process.env.JOURNEY==='success'&&process.env.DIRECT==='success'&&process.env.RECOVERY==='success'&&process.env.CLEANUP==='success';
+          const passed=process.env.READY==='true'&&process.env.JOURNEY==='success'&&process.env.DIRECT==='success'&&process.env.RECOVERY==='success'&&process.env.CLEANUP==='success'&&process.env.RETENTION==='success';
           let results;try{results=JSON.parse(await readFile('test-results/live/results.json','utf8'));}catch{}
           const text=['## Live blumr.io checks',passed?'**Passed, including cleanup.**':'**Not verified.** See the failed or skipped steps.',
             ...(results?.checks||[]).map(r=>'- '+r.check+': '+r.status),
             '','Scoped recovery drill: '+(process.env.RECOVERY||'not started')+'; full-project backup restore remains unverified.',
+            '','Retention evidence: '+(process.env.RETENTION||'not started'),
             '','Temporary account cleanup: '+(process.env.CLEANUP||'not started'),
             'Screenshots and results are in the live-blumr-results artifact.','',
             'Not covered: inbox delivery of confirmation/password-reset emails, handwriting, heavily degraded scans, or every browser/device.',

@@ -54,6 +54,17 @@ test('navigation telemetry recovers a lost response without double counting; sav
  await f.service.trackEvent('resume_analyzed',{sessionId:'session'});
  assert.equal(f.calls.length,2);
 });
+test('comparison observations deduplicate rerenders and preserve identity on a failed-response retry',async()=>{
+ const f=fixture(),calls=[];let fail=true;
+ f.setRpc(async(name,args)=>{calls.push({name,args});return fail?{error:{code:'503'}}:{data:null};});
+ await f.service.recordComparison('job',['a'],'session');assert.equal(calls.length,0);
+ await assert.rejects(f.service.recordComparison('job',['b','a'],'session'));
+ fail=false;await f.service.recordComparison('job',['a','b'],'session');
+ assert.deepEqual(calls[0],calls[1]);assert.equal(calls[1].name,'record_retention_comparison');
+ await Promise.all([f.service.recordComparison('job',['b','a'],'session'),f.service.recordComparison('job',['a','b'],'session')]);assert.equal(calls.length,2);
+ await f.service.recordComparison('other-job',['a','b'],'session');await f.service.recordComparison('job',['a','b'],'new-session');assert.equal(calls.length,4);
+ assert.equal(f.calls.length,0,'Observed comparisons never write confirmed product usage');
+});
 test('load and unchanged save perform no writes; one job edit updates only that job',async()=>{
  const f=fixture(),state=await f.service.load();await f.service.flush(state);assert.equal(f.calls.length,0);
  state.jobs[0].title='Updated';await f.service.flush(state);

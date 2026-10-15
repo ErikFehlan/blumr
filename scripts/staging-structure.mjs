@@ -28,6 +28,11 @@ export function retentionExpectations(sql){
  for(const [key,value] of expected)value.admin=key==='function:get_actionable_notifications(uuid)';
  return expected;
 }
+export function measurementExpectations(sql){
+ const expected=knowledgeExpectations(sql,['capture_retention_usage','capture_retention_submittal','record_retention_comparison','set_retention_cohort','get_admin_retention_summary']);
+ for(const [key,value] of expected)if(key.startsWith('function:capture_retention_')){value.admin=false;value.triggerOnly=true;}
+ return expected;
+}
 export function inferenceExpectations(sql){
  return knowledgeExpectations(sql,['criterion_key','human_sources','validate_predictions','capture_prediction','capture_source','inference_history','capture_job','for_job','get_inference_learning_quality']);
 }
@@ -36,7 +41,7 @@ export function knowledgeExpectations(sql,requestedNames){
  const pattern=/create or replace function (public|blumr_knowledge)\.(\w+)\(([^)]*)\) returns (text|boolean|void|trigger|jsonb)\s+language (sql|plpgsql)\s+(?:(immutable|stable|volatile)\s+)?(?:security (definer|invoker)\s+)?set search_path='' as \$\$([\s\S]*?)\$\$;/g;
  for(const [,schema,name,args,result,language,volatility,security,body] of sql.matchAll(pattern)){
   if(!names.includes(name))throw Error('Unexpected knowledge routine');
-  const parameters=args?args.split(',').map(arg=>{const p=arg.trim().match(/^(\w+) (uuid|text)$/);if(!p)throw Error('Unsupported knowledge argument');return p;}):[];
+  const parameters=args?args.split(',').map(arg=>{const p=arg.trim().match(/^(\w+) (uuid(?:\[\])?|text)$/);if(!p)throw Error('Unsupported knowledge argument');return p;}):[];
   const key='function:'+(schema==='public'?'':schema+'.')+name+'('+parameters.map(p=>p[2]).join(',')+')';
   expected.set(key,{body,language,result,setof:false,args:parameters.map(p=>p[1]+' '+p[2]).join(', '),defaults:null,
    private:schema==='blumr_knowledge',admin:schema==='public'&&name!=='reassessment_job_input',securityDefiner:security==='definer',volatility:volatility==='immutable'?'i':volatility==='stable'?'s':'v'});
