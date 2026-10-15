@@ -44,7 +44,21 @@
     const area=api?.root.querySelector('#submissionDraft');if(!area)return;
     const count=prose.words(area.value).length,label=api.root.querySelector('#submissionWordCount');
     if(label)label.textContent=count+' words'+(count>150?' · Aim for 150 or fewer':'');
+    const preview=api.root.querySelector('#submissionPreviewText');if(preview)preview.textContent=area.value||'Your introduction will appear here as you write.';
     if(area.getBoundingClientRect().width){area.style.height='auto';area.style.height=area.scrollHeight+'px';}
+  }
+  function submissionMode(wrap,preview){
+    wrap.querySelector('#submissionDraft').hidden=preview;
+    wrap.querySelector('#submissionPreview').hidden=!preview;
+    wrap.querySelectorAll('[data-submission-mode]').forEach(button=>button.setAttribute('aria-pressed',String((button.dataset.submissionMode==='preview')===preview)));
+    wrap.querySelector('#submissionDraftHelp').textContent=preview?'Preview shows the text that will be copied.':'Click anywhere in the draft to make it yours.';
+    refreshDraft();
+  }
+  function completedSubmission(candidate,wrap,raw,copied){
+    if(current!==candidate.id||wrap.dataset.workspaceCandidate!==candidate.id||drafts.has(candidate.id)||wrap.querySelector('#submissionDraft').value!==raw)return;
+    const completion=wrap.querySelector('#submissionCompletion');completion.hidden=false;
+    completion.querySelector('strong').textContent=copied?'Your introduction is ready to paste.':'Your introduction is saved.';
+    completion.querySelector('p').textContent=copied?'Saved and copied. Paste it into your message when you’re ready.':'You can come back to this draft or save and copy it when you’re ready.';
   }
   function pending(){return !!quickNotes?.pending()||drafts.size>0||[...disagreements.values()].some(d=>d.text.trim()||d.saving);}
   function noteStatus(candidate){
@@ -70,7 +84,7 @@
     wrap.innerHTML=`<div class="rf-assessment-region"><div id="workspaceIntake" class="rf-card rf-intake-brief" hidden></div><div id="workspaceEvaluation" class="rf-card" aria-live="polite" hidden></div>
       <section class="rf-card rf-workspace-overview" aria-labelledby="workspaceBriefTitle"><div class="rf-brief-heading"><div><span class="rf-kicker">Screening brief</span><h3 id="workspaceBriefTitle">${escape(readiness.label)}</h3><p class="rf-sub"></p></div><div class="rf-brief-heading-actions">${candidate.resumeIntake?'<button class="rf-btn" type="button" data-workspace-view-resume>View Resume</button>':''}<div id="workspaceFit" class="rf-brief-fit" aria-label="Assessment scores"></div></div></div><div id="workspaceAssessmentPoints" class="rf-point-groups rf-brief-points">${assessmentPointsHTML(candidate)}</div><p class="rf-evidence-caution rf-brief-caution">${candidate.resumeIntake?'Select any strength or concern to review its source. Direct evidence and transferable experience are labeled separately; open questions need verification.':'No stored resume is available for source review on this candidate.'}</p><details class="rf-review-explanation rf-brief-explanation"><summary>Why this assessment?</summary><div id="workspaceAssessmentReasons"></div></details></section></div>
       <div class="rf-card rf-screening-work"><div class="rf-workspace-columns"><form id="workspaceNoteForm" class="rf-form"><details class="rf-review-explanation"><summary>How do notes affect assessments?</summary><p>Your original words are saved first. Review the interpretation in Saved notes &amp; AI insights below. Accepting its wording leaves scores unchanged; assessment proposals have their own approval.</p></details><h3>Recruiter feedback</h3><label for="workspaceNote">Screening notes</label><textarea id="workspaceNote" maxlength="10000" placeholder="What did you learn about their skills, ownership, or working style?">${escape(note.text)}</textarea><div class="rf-note-controls"><p id="workspaceNoteStatus" class="rf-sub" role="status"></p><button type="button" class="rf-linkbtn" id="newQuickNote">New note</button><button type="submit" class="rf-btn" id="retryQuickNote" hidden>Retry save</button></div></form><div class="rf-screen-questions"><h3>Ask in your screen</h3><ol id="workspaceQuestions">${questions.map(q=>`<li>${escape(q)}</li>`).join('')}</ol></div></div><details class="rf-manager-disagreement"><summary>Manager disagrees with this assessment?</summary><p class="rf-sub">Capture what they saw. An interview decision alone does not establish a skill. Scores and reusable lessons each require your review.</p><label for="disagreementKind">What did blumr miss?</label><select id="disagreementKind">${Object.entries(global.BlumrAssessmentMemory.disagreementKinds).map(([value,label])=>`<option value="${value}">${escape(label)}</option>`).join('')}</select><label for="disagreementReason">Manager’s explanation</label><textarea id="disagreementReason" maxlength="3000" placeholder="For example: RabbitMQ work demonstrated messaging concepts the manager considers transferable to Kafka.">${escape(disagreements.get(current)?.text||'')}</textarea><button type="button" class="rf-btn" id="saveDisagreement">Save disagreement for review</button><p id="disagreementStatus" class="rf-sub" role="status"></p></details><details class="rf-feedback-history"><summary>Saved notes &amp; AI insights</summary><div id="workspaceFeedback" aria-live="polite"></div></details></div>
-      <details id="workspaceSubmission" class="rf-card rf-workspace-details rf-submission-tools"><summary>Prepare a submittal</summary><div class="rf-submission-heading"><div><span class="rf-kicker">Candidate presentation</span><h3>Make the introduction.</h3><p class="rf-sub">Review the source, shape the story, and save your introduction.</p></div><span class="rf-submission-badge">Client submittal</span></div><div id="submissionGuidance" class="rf-guidance-slot" data-guidance-tip="submission"></div><div id="submissionEvidence" class="rf-submission-evidence"></div><div class="rf-submission-document"><div class="rf-submission-document-head"><label for="submissionDraft">Submittal draft</label><span id="submissionWordCount"></span></div><textarea id="submissionDraft" maxlength="12000" spellcheck="true" aria-describedby="submissionDraftHelp submissionWordCount" placeholder="Add a short introduction and 3–5 supported strengths for this role.">${escape(drafts.get(current)??candidate.submissionDraft?.text??summary(candidate,job))}</textarea><div class="rf-submission-document-foot"><span id="submissionDraftHelp">Click anywhere in the draft to make it yours.</span><span>Plain text · ready to paste</span></div></div><div class="rf-submission-footer"><div class="rf-actions"><button type="button" class="rf-btn primary" id="workspaceCopy">Save &amp; copy submittal</button><button type="button" class="rf-btn" id="saveSubmissionDraft">Save submittal</button><button type="button" class="rf-linkbtn" id="regenerateSubmission">Generate fresh draft</button></div><p class="rf-sub" id="submissionDraftStatus" role="status">${drafts.has(current)?'Unsaved edits':candidate.submissionDraft?'Saved draft':'Draft ready · review before sharing'}</p></div></details>`;
+      <details id="workspaceSubmission" class="rf-card rf-workspace-details rf-submission-tools"><summary>Prepare a submittal</summary><div class="rf-submission-heading"><div><span class="rf-kicker">Candidate presentation</span><h3>Make the introduction.</h3><p class="rf-sub">${escape(displayName(candidate))} for ${escape(job.title)}${job.client?' · '+escape(job.client):''}</p></div><span class="rf-submission-badge">Client submittal</span></div><div id="submissionGuidance" class="rf-guidance-slot" data-guidance-tip="submission"></div><div id="submissionEvidence" class="rf-submission-evidence"></div><div class="rf-submission-document"><div class="rf-submission-document-head"><label for="submissionDraft">Submittal draft</label><div class="rf-submission-mode" role="group" aria-label="Submittal view"><button type="button" data-submission-mode="edit" aria-pressed="true">Edit draft</button><button type="button" data-submission-mode="preview" aria-pressed="false">Preview</button></div><span id="submissionWordCount"></span></div><textarea id="submissionDraft" maxlength="12000" spellcheck="true" aria-describedby="submissionDraftHelp submissionWordCount" placeholder="Add a short introduction and 3–5 supported strengths for this role.">${escape(drafts.get(current)??candidate.submissionDraft?.text??summary(candidate,job))}</textarea><div id="submissionPreview" class="rf-submission-preview" tabindex="0" aria-label="Submittal preview" hidden><span class="rf-kicker">Your introduction</span><div id="submissionPreviewText"></div></div><div class="rf-submission-document-foot"><span id="submissionDraftHelp">Click anywhere in the draft to make it yours.</span><span>Plain text · ready to paste</span></div></div><div class="rf-submission-footer"><div class="rf-actions"><button type="button" class="rf-btn primary" id="workspaceCopy">Save &amp; copy submittal</button><button type="button" class="rf-btn" id="saveSubmissionDraft">Save submittal</button><button type="button" class="rf-linkbtn" id="regenerateSubmission">Generate fresh draft</button></div><p class="rf-sub" id="submissionDraftStatus" role="status">${drafts.has(current)?'Unsaved edits':candidate.submissionDraft?'Saved draft':'Draft ready · review before sharing'}</p></div><div id="submissionCompletion" class="rf-submission-completion" role="status" hidden><div><strong></strong><p></p></div><button type="button" class="rf-btn" id="submissionBackToShortlist">Back to shortlist →</button></div></details>`;
     const id=current,area=wrap.querySelector('#workspaceNote');
     area.addEventListener('input',e=>quickNotes.edit(candidate,e.target.value));
     area.addEventListener('blur',()=>void quickNotes.flush(candidate));
@@ -90,10 +104,12 @@
       }catch(error){status.textContent=error.message||'Unable to save. Your explanation is retained.';}
       finally{disagreement.saving=false;button.disabled=false;reasonArea.disabled=false;kindSelect.disabled=false;}
     });
-    wrap.querySelector('#submissionDraft').addEventListener('input',e=>{drafts.set(id,e.target.value);wrap.querySelector('#submissionDraftStatus').textContent='Unsaved edits';refreshDraft();});
+    wrap.querySelectorAll('[data-submission-mode]').forEach(button=>button.addEventListener('click',()=>submissionMode(wrap,button.dataset.submissionMode==='preview')));
+    wrap.querySelector('#submissionBackToShortlist').addEventListener('click',()=>api.showShortlist?.());
+    wrap.querySelector('#submissionDraft').addEventListener('input',e=>{wrap.querySelector('#submissionCompletion').hidden=true;drafts.set(id,e.target.value);wrap.querySelector('#submissionDraftStatus').textContent='Unsaved edits';refreshDraft();});
     wrap.querySelector('#saveSubmissionDraft').addEventListener('click',()=>void saveSubmission(candidate,wrap));
     wrap.querySelector('#workspaceCopy').addEventListener('click',copy);
-    wrap.querySelector('#regenerateSubmission').addEventListener('click',()=>{if(!global.confirm('Replace this draft with a fresh submittal from the candidate’s strengths?'))return;const text=summary(candidate,job);drafts.set(id,text);wrap.querySelector('#submissionDraft').value=text;wrap.querySelector('#submissionDraftStatus').textContent='Fresh draft · not saved';refreshDraft();});
+    wrap.querySelector('#regenerateSubmission').addEventListener('click',()=>{if(!global.confirm('Replace this draft with a fresh submittal from the candidate’s strengths?'))return;wrap.querySelector('#submissionCompletion').hidden=true;submissionMode(wrap,false);const text=summary(candidate,job);drafts.set(id,text);wrap.querySelector('#submissionDraft').value=text;wrap.querySelector('#submissionDraftStatus').textContent='Fresh draft · not saved';refreshDraft();});
     draftObserver?.disconnect();
     if(global.ResizeObserver){let width=0;draftObserver=new ResizeObserver(entries=>{const next=entries[0].contentRect.width;if(next!==width){width=next;refreshDraft();}});draftObserver.observe(wrap.querySelector('#submissionDraft'));}
     wrap.querySelector('#workspaceSubmission').addEventListener('toggle',refreshDraft);
@@ -185,7 +201,7 @@
   }
   function openSubmission(){
     const section=api?.root.querySelector('#workspaceSubmission');if(!section)return;
-    section.open=true;refreshDraft();section.scrollIntoView({block:'start'});api.root.querySelector('#submissionDraft')?.focus({preventScroll:true});
+    section.open=true;submissionMode(api.root.querySelector('#candidateWorkspace'),false);refreshDraft();section.scrollIntoView({block:'start'});api.root.querySelector('#submissionDraft')?.focus({preventScroll:true});
   }
   async function saveSubmission(candidate,wrap,{copyText=null}={}){
     const area=wrap.querySelector('#submissionDraft'),raw=area.value,text=raw.trim(),id=candidate.id;
@@ -193,16 +209,16 @@
     if(submissionSaves.has(id))return false;
     const buttons=[wrap.querySelector('#saveSubmissionDraft'),wrap.querySelector('#workspaceCopy')],status=wrap.querySelector('#submissionDraftStatus'),previous=candidate.submissionDraft;
     const savedDraft={text,updatedAt:Date.now()};candidate.submissionDraft=savedDraft;drafts.set(id,raw);submissionSaves.add(id);
-    buttons.forEach(b=>b.disabled=true);status.textContent='Saving draft…';
+    wrap.querySelector('#submissionCompletion').hidden=true;buttons.forEach(b=>b.disabled=true);status.textContent='Saving draft…';
     try{
       await api.flush();
       if(drafts.get(id)===raw)drafts.delete(id);
       status.textContent=drafts.has(id)?'Saved · newer edits are unsaved':'Saved draft';
       api.submittalPrepared?.(candidate);
       if(copyText!==null){
-        try{await navigator.clipboard.writeText(copyText);api.toast('Submittal saved and copied.');api.completeGuidance?.('submission');}
-        catch{area.focus();area.select();api.toast('Draft saved. Select and copy it using your browser.','error');}
-      }else api.toast('Submittal draft saved.');
+        try{await navigator.clipboard.writeText(copyText);completedSubmission(candidate,wrap,raw,true);api.completeGuidance?.('submission');}
+        catch{if(current===id&&wrap.dataset.workspaceCandidate===id){submissionMode(wrap,false);area.focus();area.select();status.textContent='Draft saved · copy still needed';api.toast('Draft saved. Select and copy it using your browser.','error');}}
+      }else completedSubmission(candidate,wrap,raw,false);
       return true;
     }catch(error){
       if(candidate.submissionDraft===savedDraft){if(previous)candidate.submissionDraft=previous;else delete candidate.submissionDraft;}

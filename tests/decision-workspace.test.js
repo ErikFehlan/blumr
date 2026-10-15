@@ -38,3 +38,14 @@ test('submittal excludes strengths explicitly marked unsupported without matchin
  c.strengths.reverse();assert.deepEqual(p.sellingPoints(c),['Coordinated releases.']);
  c.resumeIntake.brief.resume_evidence[0]={claim:'A different historical claim.',quote:'Different quote.'};assert.equal(p.sellingPoints(c).length,2);
 });
+
+test('shortlist profiles keep pending and stale assessments distinct from current evidence',()=>{
+ const pending={...candidate(),id:'pending',aiReview:null,resumeIntake:{phase:'ready'},jdScore:9.4,managerScore:9.4};
+ const html=d.shortlistHTML([pending]);assert.match(html,/Awaiting assessment review/);assert.doesNotMatch(html,/9\.4|Owned release test plans/);
+ const stale=d.shortlistHTML([candidate()],{signature:()=> 'changed'});assert.match(stale,/Previously saved fit/);assert.match(stale,/Context changed/);assert.doesNotMatch(stale,/From saved strengths/);
+});
+test('comparison overview preserves candidate identity, saved score separation and unsupported-strength exclusions',()=>{
+ const c=candidate();c.strengths=['Unsupported claim.','Owned release test plans.'];c.resumeIntake={reviewedAt:1,brief:{resume_evidence:[{claim:'Unsupported claim.',quote:'Source passage.'}]},evidenceReviews:{'strength-0':{status:'unsupported'}}};
+ const other={...candidate(),id:'two',managerScore:5.4};const before=JSON.stringify([c,other]);
+ const html=d.comparisonHTML(job,[c,other]);assert.match(html,/data-profile-candidate="one"/);assert.match(html,/data-profile-candidate="two"/);assert.doesNotMatch(html,/Unsupported claim/);assert.match(html,/JD Fit/);assert.match(html,/Manager Fit/);assert.match(html,/5\.4/);assert.equal(JSON.stringify([c,other]),before);
+});
