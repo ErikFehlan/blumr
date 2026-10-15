@@ -109,8 +109,7 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
 
  }
  stage='comparison';await nav('compare');await page.locator('#compare1').selectOption(candidateIds[0]);await page.locator('#compare2').selectOption(candidateIds[1]);
- await page.locator('#compareResults .rf-decision-table').waitFor();
- assert.equal(await page.locator('#compareResults [data-decision-action="review"]').count(),2);pass('Live comparison opens the two selected candidates');
+ await require('./fixtures/assert-comparison.cjs')(page,candidateIds.slice(0,2));pass('Live comparison opens the two selected candidates');
  await nav('candidates');await page.locator(`[data-candidate-id="${candidateIds.at(-1)}"]`).click();
  stage='submittal';
  await page.locator('#workspaceSubmission > summary').click();const draft='Synthetic submittal: manual regression testing and documented defect remediation.';
