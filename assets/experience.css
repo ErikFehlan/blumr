@@ -85,7 +85,7 @@
 .rf-decision-shortlist .rf-candidate-fit{grid-column:2;grid-row:1/3;align-self:center}
 #rf-app .rf-candidate-profile-actions .rf-linkbtn{font-size:12px;text-align:left}
 .rf-compare-overview-heading{margin-bottom:20px}
-#rf-app .rf-compare-overview-heading h3{margin:8px 0;font-size:clamp(24px,2.4vw,30px);letter-spacing:-.025em;line-height:1.25}
+#rf-app[data-theme] .rf-compare-overview-heading h3{margin:8px 0;font-size:clamp(24px,2.4vw,30px);letter-spacing:-.025em;line-height:1.25}
 .rf-compare-overview-heading p{margin:0;color:var(--ui-muted);font-size:13px;line-height:1.65}
 .rf-compare-profiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-bottom:32px}
 #rf-app .rf-compare-profiles .rf-candidate-profile{display:flex;flex-direction:column;gap:16px}
@@ -121,3 +121,14 @@
 @media(max-width:360px){.rf-candidate-fit span{min-height:3em}.rf-candidate-fit strong{font-size:24px}#rf-app .rf-candidate-profile{padding:14px}.rf-candidate-monogram{display:none}.rf-candidate-profile-actions{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.rf-submission-completion,.rf-feedback-impact[open]>.rf-impact-body{animation:none}}
 #rf-app[data-reduce-motion="true"] :is(.rf-submission-completion,.rf-feedback-impact[open]>.rf-impact-body){animation:none}
+
+#rf-app[data-theme] .rf-submission-heading h3{font-size:clamp(24px,2.4vw,30px);line-height:1.25;letter-spacing:-.025em;margin:8px 0 12px}
+#rf-app .rf-compare-builder-summary{display:flex;justify-content:space-between;align-items:center;gap:16px;list-style:none;cursor:pointer;color:var(--ui-text)}
+.rf-compare-builder-summary::-webkit-details-marker{display:none}
+.rf-compare-builder-summary>div{min-width:0}
+.rf-compare-builder-summary strong{display:block;font-size:18px;line-height:1.4;font-weight:600;margin-top:6px;overflow-wrap:anywhere}
+.rf-compare-builder-summary>span{font-size:12px;color:var(--ui-accent);white-space:nowrap}
+.rf-compare-builder-summary>span::after{content:' +'}
+.rf-compare-builder[open]>.rf-compare-builder-summary>span::after{content:' −'}
+.rf-compare-builder[open]>.rf-compare-builder-summary{padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid var(--ui-panel-line)}
+.rf-compare-builder[open] .rf-compare-intro{display:none}
