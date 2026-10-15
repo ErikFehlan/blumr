@@ -23,7 +23,7 @@ const root=path.resolve(__dirname,'..');
      const c=window.testState.candidates.find(c=>c.id===id),job=window.testState.jobs.find(j=>j.id===c.jobId),text=window.testDocs[id];
      const neutral={...c,role:'',signal:'',tags:[],strengths:[],concerns:[],resumeJDScore:0,resumeIntake:null};
      const signature=window.AncalagonContext.signature(window.AncalagonContext.build(job,neutral,[],[]));
-     window.testTasks[id]={candidate_id:id,job_id:c.jobId,status:window.pauseIntake?'processing':'ready',revision:'r1',result:{name:text.split('\n')[0],role:'QA Analyst',score:8,manager_score:8.5,primary_signal:'Manual testing',jd_reason:'Testing demonstrated',manager_reason:'Ownership demonstrated',concerns:[],tags:['QA'],screening_questions:['What tests did you own?'],resume_evidence:[{claim:'Manual regression',quote:'Owned manual regression testing for billing systems'}],context_signature:signature}};
+     window.testTasks[id]={candidate_id:id,job_id:c.jobId,status:window.pauseIntake?'processing':'ready',revision:'r1',result:{name:text.split('\n')[0],role:'QA Analyst',score:text.startsWith('Alex')?9.2:text.startsWith('Taylor')?7.4:8.4,manager_score:8.5,criteria_assessment:[{criterion:'Manual testing',status:'supported',evidence_type:'direct',confidence:'high',confidence_score:90}],primary_signal:'Manual testing',jd_reason:'Testing demonstrated',manager_reason:'Ownership demonstrated',concerns:[],tags:['QA'],screening_questions:['What tests did you own?'],resume_evidence:[{claim:'Manual regression',quote:'Owned manual regression testing for billing systems'}],context_signature:signature}};
     },loadResumeIntake:async id=>window.testTasks[id]||null,
     loadResumeIntakes:async ids=>{window.batchReads++;return ids.map(id=>window.testTasks[id]).filter(Boolean).map(({result,...task})=>task)},
     reviewResumeIntake:async(id,revision,state)=>{
@@ -34,6 +34,7 @@ const root=path.resolve(__dirname,'..');
    window.AncalagonData={create:()=>api};window.ancalagonAuth={session:{user:{id:'tester'},access_token:'test'},workspace:{id:'workspace'}};
   });
   await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();
+  assert.equal(await page.locator('#resumeUploadContext').textContent(),'For QA Analyst');
   const resume=(name,filename=name+'.txt')=>({name:filename,mimeType:'text/plain',buffer:Buffer.from(name+'\nQA Analyst\nOwned manual regression testing for billing systems and documented defects.')});
   await page.locator('#resumeUpload').setInputFiles([resume('Alex Example'),resume('Sam Example','Retry.txt'),resume('Alex Example','Duplicate.txt'),resume('Taylor Example')]);
   await page.waitForFunction(()=>window.testState.candidates.length===3&&Object.keys(window.testDocs).length===2);
@@ -46,6 +47,30 @@ const root=path.resolve(__dirname,'..');
   assert.match(await page.locator('#resumeIntakeStatus').textContent(),/3 ready to review/);
   if(process.env.CAPTURE_UI)await page.screenshot({path:process.env.CAPTURE_UI+'-ready.png',fullPage:true});
   await page.locator('[data-queue-open]').click();
+  await page.locator('.rf-fit-moment[data-fit-tone="awesome"]').waitFor();
+  assert.match(await page.locator('.rf-fit-moment').textContent(),/Awesome fit.*Proposed JD Fit.*9.2.*Proposed Manager Fit.*8.5/);
+  await page.waitForFunction(()=>!document.querySelector('.rf-fit-enter'));
+  await page.locator('#workspaceNote').fill('A draft to preserve during assessment refresh.');
+  await page.evaluate(()=>window.AncalagonWorkspace.refreshIntake());
+  assert.equal(await page.locator('.rf-fit-enter').count(),0,'polling does not replay the result reveal');
+  assert.equal(await page.locator('#workspaceNote').inputValue(),'A draft to preserve during assessment refresh.');
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'workspaceNote');
+  await page.locator('#workspaceNote').fill('');
+  const navigate=async name=>{if(await page.locator('#mobileNavToggle').isVisible())await page.locator('#mobileNavToggle').click();await page.locator('.rf-nav [data-page="'+name+'"]').click();};
+  for(const theme of ['tech','light','sage']){
+   await page.evaluate(theme=>document.querySelector('#rf-app').dataset.theme=theme,theme);
+   for(const width of [1440,390,320]){
+    await page.setViewportSize({width,height:1000});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'result fits '+theme+' '+width);
+    if(process.env.CAPTURE_UI&&width!==320)await page.locator('#workspaceIntake').screenshot({path:process.env.CAPTURE_UI+'-fit-'+theme+'-'+width+'.png',animations:'disabled'});
+   }
+  }
+  await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>document.querySelector('#rf-app').dataset.theme='tech');
+  await navigate('home');
+  assert.equal(await page.locator('.rf-priority-lead [data-home-action="candidate"]').count(),1);
+  if(process.env.CAPTURE_UI)await page.screenshot({path:process.env.CAPTURE_UI+'-home-next-action.png',fullPage:true,animations:'disabled'});
+  await page.locator('.rf-priority-lead [data-home-action="candidate"]').click();
+  assert.equal(await page.locator('.rf-fit-enter').count(),0,'reopening the same proposal stays quiet');
   await page.locator('#candidateGuidance [data-guidance-open="approval"]').waitFor();
   await page.evaluate(()=>window.guidanceFail=true);
   await page.locator('#candidateGuidance [data-guidance-dismiss]').click();
@@ -61,6 +86,7 @@ const root=path.resolve(__dirname,'..');
   const names=[];
   for(let n=0;n<3;n++){
    await page.locator('#workspaceIntake [data-intake-next]').waitFor();names.push(await page.locator('#detailName').textContent());
+   assert.equal(await page.locator('.rf-fit-moment h4').textContent(),names.at(-1)==='Alex Example'?'Awesome fit':names.at(-1)==='Taylor Example'?'We’re getting there':'Good fit!');
    await page.locator('#workspaceIntake [data-intake-next]').click();
    await page.waitForFunction(n=>window.testState.candidates.filter(c=>c.aiReview).length===n,n+1);
   }

@@ -19,7 +19,8 @@
     'assets/upload-validation.js?v=20261005-upload-guards',
     'assets/pdf-text.js?v=20260915-intake',
     'assets/resume-viewer.js?v=20261014-repeat-resume',
-    'assets/resume-intake.js?v=20261014-repeat-resume',
+    'assets/experience.js?v=20261015-experience',
+    'assets/resume-intake.js?v=20261015-experience',
     'assets/resume-remote.js?v=20260917-security',
     'assets/feedback-impact.js?v=20261014-feedback',
     'assets/job-review.js?v=20261014-feedback',
@@ -28,7 +29,7 @@
     'assets/candidate-workspace.js?v=20261014-decisions',
     'assets/criteria-automation.js?v=20261002-guided-experience',
     'assets/decision-workspace.js?v=20261014-decisions',
-    'assets/home.js?v=20261014-decisions',
+    'assets/home.js?v=20261015-experience',
     'assets/focus-ui.js?v=20261014-decisions',
     'assets/recruiter-workflow.js?v=20260915-phase2',
     'assets/tutorial.js?v=20260915-tutorial',
@@ -39,7 +40,7 @@
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
     'assets/retention-analytics.js?v=20261014-retention',
-    'assets/app.js?v=20261014-retention'
+    'assets/app.js?v=20261015-experience'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;

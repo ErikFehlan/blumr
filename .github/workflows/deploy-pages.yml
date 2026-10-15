@@ -61,6 +61,7 @@ jobs:
           node --check assets/feedback-impact.js
           node --check assets/retention-analytics.js
           node --check assets/doc-to-text.js
+          node --check assets/experience.js
           node --check assets/resume-intake.js
           node --check assets/resume-viewer.js
           node --check assets/resume-word-frame.js
