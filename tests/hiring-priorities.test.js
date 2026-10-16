@@ -26,6 +26,19 @@ test('JD priority generation anchors exact passages, rejects invented sources an
  assert.throws(()=>validatePriorities([...out,...out],passages),/invalid_priorities/);
  assert.deepEqual(validatePriorities([],[]),[]);assert.equal(prioritiesSchema([]).maxItems,0);
 });
+test('required and preferred labels use their own exact clause, never another qualification in the passage',async()=>{
+ const {jobPassages,validatePriorities}=await import('../supabase/functions/refine-job-criteria/priorities.mjs');
+ const passages=jobPassages({description:'Own manual testing. SQL is required. Playwright is preferred but not required.'});
+ const make=(title,requirement_type,requirement_evidence)=>({title,reason:'Supports the described work.',question:'What work did you do?',requirement_type,requirement_evidence,source_id:passages[0].id});
+ const result=validatePriorities([
+  make('Own manual testing','required','Own manual testing.'),
+  make('Validate data with SQL','required','SQL is required.'),
+  make('Use Playwright','preferred','Playwright is preferred but not required.')
+ ],passages);
+ assert.deepEqual(result.map(p=>p.requirement_type),['inferred','required','preferred']);
+ for(const evidence of [undefined,'Manual testing is required.'])assert.equal(validatePriorities([make('Own manual testing','required',evidence)],passages)[0].requirement_type,'inferred');
+ assert.equal(validatePriorities([make('Use Playwright','required','Playwright is preferred but not required.')],passages)[0].requirement_type,'inferred');
+});
 test('priority findings require candidate evidence and cover every priority, while unknowns remain valid',async()=>{
  const {withPriorityAssessment,validatePriorityAssessment}=await import('../supabase/functions/_shared/priority-assessment.mjs');
  const priorities={basis:'job_description',review_status:'suggested',items:[item]},sources=[{id:'jd',kind:'requirement'},{id:'resume-1',kind:'resume quotation'}];

@@ -69,7 +69,7 @@ Deno.test('legacy rollout mode preserves the existing AI criteria path',async()=
     assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('criteria-run-legacy-legacy-')===true,'legacy criteria request identity missing');
     const input=JSON.parse(body.input),sourceId=input.job_description_sources[0].id;
     assert(Array.isArray(input.criteria)&&input.criteria.length===1,'legacy criteria were not sent to AI');
-    return json({output:[{content:[{type:'output_text',text:JSON.stringify({criteria:[{index:0,label:'5 years of .NET development experience',question:'Describe your .NET experience.'}],hiring_priorities:[{title:'5 years of .NET development experience',reason:'Core requirement.',requirement_type:'required',question:'Describe your .NET experience.',source_id:sourceId}]})}]}]});
+    return json({output:[{content:[{type:'output_text',text:JSON.stringify({criteria:[{index:0,label:'5 years of .NET development experience',question:'Describe your .NET experience.'}],hiring_priorities:[{title:'5 years of .NET development experience',reason:'Core requirement.',requirement_type:'required',requirement_evidence:'Requires 5 years of .NET development experience.',question:'Describe your .NET experience.',source_id:sourceId}]})}]}]});
    }
    if(path.endsWith('/finish_job_criteria')){finished=body;return json(true);}
    throw Error('Unexpected request: '+path);

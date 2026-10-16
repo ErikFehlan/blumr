@@ -2,7 +2,7 @@ import {jobPassages, prioritiesSchema, priorityInstructions, validatePriorities}
 import {untrustedInputInstructions} from '../_shared/untrusted-input.mjs';
 import {analysisModel, modelReasoning} from '../_shared/model-routing.mjs';
 import {fetchWithRetry} from '../_shared/provider-retry.ts';
-export const priorityVersion='role-priorities-v2';
+export const priorityVersion='role-priorities-v3';
 export type PriorityInput={title:string;description:string;manager_notes?:string};
 export function priorityInput(value:any):PriorityInput {
   if(!value||typeof value.title!=='string'||!value.title.trim()||typeof value.description!=='string'||!value.description.trim())throw Error('invalid_priority_input');
