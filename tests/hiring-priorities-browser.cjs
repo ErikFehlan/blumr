@@ -36,7 +36,7 @@ const dir=path.resolve(__dirname,'..');
   fs.mkdirSync('test-results/hiring-priorities',{recursive:true});
   await page.evaluate(()=>document.querySelector('#rf-app').dataset.theme='light');await panel.screenshot({path:'test-results/hiring-priorities/job-mint.png'});
   await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('[data-candidate-id="candidate-a"]').first().click();
-  const assessment=page.locator('#workspaceEvaluation .rf-priority-assessment');await assessment.getByText('Top hiring priorities',{exact:true}).waitFor();
+  const assessment=page.locator('#workspaceEvaluation .rf-priority-assessment');await assessment.getByText('Hiring priorities',{exact:true}).waitFor();
   assert.equal(await assessment.getByText('Not established',{exact:true}).count(),4);await assessment.screenshot({path:'test-results/hiring-priorities/candidate-mint.png'});
   await page.setViewportSize({width:390,height:844});await page.waitForFunction(()=>document.querySelector('.rf-sidebar').getBoundingClientRect().right<=0);
   await assessment.evaluate(el=>window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-155,behavior:'instant'}));

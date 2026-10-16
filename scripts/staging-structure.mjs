@@ -118,3 +118,15 @@ export function structuralDifferences(production,stage,expected) {
  }
  return [...differences];
 }
+
+export function priorityExpectations(sql){
+ const expected=new Map(),names=['merge_hiring_priority_edits','attach_hiring_priority_draft','capture_hiring_priorities','review_job_hiring_priorities'];
+ const pattern=/create or replace function public\.(\w+)\(([^)]*)\)\s+returns (jsonb|trigger)\s+language (plpgsql)\s+(?:security (definer|invoker)\s+)?set search_path='' as \$\$([\s\S]*?)\$\$;/g;
+ for(const [,name,args,result,language,security,body] of sql.matchAll(pattern)){
+  if(!names.includes(name))throw Error('Unexpected priority routine');
+  const parameters=args?args.split(',').map(arg=>{const p=arg.trim().match(/^(\w+) (uuid|integer|text|jsonb)( default null)?$/);if(!p)throw Error('Unsupported priority argument');return p;}):[];
+  expected.set('function:'+name+'('+parameters.map(p=>p[2]).join(',')+')',{body,language,result,setof:false,args:parameters.map(p=>p[1]+' '+p[2]).join(', '),defaults:parameters.some(p=>p[3])?'NULL::jsonb':null,securityDefiner:security==='definer',admin:name==='review_job_hiring_priorities',triggerOnly:result==='trigger',volatility:'v'});
+ }
+ if(expected.size!==names.length||(sql.match(/create or replace function/gi)||[]).length!==names.length)throw Error('Priority declarations incomplete');
+ return expected;
+}

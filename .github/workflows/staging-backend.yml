@@ -68,6 +68,8 @@ jobs:
           node scripts/usage-analytics-backend.mjs verify
           node scripts/retention-measurement-check.mjs
           node scripts/demo-analytics-smoke.mjs
+      - name: Verify role-specific hiring priorities and setup persistence
+        run: node scripts/priority-quality-smoke.mjs
       - name: Verify real assessment bursts and adversarial access
         run: node scripts/staging-readiness.mjs run
       - name: Verify readiness fixture cleanup
@@ -78,6 +80,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: staging-readiness
-          path: test-results/readiness/
+          path: |
+            test-results/readiness/
+            test-results/priorities/
           retention-days: 14
           if-no-files-found: ignore

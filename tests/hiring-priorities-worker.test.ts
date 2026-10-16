@@ -3,25 +3,25 @@ import {handleAnalysis} from '../supabase/functions/analyze-patterns-v2/analysis
 const assert=(v:unknown,message:string)=>{if(!v)throw Error(message);};
 const json=(v:unknown)=>new Response(JSON.stringify(v));
 
-Deno.test('structured job intake finishes with code and no model request',async()=>{
+Deno.test('setup priorities are reused exactly without another model call',async()=>{
  const names=['CRITERIA_WORKER_SECRET','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','OPENAI_API_KEY','JOB_INTAKE_ENGINE'],prior=names.map(n=>Deno.env.get(n)),original=globalThis.fetch;
- const description='Requires 5 years of .NET development experience. Azure experience is preferred. Design and build APIs for enterprise systems.';
+ const description='Design and implement Azure landing zones and hub-and-spoke networking.';
+ const items=[{id:'priority-1',title:'Design Azure landing zones and hub-and-spoke networks',reason:'Establish the cloud foundation.',question:'Which landing zones did you implement?',requirement_type:'inferred',source_quote:description}];
  let aiCalls=0,finished:any;
  try{
   ['worker','https://backend.invalid','service','ai','hybrid'].forEach((v,i)=>Deno.env.set(names[i],v));
   globalThis.fetch=async(url:RequestInfo|URL,init?:RequestInit)=>{
    const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
-   if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'Senior .NET Engineer',description,criteria:['requires 5 years of .NET'],manager_notes:'',knockouts:[]}}]);
-   if(path==='/v1/responses'){aiCalls++;throw Error('Model should not be called for structured intake');}
+   if(path.endsWith('/claim_job_criteria'))return json([{job_id:'j',workspace_id:'w',revision:'r',lease_id:'l',input:{title:'Azure Engineer',description,criteria:[],manager_notes:'',knockouts:[]},priority_suggestions:{title:'Azure Engineer',description,items,model:'saved-model'}}]);
+   if(path==='/v1/responses'){aiCalls++;throw Error('Saved priorities must be reused');}
    if(path.endsWith('/finish_job_criteria')){finished=body;return json(true);}
    throw Error('Unexpected request: '+path);
   };
-  const request=new Request('https://worker.invalid',{method:'POST',headers:{'x-worker-secret':'worker'},body:'{}'});
-  const response=await handleCriteria(request);
-  assert(response.ok&&aiCalls===0,'structured intake used AI');
-  assert(finished.p_result.engine==='code_first','code-first provenance missing');
-  assert(finished.p_result.criteria[0].label==='5 years of C#/.NET development experience','personalized criteria wording changed');
-  assert(finished.p_result.hiring_priorities.some((p:any)=>p.title==='5 years of C#/.NET development experience'),'structured priority missing');
+  const response=await handleCriteria(new Request('https://worker.invalid',{method:'POST',headers:{'x-worker-secret':'worker'},body:'{}'}));
+  assert(response.ok&&aiCalls===0,'saved list used AI');
+  assert(finished.p_result.engine==='saved_priorities','reuse provenance missing');
+  assert(JSON.stringify(finished.p_result.hiring_priorities)===JSON.stringify(items),'setup list was rewritten');
+  assert(finished.p_result.criteria.length===0,'priorities became screening criteria');
  }finally{globalThis.fetch=original;names.forEach((n,i)=>prior[i]===undefined?Deno.env.delete(n):Deno.env.set(n,prior[i]!));}
 });
 
@@ -48,7 +48,7 @@ Deno.test('ambiguous JD-only jobs fall back to grounded AI priorities through th
   assert((await handleCriteria(new Request('https://worker.invalid',{method:'POST',body:'{}'}))).status===401&&calls===0,'public generation allowed');
   const request=()=>new Request('https://worker.invalid',{method:'POST',headers:{'x-worker-secret':'worker'},body:'{}'});
   assert((await handleCriteria(request())).ok&&finished.p_error===null,'generation failed');
-  assert(finished.p_result.engine==='hybrid_fallback','fallback provenance missing');
+  assert(finished.p_result.engine==='role_analysis','fallback provenance missing');
   assert(finished.p_lease==='l'&&finished.p_revision==='r','revision protection lost');
   assert(description.includes(finished.p_result.hiring_priorities[0].source_quote),'source quotation changed');
   forged=true;await handleCriteria(request());assert(finished.p_error==='invalid_priorities'&&finished.p_result===null,'invented source saved');
@@ -69,7 +69,7 @@ Deno.test('legacy rollout mode preserves the existing AI criteria path',async()=
     assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('criteria-run-legacy-legacy-')===true,'legacy criteria request identity missing');
     const input=JSON.parse(body.input),sourceId=input.job_description_sources[0].id;
     assert(Array.isArray(input.criteria)&&input.criteria.length===1,'legacy criteria were not sent to AI');
-    return json({output:[{content:[{type:'output_text',text:JSON.stringify({criteria:[{index:0,label:'5 years of .NET development experience',question:'Describe your .NET experience.'}],hiring_priorities:[{title:'5 years of .NET development experience',reason:'Core requirement.',requirement_type:'required',question:'Describe your .NET experience.',source_id:sourceId}]})}]}]});
+    return json({output:[{content:[{type:'output_text',text:JSON.stringify({criteria:[{index:0,label:'5 years of .NET development experience',question:'Describe your .NET experience.'}],hiring_priorities:[{title:'5 years of .NET development experience',reason:'Core requirement.',requirement_type:'required',requirement_evidence:'Requires 5 years of .NET development experience.',question:'Describe your .NET experience.',source_id:sourceId}]})}]}]});
    }
    if(path.endsWith('/finish_job_criteria')){finished=body;return json(true);}
    throw Error('Unexpected request: '+path);
