@@ -9,6 +9,7 @@ migrations.push('20261008192119_activation_funnel.sql','20261013132955_demo_vide
 migrations.push('20261014174000_assessment_save_versions.sql');
 migrations.push('20261014192401_retention_feedback_reminders.sql');
 migrations.push('20261014212910_retention_measurement.sql');
+migrations.push('20261016152240_unified_hiring_priorities.sql');
 // Publish replacement functions atomically; old capacity definitions must never
 // become visible halfway through a repeated deployment.
 const definitions=await Promise.all(migrations.map(name=>readFile('supabase/migrations/'+name,'utf8')));

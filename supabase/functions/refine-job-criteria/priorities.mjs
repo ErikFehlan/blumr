@@ -8,10 +8,14 @@ export function prioritiesSchema(passages){
    requirement_type:{type:'string',enum:['required','preferred','inferred']},source_id:passages.length?{type:'string',enum:passages.map(s=>s.id)}:text(80),question:text(220)}}};
 }
 export const priorityInstructions=`
-SUGGESTED HIRING PRIORITIES
-Separately identify up to five distinct, most important job-related priorities, ordered by importance, using ONLY job_description_sources. Do not use candidate information, manager_notes, or recruiter criteria to invent JD priorities. These are a starting point for roles with no manager access, not claims about a manager's personal preferences.
-Focus on the work, technical or functional capability, scope, ownership and deliverables central to success. Prefer explicit core responsibilities over incidental mentions, generic boilerplate or keyword frequency. Preserve seniority, numerical thresholds, alternatives and negation. Do not infer protected traits or demographic proxies. Never add experience, credentials, tools or thresholds that are absent from the description. Return fewer than five, including [], if the description supports fewer distinct priorities. Do not split one requirement into duplicates to fill slots.
-Each priority has a concise title, a one-sentence reason explaining its importance (max 25 words), a supplied source_id, and one evidence-seeking screening question (max 25 words). The server attaches the original source passage. Classify required only when explicitly required, preferred only when explicitly optional/preferred, and inferred for responsibility-based importance. Ranking is a suggestion, not a numeric scoring weight or new knockout rule.`;
+HIRING PRIORITIES: RECRUITER QUALITY BAR
+Read the entire role before selecting up to five distinct priorities, ordered by their importance to successful performance. The job title is a consistency check, not permission to add typical requirements for that title. Infer the role's purpose, actual deliverables, seniority, individual-versus-team ownership, and the environment from the supplied job_description_sources.
+Choose capabilities that would materially distinguish someone able to do THIS job. Preserve what the person will actually do, important tools and workflows, scope, alternatives, and depth. Combine related details into one useful capability; retain separate outcomes even when they use the same technology. Do not reduce architecture, implementation, troubleshooting, or delivery work to generic tool experience. Do not rank by keyword counts, sentence order, years, or tool recognition. Core work normally outranks incidental preferences, general communication claims, and standard boilerplate. A required license may be central when the described work legally depends on it.
+Use ONLY job_description_sources as evidence for JD priorities. manager_context may clarify scope or which already-supported capability matters most; it cannot create a JD requirement, turn teamwork into sole ownership, or become a fabricated quotation. Candidate information is irrelevant. These are suggested job priorities, not claims about a manager's unprovided preferences.
+Preserve exact numerical thresholds, alternatives (including OR), negation and preferred-versus-required distinctions. Never add absent tools, credentials, years, independent ownership, or protected traits/demographic proxies. A responsibility's importance is inferred, not automatically mandatory. Return fewer than five, including [], when the description does not support more. Do not fill slots with generic traits or duplicate capabilities.
+For every item give an action-oriented, specific title; a short reason explaining WHY that capability matters to this role's work (not 'the JD says so'); the source_id of the most relevant original passage; and one targeted evidence-seeking screening question. Titles max 140 characters; reasons max 240; questions max 220. A question must not presume qualifications or introduce new requirements.
+Before returning, silently check: Would a recruiter recognize the actual position from this list? Does each priority materially help evaluate the work? Is every substantive detail supported by the cited passage? Did I retain alternatives and team scope? Is a core responsibility missing while a minor preference occupies a slot? Revise weak items within this same response. Ranking never creates numerical weights or knockout rules.
+`;
 export function validatePriorities(items,passages){
  const fail=()=>{throw Error('invalid_priorities');};
  if(!Array.isArray(items)||items.length>5)fail();
@@ -25,6 +29,7 @@ export function validatePriorities(items,passages){
   if(numbers(title).some(n=>!numbers(source.text).includes(n)))fail();
   // A responsibility's importance is inferred; never silently promote it to a must-have.
   let type=p.requirement_type;
+  if(type==='required'&&/\b(not required|not mandatory|not necessary|no requirement)\b/i.test(source.text))type='inferred';
   if(type==='required'&&!/\b(must|required|mandatory|minimum|essential)\b/i.test(source.text))type='inferred';
   if(type==='preferred'&&!/\b(preferred|preferably|optional|plus|bonus|nice.to.have)\b/i.test(source.text))type='inferred';
   return {id:'priority-'+(i+1),title,reason:p.reason.trim(),requirement_type:type,source_quote:source.text,question:p.question.trim()};

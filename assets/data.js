@@ -49,7 +49,7 @@
 
     async function load() {
       const [jobRows, candidateRows, feedbackRows, outcomeRows, benchmarkRows, screeningRows, reviewRows, priorityRows] = await Promise.all([
-        query('jobs', 'id,title,client,description,manager_feedback,criteria,knockouts,weights,pattern_analysis,status,close_reason,closed_at,hired_candidate_id,created_at,updated_at'),
+        query('jobs', 'id,title,client,description,manager_feedback,priority_draft_id,priority_draft_edits,criteria,knockouts,weights,pattern_analysis,status,close_reason,closed_at,hired_candidate_id,created_at,updated_at'),
         query('candidates', 'id,job_id,name,role,stage,resume_jd_score,jd_score,original_manager_score,manager_score,confidence,recommendation,primary_signal,strengths,concerns,tags,screening_questions,created_at,updated_at'),
         query('manager_feedback', 'id,job_id,candidate_id,feedback_type,outcome,feedback_text,created_at,updated_at'),
         query('interview_outcomes', 'id,job_id,candidate_id,interview_stage,decision,positives,concerns,notes,previous_pipeline_stage,source_updated_at,created_at,updated_at'),
@@ -66,6 +66,7 @@
         jobs: jobRows.map(row => ({
           id: row.id, title: row.title, client: row.client || '', description: row.description || '',
           hiringPriorities: window.BlumrHiringPriorities?.effective(priorityRows.find(t=>t.job_id===row.id),row)||null,
+          priorityDraftId:row.priority_draft_id||null,priorityDraftEdits:row.priority_draft_edits||null,
           managerFeedback: row.manager_feedback || '', criteria: row.criteria || [], knockouts: row.knockouts || [],
           weights: row.weights || [], patternAnalysis: row.pattern_analysis || null,
           status: row.status || 'active', closeReason: row.close_reason || '', closedAt: row.closed_at ? epoch(row.closed_at) : null,
@@ -227,7 +228,7 @@
       if (!loaded && !seeding) throw new Error("Load the workspace successfully before saving.");
       const jobRows = state.jobs.map(job => ({
         id: job.id, workspace_id: workspaceId, title: job.title, client: compact(job.client), description: job.description || '',
-        manager_feedback: job.managerFeedback || '', criteria: job.criteria || [], knockouts: job.knockouts || [], weights: job.weights || [],
+        manager_feedback: job.managerFeedback || '', priority_draft_id:job.priorityDraftId||null,priority_draft_edits:job.priorityDraftEdits||null, criteria: job.criteria || [], knockouts: job.knockouts || [], weights: job.weights || [],
         pattern_analysis: job.patternAnalysis || null, status: job.status || 'active', close_reason: compact(job.closeReason),
         closed_at: job.closedAt ? iso(job.closedAt) : null, hired_candidate_id: compact(job.hiredCandidateId),
         created_by: userId, created_at: iso(job.createdAt), updated_at: iso(job.updatedAt)

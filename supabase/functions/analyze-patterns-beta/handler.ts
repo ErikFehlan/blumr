@@ -1,3 +1,4 @@
+import {handlePriorityDraft} from '../refine-job-criteria/drafts.ts';
 import {boundedJSON, reserveModelCall, recordProviderUsage, SecurityLimit, securityMessage} from '../_shared/security.ts';
 import {withDirectIdempotency} from '../_shared/direct-idempotency.ts';
 import { handleAnalysis } from "../analyze-patterns-v2/analysis.ts";
@@ -49,6 +50,8 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   if (!user?.id) return json({ error: "Your session is invalid or expired" }, 401);
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!serviceKey) return json({ error: "Analysis service configuration incomplete" }, 503);
+
+  if(payload.analysis_type==='hiring_priorities')return handlePriorityDraft(payload.job,{workspace:workspaceId,actor:user.id,base:supabaseUrl,serviceKey});
 
   // Memory is resolved from reviewed server records, never trusted from the
   // browser's claimed approval status. The caller JWT enforces workspace access.

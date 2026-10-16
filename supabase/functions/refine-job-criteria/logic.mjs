@@ -9,7 +9,7 @@ export function priority(raw){
 export function prepare(input){
  const criteria=Array.isArray(input.criteria)?input.criteria:[];
  if(criteria.length>40||criteria.some(x=>typeof x!=='string'||x.length>1500))throw Error('input_too_large');
- if(JSON.stringify(input).length>60000)throw Error('input_too_large');
+ if(JSON.stringify(input).length>160000)throw Error('input_too_large');
  return criteria.map((original,index)=>({index,original,priority:priority(original)}));
 }
 const numbers=s=>(s.match(/\d+(?:\.\d+)?\s*\+?/g)||[]).map(x=>x.replace(/\s/g,''));

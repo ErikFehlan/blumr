@@ -101,3 +101,14 @@ test('retention routines require exact source and distinct member versus worker 
  assert.deepEqual(structuralDifferences([],stage,expected),['function:onboarding_reminder_target(uuid)']);
  assert.throws(()=>retentionExpectations(sql.replace('onboarding_step(p_user','unknown_step(p_user')));
 });
+
+test('priority draft and review routines must match source and restricted callers',async()=>{
+ const {priorityExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261016152240_unified_hiring_priorities.sql','utf8'),expected=priorityExpectations(sql);
+ assert.equal(expected.size,4);
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:false,args:e.args,defaults:e.defaults,security_definer:e.securityDefiner,volatility:'v',config:['search_path=""'],worker_allowed:true,clients_denied:!e.admin,anon_denied:true,authenticated_allowed:e.admin}}));
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ stage.find(r=>r.name==='attach_hiring_priority_draft()').routine.clients_denied=false;
+ assert.deepEqual(structuralDifferences([],stage,expected),['function:attach_hiring_priority_draft()']);
+ assert.throws(()=>priorityExpectations(sql.replace('attach_hiring_priority_draft() returns','unlisted_priority() returns')));
+});

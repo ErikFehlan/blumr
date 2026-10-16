@@ -25,7 +25,7 @@ jobs:
         run: deno check supabase/functions/account-controls/index.ts supabase/functions/refine-job-criteria/index.ts supabase/functions/analyze-patterns-beta/index.ts supabase/functions/reassess-job/index.ts supabase/functions/sol-model-check/index.ts
       - name: Test code-first job intake
         run: |
-          deno test --allow-env tests/hiring-priorities-worker.test.ts
+          deno test --allow-env tests/hiring-priorities-worker.test.ts tests/priority-drafts.test.ts
           node --check scripts/criteria-backend.mjs
           node --test tests/code-first-job-intake.test.js tests/code-first-job-intake-corpus.test.js tests/criteria-automation.test.js tests/hiring-priorities.test.js
       - name: Test focused feedback and authentication
@@ -119,3 +119,10 @@ jobs:
           createdb -h localhost -U postgres durable_worker_recovery
           psql -h localhost -U postgres -d durable_worker_recovery -f tests/durable-worker-recovery.sql
           node tests/durable-worker-concurrency.mjs
+
+      - name: Test unified priority draft persistence and isolation
+        env:
+          PGPASSWORD: postgres
+        run: |
+          createdb -h localhost -U postgres unified_priorities
+          psql -h localhost -U postgres -d unified_priorities -f tests/unified-priorities.sql

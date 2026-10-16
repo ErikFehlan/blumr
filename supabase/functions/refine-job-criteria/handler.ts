@@ -1,8 +1,9 @@
+import {generatePriorities} from './generate.ts';
 import {untrustedInputInstructions} from '../_shared/untrusted-input.mjs';
 import {reserveModelCall, recordProviderUsage, SecurityLimit} from '../_shared/security.ts';
 import {prepare,validate} from './logic.mjs';
 import {jobPassages,prioritiesSchema,priorityInstructions,validatePriorities} from './priorities.mjs';
-import {personalizeCriteria,suggestPriorities} from './code-first.mjs';
+import {personalizeCriteria} from './code-first.mjs';
 import {analysisModel,modelReasoning} from '../_shared/model-routing.mjs';
 import {fetchWithRetry} from '../_shared/provider-retry.ts';
 
@@ -72,19 +73,20 @@ export async function handleCriteria(request:Request){
       return {model,parsed:JSON.parse(text||'{}')};
     }
 
+    // Reuse the exact list already reviewed during setup. Criteria/feedback edits
+    // must not spend tokens or replace the job's established priorities.
+    const saved=[task.priority_review,task.priority_suggestions].find(p=>p&&p.title===task.input.title&&p.description===(task.input.description||''));
     let result:any,model='code-first-v1';
-    if(intakeEngine==='legacy_ai'){
-      const ai=await modelRequest('legacy');
-      model=ai.model;
+    if(saved){
+      result={...personalizeCriteria(source),hiring_priorities:(task.priority_suggestions?.title===task.input.title&&task.priority_suggestions?.description===(task.input.description||'')?task.priority_suggestions.items:saved.items),engine:'saved_priorities',confidence:null,fallback_reason:null};
+      model=task.priority_suggestions?.model||'saved-priorities';
+    }else if(intakeEngine==='legacy_ai'){
+      const ai=await modelRequest('legacy');model=ai.model;
       result={...validate(ai.parsed,source),hiring_priorities:validatePriorities(ai.parsed.hiring_priorities,passages),engine:'legacy_ai',confidence:null,fallback_reason:'legacy_mode'};
     }else{
-      const criteriaResult=personalizeCriteria(source),priorityResult=suggestPriorities(passages);
-      result={...criteriaResult,hiring_priorities:priorityResult.sufficient?priorityResult.items:[],engine:'code_first',confidence:priorityResult.confidence,fallback_reason:null};
-      if(passages.length&&!priorityResult.sufficient){
-        const ai=await modelRequest('priorities');
-        model=ai.model;
-        result={...criteriaResult,hiring_priorities:validatePriorities(ai.parsed.hiring_priorities,passages),engine:'hybrid_fallback',confidence:priorityResult.confidence,fallback_reason:'low_code_confidence'};
-      }
+      const ai=await generatePriorities(task.input,{requestId:`criteria-${task.usage_run_id||task.revision}-priorities`,beforeModel:(bytes,tokens)=>reserveModelCall(task.workspace_id,null,bytes,tokens),onUsage:body=>recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null)});
+      model=ai.model;
+      result={...personalizeCriteria(source),hiring_priorities:ai.hiring_priorities,engine:'role_analysis',confidence:null,fallback_reason:null};
     }
 
     console.log('job_intake_result',JSON.stringify({engine:result.engine,confidence:result.confidence,criteria_count:result.criteria?.length||0,priority_count:result.hiring_priorities?.length||0}));

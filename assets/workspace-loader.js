@@ -3,9 +3,9 @@
 
   const sources = [
     'assets/job-intake-code.js?v=20261002-guided-experience',
-    'assets/job-wizard.js?v=20261008-quick-start',
-    'assets/hiring-priorities.js?v=20260924-priorities',
-    'assets/data.js?v=20261014-retention',
+    'assets/job-wizard.js?v=20261016-priorities',
+    'assets/hiring-priorities.js?v=20261016-priorities',
+    'assets/data.js?v=20261016-priorities',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20261014-decisions',
     'assets/evidence.js?v=20260911-quick-feedback',
@@ -28,7 +28,7 @@
     'assets/quick-notes.js?v=20260914-focus',
     'assets/candidate-workspace.js?v=20261015-shortlist',
     'assets/criteria-automation.js?v=20261002-guided-experience',
-    'assets/decision-workspace.js?v=20261015-shortlist',
+    'assets/decision-workspace.js?v=20261016-priorities',
     'assets/home.js?v=20261015-experience',
     'assets/focus-ui.js?v=20261014-decisions',
     'assets/recruiter-workflow.js?v=20260915-phase2',
@@ -40,7 +40,7 @@
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
     'assets/retention-analytics.js?v=20261014-retention',
-    'assets/app.js?v=20261015-shortlist'
+    'assets/app.js?v=20261016-priorities'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;

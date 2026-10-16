@@ -29,7 +29,7 @@ test('a learned relationship does not manufacture transferable experience in a n
  assert.ok(p.sources.some(s=>s.id===id&&s.kind==='automatic learning'));
 });
 test('learning controls remain optional and do not add a job setup step',()=>{
- const wizard=fs.readFileSync('assets/job-wizard.js','utf8');assert.match(wizard,/\['Job Details','Requirements','Top 5 Priorities','Review'\]/);
+ const wizard=fs.readFileSync('assets/job-wizard.js','utf8');assert.match(wizard,/\['Job Details','Requirements','Hiring priorities','Review'\]/);
  assert.match(wizard,/Relevant learning.*applied automatically/);
  const proposed=memory.suggestions({status:'ready',revision:'r',result:{learning_suggestions:[{kind:'evaluation_method',text:'Inspect ownership.'}]}},{id:'c'});
  assert.match(proposed,/Optional custom lessons/);assert.doesNotMatch(proposed,/<details[^>]*\bopen\b/);

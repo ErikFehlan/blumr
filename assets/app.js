@@ -41,7 +41,7 @@
       });
       const candidateFilters=new Map();let candidateListJob=null,lastJobOptions=null;let jobListFilter='active';
       const focusUI=window.AncalagonFocus.create({root,navigate:page=>showPage(page)});focusUI.init();
-      const jobWizard=window.BlumrJobWizard.create(root,{extract:extractLocalResume});
+      const jobWizard=window.BlumrJobWizard.create(root,{extract:extractLocalResume,priorities:job=>callHybrid({analysis_type:'hiring_priorities',job},'Hiring priorities')});
       const analyticsSessionId=crypto.randomUUID();
       function makeId(){return globalThis.crypto?.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&3|8);return v.toString(16)})}
       function escapeHTML(value){return String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]))}
@@ -374,7 +374,7 @@
       async function callHybrid(payload,errorLabel='Analysis',{signal}={}){
         const url=(hybridState.settings?.url||'').trim(),anonKey=(hybridState.settings?.anonKey||'').trim(),auth=window.ancalagonAuth,accessToken=auth?.session?.access_token;
         if(!url||!anonKey)throw new Error('Hybrid engine is not configured');if(!accessToken)throw new Error('Sign in again before using AI analysis');
-        const requestBody={...payload,evaluation_context:payload.evaluation_context||evaluationContext(payload.candidate_ref?candidateForRef(payload.candidate_ref):null),workspace_id:auth.workspace.id};
+        const requestBody={...payload,evaluation_context:payload.analysis_type==='hiring_priorities'?undefined:payload.evaluation_context||evaluationContext(payload.candidate_ref?candidateForRef(payload.candidate_ref):null),workspace_id:auth.workspace.id};
         const execute=async()=>{
           const started=performance.now();
           const controller=new AbortController(),abort=()=>controller.abort();
@@ -785,7 +785,7 @@ function renderJobs(){
         }));
         grid.querySelectorAll('[data-goto]').forEach(button=>button.addEventListener('click',()=>showPage(button.dataset.goto)));
       }
-      function editJob(id){jobWizard.edit();const j=jobs.find(x=>x.id===id);if(!j)return;root.querySelector('#jobEditor').open=true;root.querySelector('#jobId').value=j.id;root.querySelector('#jobTitle').value=j.title;root.querySelector('#jobClient').value=j.client||'';root.querySelector('#jobDescription').value=j.description||'';root.querySelector('#jobManagerFeedback').value=j.managerFeedback||'';root.querySelector('#jobCriteria').value=(j.criteria||[]).join('\n');root.querySelector('#jobKnockouts').value=(j.knockouts||[]).join('\n');root.querySelector('#jobFormTitle').textContent='Edit Job';root.querySelector('#cancelJobEdit').classList.remove('rf-hidden')}
+      function editJob(id){jobWizard.edit();const j=jobs.find(x=>x.id===id);if(!j)return;root.querySelector('#jobEditor').open=true;root.querySelector('#jobId').value=j.id;root.querySelector('#jobTitle').value=j.title;root.querySelector('#jobClient').value=j.client||'';root.querySelector('#jobDescription').value=j.description||'';root.querySelector('#jobManagerFeedback').value=j.managerFeedback||'';root.querySelector('#jobCriteria').value=(j.criteria||[]).join('\n');root.querySelector('#jobKnockouts').value=(j.knockouts||[]).join('\n');jobWizard.load(j);root.querySelector('#jobFormTitle').textContent='Edit Job';root.querySelector('#cancelJobEdit').classList.remove('rf-hidden')}
       function openJobForm(){if(root.querySelector('#jobForm').dataset.saving==='true')return;if(root.querySelector('#jobEditor').open)jobWizard.keep();resetJobForm();root.querySelector('#jobEditor').open=true;jobWizard.start();recordActivation('quick_start_opened',null);}
       function resetJobForm(){jobWizard.reset();root.querySelector('#jobEditor').open=false;root.querySelector('#jobForm').reset();root.querySelector('#jobId').value='';root.querySelector('#jobFormTitle').textContent='Add Job';root.querySelector('#cancelJobEdit').classList.add('rf-hidden')}
       function signalDirection(type,outcome){const value=((type||'')+' '+(outcome||'')).toLowerCase();if(value.includes('pass')||value.includes('concern')||value.includes('reject'))return'negative';if(value.includes('positive')||value.includes('move forward')||value.includes('interview'))return'positive';return'neutral'}
@@ -1118,6 +1118,11 @@ function renderJobs(){
         e.preventDefault();
         const form=e.currentTarget,submit=e.submitter||form.querySelector('button[type="submit"]');
         if(submit?.disabled||form.dataset.saving==='true')return;
+        const priorityGeneration=workspaceGeneration;
+        let priorityDraft;form.dataset.saving='true';if(submit)submit.disabled=true;
+        try{priorityDraft=await jobWizard.ensure();if(priorityGeneration!==workspaceGeneration)return;}
+        catch(error){if(priorityGeneration===workspaceGeneration){jobWizard.status(error.message,true);showToast(error.message,'error');}return;}
+        finally{if(priorityGeneration===workspaceGeneration){delete form.dataset.saving;if(submit)submit.disabled=false;}}
         const existingId=root.querySelector('#jobId').value;
         const pendingCreate=form.dataset.pendingCreate==='true';
         const title=root.querySelector('#jobTitle').value.trim();
@@ -1134,10 +1139,10 @@ function renderJobs(){
         if(existingId){
           const j=jobs.find(x=>x.id===existingId);
           if(!j){showToast('This job is no longer available. Refresh and try again.','error');return;}
-          Object.assign(j,{title,client,description,managerFeedback,criteria,knockouts});j.weights=deriveJobWeights(j);
+          Object.assign(j,{title,client,description,managerFeedback,criteria,knockouts});if(priorityDraft){j.priorityDraftId=priorityDraft.id;j.priorityDraftEdits=priorityDraft.items;j.hiringPriorities={source_title:title,source_description:description,review_status:'accepted',items:priorityDraft.items};}j.weights=deriveJobWeights(j);
         }else{
           const id=makeId('job'),j={id,title,client,description,managerFeedback,criteria,knockouts};
-          j.weights=deriveJobWeights(j);jobs.push(j);activeJobId=id;
+          if(priorityDraft){j.priorityDraftId=priorityDraft.id;j.priorityDraftEdits=priorityDraft.items;j.hiringPriorities={source_title:title,source_description:description,review_status:'accepted',items:priorityDraft.items};}j.weights=deriveJobWeights(j);jobs.push(j);activeJobId=id;
           root.querySelector('#jobId').value=id;form.dataset.pendingCreate='true';
         }
         form.dataset.saving='true';
