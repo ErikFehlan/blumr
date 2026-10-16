@@ -107,6 +107,7 @@ export function structuralDifferences(production,stage,expected) {
  const actual=new Map(stage.map(x=>[x.kind+':'+x.name,x]));
  const differences=new Set();
  for(const [key,e] of expected) {
+  if(e.columnDefinition!==undefined){if(actual.get(key)?.definition!==e.columnDefinition)differences.add(key);continue;}
   const r=actual.get(key)?.routine;
   const permissions=e.private?(r?.clients_denied===true&&r?.worker_allowed===false):e.authHook?(r?.clients_denied===true&&r?.auth_admin_allowed===true):e.triggerOnly?r?.clients_denied===true:e.admin?(r?.anon_denied===true&&r?.authenticated_allowed===true):(r?.worker_allowed===true&&r?.clients_denied===true);
   if(!r||r.source!==e.body||r.language!==e.language||r.result!==e.result||r.setof!==e.setof||r.args!==e.args||r.defaults!==e.defaults||r.security_definer!==Boolean(e.securityDefiner??e.admin)||r.volatility!==(e.volatility||'v')||JSON.stringify(r.config)!==JSON.stringify(['search_path=""'])||!permissions)differences.add(key);
@@ -117,6 +118,19 @@ export function structuralDifferences(production,stage,expected) {
   if(normalizeStructure(actual.get(key)?.definition||'')!==normalizeStructure(row.definition))differences.add(key);
  }
  return [...differences];
+}
+export function costExpectations(sql){
+ const names=['ai_cost_estimate','capture_ai_cost','admin_ai_cost_report','admin_set_model_cost_rates','admin_list_model_rates'],expected=new Map();
+ const pattern=/create or replace function public\.(\w+)\(([^)]*)\) returns (jsonb|trigger|void)\s+language plpgsql (stable )?security definer set search_path='' as \$\$([\s\S]*?)\$\$;/g;
+ for(const [,name,args,result,stable,body] of sql.matchAll(pattern)){
+  if(!names.includes(name))throw Error('Unexpected cost routine');
+  const parameters=args?args.split(',').map(arg=>{const p=arg.trim().match(/^(\w+) (text|integer|numeric)(?: default (30))?$/);if(!p)throw Error('Unsupported cost argument');return p;}):[];
+  expected.set('function:'+name+'('+parameters.map(p=>p[2]).join(',')+')',{body,language:'plpgsql',result,setof:false,args:parameters.map(p=>p[1]+' '+p[2]).join(', '),
+   defaults:parameters.some(p=>p[3])?'30':null,securityDefiner:true,admin:name.startsWith('admin_'),triggerOnly:name==='capture_ai_cost',volatility:stable?'s':'v'});
+ }
+ if(expected.size!==5||(sql.match(/create or replace function/gi)||[]).length!==5)throw Error('Cost declarations incomplete');
+ expected.set('column:ai_provider_usage.workspace_id',{columnDefinition:'uuid:YES:'});
+ return expected;
 }
 
 export function priorityExpectations(sql){

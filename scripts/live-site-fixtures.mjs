@@ -38,7 +38,7 @@ if(mode==='create'){
   const user={email:fixtureEmail(state.run,i),password:randomBytes(32).toString('base64url')};mask(user.password);
   state.users.push(user);await save(state); // Allows cleanup after a lost creation response.
   await management('insert into public.beta_access(email) values($1)',[user.email]);
-  const created=await request('/auth/v1/admin/users',service,'POST',{email:user.email,password:user.password,email_confirm:true,user_metadata:{display_name:'Synthetic live test',blumr_live_run:state.run}});
+  const created=await request('/auth/v1/admin/users',service,'POST',{email:user.email,password:user.password,email_confirm:true,app_metadata:{blumr_test_run:process.env.GITHUB_RUN_ID||state.run},user_metadata:{display_name:'Synthetic live test',blumr_live_run:state.run}});
   user.id=created.id;assertFixtureUser(state,user,created);await save(state);
   const login=await request('/auth/v1/token?grant_type=password',anon,'POST',{email:user.email,password:user.password});
   user.access=login.access_token;mask(user.access);

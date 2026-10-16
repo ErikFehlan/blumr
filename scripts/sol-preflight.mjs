@@ -29,7 +29,7 @@ assert.equal(anonymous.status,401,'Private model validation accepted an unauthen
 const email=`ancalagon-sol-test-${randomUUID()}@example.invalid`;let user,workspace;
 try{
  await query('insert into public.beta_access(email) values($1)',[email]);
- const created=await request('/auth/v1/admin/users','POST',{email,password:randomBytes(32).toString('base64url'),email_confirm:true});
+ const created=await request('/auth/v1/admin/users','POST',{email,password:randomBytes(32).toString('base64url'),email_confirm:true,app_metadata:{blumr_test_run:process.env.GITHUB_RUN_ID||'manual-model-check'}});
  user=created.id||created.user?.id;assert.ok(user);
  const memberships=await request('/rest/v1/workspace_members?select=workspace_id&user_id=eq.'+user);
  assert.equal(memberships.length,1);workspace=memberships[0].workspace_id;

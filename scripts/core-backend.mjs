@@ -10,10 +10,13 @@ migrations.push('20261014174000_assessment_save_versions.sql');
 migrations.push('20261014192401_retention_feedback_reminders.sql');
 migrations.push('20261014212910_retention_measurement.sql');
 migrations.push('20261016152240_unified_hiring_priorities.sql');
+migrations.push('20261016194559_durable_ai_cost_accounting.sql');
 // Publish replacement functions atomically; old capacity definitions must never
 // become visible halfway through a repeated deployment.
 const definitions=await Promise.all(migrations.map(name=>readFile('supabase/migrations/'+name,'utf8')));
 definitions.push(await readFile('supabase/patches/assessment-heartbeat-recovery.sql','utf8'));
+const costEnvironment=ref==='zqiqjzxcpznhzjengfff'?'production':ref==='momfzjmycveqginxmqib'?'staging':'unclassified';
+definitions.push(`update public.ai_cost_settings set environment='${costEnvironment}' where id;`);
 const query='begin;\n'+definitions.map(sql=>sql.replace(/^begin;\s*$/gmi,'').replace(/^commit;\s*$/gmi,'')).join('\n')+'\ncommit;';
 const response=await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`,{method:'POST',
  headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},

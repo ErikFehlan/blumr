@@ -1,6 +1,6 @@
 // Compare deployment structure only. Never copy production account data into staging.
 import {readFile} from 'node:fs/promises';
-import {capacityExpectations,workerExpectations,guardExpectations,signupExpectations,knowledgeExpectations,inferenceExpectations,retentionExpectations,measurementExpectations,priorityExpectations,structuralDifferences} from './staging-structure.mjs';
+import {capacityExpectations,workerExpectations,guardExpectations,signupExpectations,knowledgeExpectations,inferenceExpectations,retentionExpectations,measurementExpectations,priorityExpectations,costExpectations,structuralDifferences} from './staging-structure.mjs';
 const token=process.env.SUPABASE_ACCESS_TOKEN;
 if(process.env.SUPABASE_PROJECT_REF!=='momfzjmycveqginxmqib'||!token)throw Error('Staging parity requires the isolated staging project');
 async function api(ref,path,body){
@@ -34,6 +34,7 @@ for(const [key,value] of inferenceExpectations(await readFile('supabase/migratio
 for(const [key,value] of retentionExpectations(await readFile('supabase/migrations/20261014192401_retention_feedback_reminders.sql','utf8')))expected.set(key,value);
 for(const [key,value] of measurementExpectations(await readFile('supabase/migrations/20261014212910_retention_measurement.sql','utf8')))expected.set(key,value);
 for(const [key,value] of priorityExpectations(await readFile('supabase/migrations/20261016152240_unified_hiring_priorities.sql','utf8')))expected.set(key,value);
+for(const [key,value] of costExpectations(await readFile('supabase/migrations/20261016194559_durable_ai_cost_accounting.sql','utf8')))expected.set(key,value);
 const differences=structuralDifferences(production,stage,expected);
 if(differences.length)throw Error('Staging structural differences: '+differences.join(', '));
 const [knowledge]=await api('momfzjmycveqginxmqib','/database/query',{query:`select
@@ -47,6 +48,12 @@ const [ledger]=await api('momfzjmycveqginxmqib','/database/query',{query:"select
 if(ledger?.private!==true)throw Error('Worker attempt ledger is not service-only');
 const [priorityDrafts]=await api('momfzjmycveqginxmqib','/database/query',{query:"select relrowsecurity and not has_table_privilege('anon',oid,'select,insert,update,delete') and not has_table_privilege('authenticated',oid,'select,insert,update,delete') and has_table_privilege('service_role',oid,'select,insert,update,delete') as private from pg_class where oid='public.hiring_priority_drafts'::regclass"});
 if(priorityDrafts?.private!==true)throw Error('Priority drafts are not service-only');
+const [costs]=await api('momfzjmycveqginxmqib','/database/query',{query:`select
+ (select environment='staging' from public.ai_cost_settings where id) as environment,
+ (select relrowsecurity and not has_table_privilege('anon',oid,'select,insert,update,delete') and not has_table_privilege('authenticated',oid,'select,insert,update,delete') from pg_class where oid='public.ai_cost_settings'::regclass) as private,
+ exists(select from pg_constraint where conrelid='public.ai_provider_usage'::regclass and conname='ai_provider_usage_workspace_id_fkey' and confdeltype='n') as retained,
+ exists(select from pg_trigger where tgname='capture_ai_cost' and tgrelid='public.ai_provider_usage'::regclass and tgenabled='O' and tgfoid='public.capture_ai_cost()'::regprocedure) as capture`});
+if(!costs?.environment||!costs.private||!costs.retained||!costs.capture)throw Error('Cost accounting isolation or retention is incomplete');
 const [uploads]=await api('momfzjmycveqginxmqib','/database/query',{query:`select (select not public and file_size_limit=10485760 and allowed_mime_types=array['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','text/plain'] from storage.buckets where id='resumes') as private_bucket,
  exists(select 1 from pg_trigger where tgrelid='public.candidate_documents'::regclass and tgname='validate_resume_document' and tgenabled='O' and tgfoid='public.validate_resume_document()'::regprocedure) as document_guard,
  not exists(select 1 from information_schema.columns c where c.table_schema='public' and c.column_name='created_by' and not exists(select 1 from pg_trigger t where t.tgrelid=('public.'||quote_ident(c.table_name))::regclass and t.tgname='preserve_record_creator' and t.tgenabled='O')) as creator_guards`});

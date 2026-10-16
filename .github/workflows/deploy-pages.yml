@@ -105,6 +105,7 @@ jobs:
           node tests/core-browser.cjs
           node tests/tutorial-browser.cjs
           CAPTURE_UI=1 node tests/admin-tools-browser.cjs
+          node tests/ai-cost-browser.cjs
 
       - name: Save UI review screenshots
         if: always()
@@ -146,6 +147,9 @@ jobs:
 
   staging:
     needs: validate
+    # Paid AI runs once on the release commit. PRs still run the complete
+    # deterministic suite; explicit staging workflow_dispatch remains available.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     uses: ./.github/workflows/staging-backend.yml
     secrets: inherit
 

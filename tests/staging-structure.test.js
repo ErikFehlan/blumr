@@ -1,6 +1,16 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {readFile}=require('node:fs/promises');
+test('cost migration verifies source, privacy and preserved accounting rows',async()=>{
+ const {costExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261016194559_durable_ai_cost_accounting.sql','utf8'),expected=costExpectations(sql);
+ const stage=[...expected].map(([key,e])=>e.columnDefinition?{kind:'column',name:key.slice(7),definition:e.columnDefinition}:{kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:false,args:e.args,defaults:e.defaults,security_definer:true,volatility:e.volatility,config:['search_path=""'],worker_allowed:true,clients_denied:!e.admin,anon_denied:true,authenticated_allowed:!!e.admin}});
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ const changed=structuredClone(stage);changed.find(r=>r.kind==='column').definition='uuid:NO:';
+ assert.deepEqual(structuralDifferences([],changed,expected),['column:ai_provider_usage.workspace_id']);
+ changed.splice(0,1);assert.ok(structuralDifferences([],changed,expected).includes('function:ai_cost_estimate(text,integer,integer,integer,integer)'));
+ assert.throws(()=>costExpectations(sql.replace('capture_ai_cost() returns','unknown_capture() returns')));
+});
 async function setup(){
  const {capacityExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
  const sql=await readFile('supabase/migrations/20261005121611_assessment_capacity.sql','utf8');
