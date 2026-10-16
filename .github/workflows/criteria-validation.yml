@@ -39,6 +39,13 @@ jobs:
           PGPASSWORD: postgres
         run: psql -h localhost -U postgres -d postgres -f tests/criteria-immediate.sql
 
+      - name: Test durable AI costs without provider calls
+        env:
+          PGPASSWORD: postgres
+        run: |
+          createdb -h localhost -U postgres ai_cost_accounting
+          psql -h localhost -U postgres -d ai_cost_accounting -f tests/ai-cost-accounting.sql
+
       - name: Test durable reassessment queue and protected approval
         env:
           PGPASSWORD: postgres

@@ -1,3 +1,4 @@
+import {providerUsage} from './provider-usage.mjs';
 export class SecurityLimit extends Error {
   constructor(public code: string, public status = 429, public retryAfter = 60) { super(code); }
 }
@@ -35,15 +36,14 @@ export function securityMessage(code: string) {
 // Save only provider usage metadata. Reservations remain the authoritative
 // limit even if this best-effort telemetry write fails.
 export async function recordProviderUsage(workspace: string, operation: string, response: any, actor: string | null = null) {
-  const usage=response?.usage, id=response?.id, model=response?.model;
-  if(!workspace||typeof id!=='string'||typeof model!=='string'||!Number.isSafeInteger(usage?.input_tokens)||!Number.isSafeInteger(usage?.output_tokens))return;
+  const usage=providerUsage(response);
+  if(!workspace||!usage)return;
   const base=Deno.env.get('SUPABASE_URL'),key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if(!base||!key)return;
-  const cached=Math.max(0,Math.min(usage.input_tokens,Number(usage.input_tokens_details?.cached_tokens)||0));
   try {
     const saved=await fetch(base+'/rest/v1/ai_provider_usage?on_conflict=response_id',{
       method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json',Prefer:'resolution=ignore-duplicates,return=minimal'},
-      body:JSON.stringify({response_id:id,workspace_id:workspace,user_id:actor,operation,model,input_tokens:usage.input_tokens,cached_input_tokens:cached,output_tokens:usage.output_tokens}),
+      body:JSON.stringify({...usage,workspace_id:workspace,user_id:actor,operation}),
       signal:AbortSignal.timeout(5000)
     });
     if(!saved.ok)console.error('Provider usage metadata could not be recorded',saved.status);

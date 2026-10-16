@@ -30,7 +30,7 @@ try{
  for(let i=0;i<2;i++){
   const email=`ancalagon-core-test-${randomUUID()}@example.invalid`,password=randomBytes(32).toString('base64url');
   fixtureEmails.push(email); // Self-service provisioning must need no approval record.
-  const created=await req('/auth/v1/admin/users',service,'POST',{email,password,email_confirm:true,user_metadata:{display_name:'Disposable core test'}});
+  const created=await req('/auth/v1/admin/users',service,'POST',{email,password,email_confirm:true,app_metadata:{blumr_test_run:process.env.GITHUB_RUN_ID||'manual-core-check'},user_metadata:{display_name:'Disposable core test'}});
   const id=created.data.id||created.data.user?.id;assert.ok(id,'Disposable user was not created');
   const user={id,paths:[]};users.push(user);
   const login=await req('/auth/v1/token?grant_type=password',null,'POST',{email,password});user.access=login.data.access_token;assert.ok(user.access,'Password login failed');

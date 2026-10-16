@@ -84,7 +84,7 @@ export async function handleCriteria(request:Request){
       const ai=await modelRequest('legacy');model=ai.model;
       result={...validate(ai.parsed,source),hiring_priorities:validatePriorities(ai.parsed.hiring_priorities,passages),engine:'legacy_ai',confidence:null,fallback_reason:'legacy_mode'};
     }else{
-      const ai=await generatePriorities(task.input,{requestId:`criteria-${task.usage_run_id||task.revision}-priorities`,beforeModel:(bytes,tokens)=>reserveModelCall(task.workspace_id,null,bytes,tokens),onUsage:body=>recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null)});
+      const ai=await generatePriorities(task.input,{requestId:`criteria-${task.usage_run_id||task.revision}-priorities`,beforeModel:(bytes,tokens)=>reserveModelCall(task.workspace_id,null,bytes,tokens),onUsage:body=>recordProviderUsage(task.workspace_id,'hiring_priorities',body,task.usage_actor_id||null)});
       model=ai.model;
       result={...personalizeCriteria(source),hiring_priorities:ai.hiring_priorities,engine:'role_analysis',confidence:null,fallback_reason:null};
     }

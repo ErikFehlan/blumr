@@ -173,10 +173,17 @@
     const report=await costLoad();if(!allowed||request!==version)return;panel.replaceChildren();
     const title=document.createElement('h3');title.textContent='AI cost coverage · last 30 days';panel.append(title);
     const note=document.createElement('p');note.className='rf-sub';
-    note.textContent=`${report.provider_calls} provider responses recorded · ${report.unattributed_calls} without a recruiter · ${report.unpriced_calls} without a model rate. Priced responses total $${Number(report.estimated_usd_for_priced_calls).toFixed(2)}. This is a partial estimate when attribution or pricing is missing; it excludes unrecorded calls, infrastructure, and support.`;panel.append(note);
+    const money=value=>'$'+Number(value).toFixed(4);
+    note.textContent=Array.isArray(report.breakdown)?`${report.provider_calls} provider responses recorded · ${report.unpriced_calls} unpriced. ${report.estimated_lower_usd==null?'No priced estimate is available.':'Recorded priced responses: '+money(report.estimated_lower_usd)+'–'+money(report.estimated_upper_usd)+'.'} Ranges allow for unreported cache writes. These are token-cost estimates, not the provider bill; they exclude unrecorded requests, infrastructure, and support. Earlier deleted test usage cannot be recovered.`:`${report.provider_calls} provider responses recorded · ${report.unattributed_calls} without a recruiter · ${report.unpriced_calls} without a model rate. Priced responses total $${Number(report.estimated_usd_for_priced_calls).toFixed(2)}. This is a partial estimate when attribution or pricing is missing; it excludes unrecorded calls, infrastructure, and support.`;panel.append(note);
+    if(Array.isArray(report.breakdown)){
+     const breakdown=document.createElement('ul');
+     for(const row of report.breakdown){const item=document.createElement('li');
+      item.textContent=`${row.environment} / ${row.purpose} · ${row.operation.replaceAll('_',' ')}: ${row.calls} responses · ${row.high==null?'Unpriced':money(row.low)+'–'+money(row.high)+' total; '+money(row.mean_low)+'–'+money(row.mean_high)+' per priced response'}${row.unpriced?' · '+row.unpriced+' unpriced':''}`;breakdown.append(item);}
+     panel.append(breakdown);
+    }
     const list=document.createElement('ul');
     for(const row of report.rows||[]){const item=document.createElement('li');
-     item.textContent=`${row.workspace} · ${row.email||'Unattributed'}: ${row.provider_calls} recorded responses, ${row.completed_operations} completed product operations, $${Number(row.estimated_usd_for_priced_calls).toFixed(2)} priced cost${row.unpriced_calls?' ('+row.unpriced_calls+' unpriced)':''}.`;list.append(item);}
+     item.textContent=`${row.workspace} · ${row.email||'Unattributed'}: ${row.provider_calls} recorded responses, ${row.completed_operations} completed product operations, ${row.estimated_usd_for_priced_calls==null?'cost unavailable':'$'+Number(row.estimated_usd_for_priced_calls).toFixed(2)+' priced cost'}${row.unpriced_calls?' ('+row.unpriced_calls+' unpriced)':''}.`;list.append(item);}
     panel.append(list);
    }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='AI cost coverage could not be loaded. Reopen Admin to retry.';}
   }
@@ -185,17 +192,17 @@
    try{
     const rates=await ratesLoad();if(!allowed||request!==version)return;panel.replaceChildren();
     const title=document.createElement('h3');title.textContent='Provider cost rates';panel.append(title);
-    const note=document.createElement('p');note.className='rf-sub';note.textContent='Enter the current USD rate per million tokens for each model you use. Estimates apply the configured rates to recorded provider usage; they do not include taxes or other infrastructure.';panel.append(note);
+    const note=document.createElement('p');note.className='rf-sub';note.textContent='Enter verified USD rates per million tokens. If cache writes have no separate charge, use the ordinary input rate. Changes apply to future responses; prior estimates retain their original rates. Known long-context multipliers still apply. Estimates exclude taxes and infrastructure.';panel.append(note);
     const form=document.createElement('form');form.className='rf-form';
     const model=document.createElement('input');model.required=true;model.maxLength=160;model.placeholder='Provider model ID';
     const select=document.createElement('select');const other=document.createElement('option');other.value='';other.textContent='Select a recorded model';select.append(other);
     for(const rate of rates){const option=document.createElement('option');option.value=rate.model;option.textContent=rate.model+' · '+rate.calls+' calls'+(rate.input===null?' · unpriced':'');select.append(option);}
     const field=(name)=>{const input=document.createElement('input');input.type='number';input.min='0';input.max='100000';input.step='0.000001';input.required=true;const label=document.createElement('label');label.textContent=name;label.append(input);form.append(label);return input;};
     form.append(select);const label=document.createElement('label');label.textContent='Model ID';label.append(model);form.append(label);
-    const input=field('Input USD / million tokens'),cached=field('Cached input USD / million tokens'),output=field('Output USD / million tokens');
-    select.addEventListener('change',()=>{const selected=rates.find(rate=>rate.model===select.value);if(!selected)return;model.value=selected.model;input.value=selected.input??'';cached.value=selected.cached??'';output.value=selected.output??'';});
+    const input=field('Input USD / million tokens'),cached=field('Cached input USD / million tokens'),write=field('Cache write USD / million tokens'),output=field('Output USD / million tokens');
+    select.addEventListener('change',()=>{const selected=rates.find(rate=>rate.model===select.value);if(!selected)return;model.value=selected.model;input.value=selected.input??'';cached.value=selected.cached??'';write.value=selected.cache_write??'';output.value=selected.output??'';});
     const save=document.createElement('button');save.type='submit';save.className='rf-btn primary';save.textContent='Save model rate';const status=document.createElement('p');status.setAttribute('role','status');form.append(save,status);
-    form.addEventListener('submit',async event=>{event.preventDefault();save.disabled=true;status.textContent='Saving rate…';try{await ratesSave(model.value.trim(),Number(input.value),Number(cached.value),Number(output.value));if(allowed&&request===version){await loadRates(request);if(costLoad)await loadCosts(request);}}catch(error){status.textContent=error.message||'Could not save model rate.';}finally{save.disabled=false;}});
+    form.addEventListener('submit',async event=>{event.preventDefault();save.disabled=true;status.textContent='Saving rate…';try{await ratesSave(model.value.trim(),Number(input.value),Number(cached.value),Number(output.value),Number(write.value));if(allowed&&request===version){await loadRates(request);if(costLoad)await loadCosts(request);}}catch(error){status.textContent=error.message||'Could not save model rate.';}finally{save.disabled=false;}});
     panel.append(form);
    }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='Model rates could not be loaded. Reopen Admin to retry.';}
   }

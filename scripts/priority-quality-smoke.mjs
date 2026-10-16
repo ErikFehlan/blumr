@@ -13,7 +13,7 @@ async function request(path,method='GET',body,access=service){const r=await fetc
 const email=`blumr-priority-check-${randomUUID()}@example.invalid`,password=randomBytes(32).toString('base64url');let user,workspace;const report=[];
 try{
  await query('insert into public.beta_access(email) values($1)',[email]);
- const created=await request('/auth/v1/admin/users','POST',{email,password,email_confirm:true});user=created.id||created.user?.id;
+ const created=await request('/auth/v1/admin/users','POST',{email,password,email_confirm:true,app_metadata:{blumr_test_run:process.env.GITHUB_RUN_ID||'manual-priority-check'}});user=created.id||created.user?.id;
  workspace=(await request('/rest/v1/workspace_members?select=workspace_id&user_id=eq.'+user))[0].workspace_id;
  const session=await request('/auth/v1/token?grant_type=password','POST',{email,password},anon),access=session.access_token;assert.ok(access);
  for(const test of priorityCases){

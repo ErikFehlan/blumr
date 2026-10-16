@@ -591,7 +591,7 @@
     const loadTeamPlans=()=>settingsRPC('admin_list_workspace_plans');
     const loadModelRates=()=>settingsRPC('admin_list_model_rates');
     const loadAICostReport=()=>settingsRPC('admin_ai_cost_report',{p_days:30});
-    const saveModelRate=(model,input,cached,output)=>settingsRPC('admin_set_model_rate',{p_model:model,p_input:input,p_cached:cached,p_output:output});
+    const saveModelRate=(model,input,cached,output,write)=>settingsRPC('admin_set_model_cost_rates',{p_model:model,p_input:input,p_cached:cached,p_output:output,p_write:write});
     const setTeamPlan=(id,plan,status,allowance,ends)=>settingsRPC('admin_set_workspace_plan',{p_workspace:id,p_plan:plan,p_status:status,p_monthly_ai_calls:allowance,p_period_ends_at:ends});
     const addTeammate=(email,role)=>settingsRPC('team_add_member',{p_workspace:workspaceId,p_email:email,p_role:role});
     const removeTeammate=id=>settingsRPC('team_remove_member',{p_workspace:workspaceId,p_user:id});

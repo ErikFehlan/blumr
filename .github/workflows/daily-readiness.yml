@@ -7,5 +7,8 @@ permissions:
   contents: read
 jobs:
   staging:
+    # Daily paid evaluations require an explicit cost decision. The separate
+    # operations monitor continues its read-only production health checks.
+    if: github.event_name == 'workflow_dispatch' || vars.RUN_SCHEDULED_PAID_AI_TESTS == 'true'
     uses: ./.github/workflows/staging-backend.yml
     secrets: inherit

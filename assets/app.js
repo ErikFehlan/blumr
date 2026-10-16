@@ -35,7 +35,7 @@
         securityLoad:()=>dataService.loadBetaSecurity(),securityAccess:(email,approved)=>dataService.manageBetaAccess(email,approved),securityPause:paused=>dataService.pauseAI(paused),
         reminderLoad:()=>dataService.loadReminderRecipients(),reminderSave:(id,enabled)=>dataService.setReminderRecipient(id,enabled),reminderSend:id=>dataService.sendOnboardingReminder(id),
         planLoad:()=>dataService.loadTeamPlans(),planSave:(id,plan,status,allowance,ends)=>dataService.setTeamPlan(id,plan,status,allowance,ends),
-        ratesLoad:()=>dataService.loadModelRates(),ratesSave:(model,input,cached,output)=>dataService.saveModelRate(model,input,cached,output),
+        ratesLoad:()=>dataService.loadModelRates(),ratesSave:(model,input,cached,output,write)=>dataService.saveModelRate(model,input,cached,output,write),
         costLoad:()=>dataService.loadAICostReport(),healthLoad:()=>dataService.loadSystemHealth(),recoveryLoad:()=>dataService.loadDirectAIRecovery?.()||[],recoveryRetry:(claim,note,verified)=>dataService.recoverDirectAIRequest(claim,note,verified),
         toast:showToast,saveFile:downloadBlob,supportLoad:()=>dataService.loadSupportRequests(true),supportReview:(id,status)=>dataService.reviewSupportRequest(id,status)
       });

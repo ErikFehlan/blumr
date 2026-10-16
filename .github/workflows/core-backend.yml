@@ -59,6 +59,8 @@ jobs:
           createdb -h localhost -U postgres demo_analytics
           psql -h localhost -U postgres -d demo_analytics -f tests/demo-analytics.sql
           node tests/usage-migration-contention.mjs
+          createdb -h localhost -U postgres ai_cost_accounting
+          psql -h localhost -U postgres -d ai_cost_accounting -f tests/ai-cost-accounting.sql
           createdb -h localhost -U postgres feedback_learning
           psql -h localhost -U postgres -d feedback_learning -f tests/learning.sql
           createdb -h localhost -U postgres beta_security
@@ -108,6 +110,8 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+      - name: Prepare durable AI cost accounting before paid checks
+        run: node scripts/ai-cost-backend.mjs
       - name: Deploy temporary private model validation
         id: sol_probe
         run: supabase functions deploy sol-model-check --project-ref "$SUPABASE_PROJECT_REF"
