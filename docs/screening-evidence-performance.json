@@ -1,0 +1,592 @@
+{
+  "recorded_at": "2026-10-19T18:22:06.304152+00:00",
+  "baseline_commit": "27479baa42596fea89659621acae15229d6a54b0",
+  "after_engine_hashes": {
+    "screening-engine.mjs": "c17acdc8665180148806c218952ac57d088fab828561873c770a3e5ae87c6b23",
+    "screening-evidence.mjs": "6183f20d97c9fc30730ba9c1e8b2a3340b3f5cb17dc537422ad4771648b4589f",
+    "screening-qualifications.mjs": "b4612a04f2825a01577cacc4a8a53150985d38edbba4a5983d408445707a9293",
+    "screening-requirements.mjs": "20e098b0667dbd9f86f7cb189f23a74b17b968230011f88410011894b132da94",
+    "screening-vocabulary.mjs": "5aed9af5830c950afb333bd5016e9a78b99559b54e60f87f5bcc2335efdb4673",
+    "job-intelligence.mjs": "4ebfe93d20c7e1cf6e5756f99a8ae21977ad8b4bf3fc35969da05ed9f20c4fd2",
+    "experience-intelligence.mjs": "691d0d10891940e5718a634ff689e5b56b4ff1b9c5d09884d9b173b8fa9e65e9",
+    "transferability.mjs": "d64429c38f350290824e64048fdafe7e3c7a1d05c51f24b756ea02318aec62eb",
+    "source-instructions.mjs": "148b3c7db4ba5ea687d36bbeede84f9a0148b616d00c31fe7c13ebc863732843",
+    "screening-rule-spec.mjs": "0b45fa68d13db7b83f2b0f102d915990297b044ec01e238849e09e0cae85b38b",
+    "capability-workflows.mjs": "47b5a407a5c00c302f43c78cd41f53a068fb63dfaffd5581dcdd92c67f74510d"
+  },
+  "before": {
+    "scope": "Synthetic local CPU benchmark; seven occupations, five priorities, 3 samples per size; excludes network, uploads, extraction, UI and models. Repeated profiles are load fixtures, not a quality sample.",
+    "node": "v24.19.0",
+    "runs": 3,
+    "results": [
+      {
+        "occupation": "cloud",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 454.13,
+        "parse_score_rank_p50_ms": 21,
+        "parsed_score_rank_p50_ms": 14.37,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "cloud",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 454.13,
+        "parse_score_rank_p50_ms": 101.9,
+        "parsed_score_rank_p50_ms": 54.05,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "cloud",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 454.13,
+        "parse_score_rank_p50_ms": 655.45,
+        "parsed_score_rank_p50_ms": 389.87,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "cloud",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 454.13,
+        "parse_score_rank_p50_ms": 1040.2,
+        "parsed_score_rank_p50_ms": 971.74,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "accounting",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 592.49,
+        "parse_score_rank_p50_ms": 30.1,
+        "parsed_score_rank_p50_ms": 29.12,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "accounting",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 592.49,
+        "parse_score_rank_p50_ms": 124.93,
+        "parsed_score_rank_p50_ms": 41.14,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "accounting",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 592.49,
+        "parse_score_rank_p50_ms": 285.56,
+        "parsed_score_rank_p50_ms": 257.42,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "accounting",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 592.49,
+        "parse_score_rank_p50_ms": 958.17,
+        "parsed_score_rank_p50_ms": 480.94,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "clinical",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 39.93,
+        "parse_score_rank_p50_ms": 20.95,
+        "parsed_score_rank_p50_ms": 14.45,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "clinical",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 39.93,
+        "parse_score_rank_p50_ms": 103.5,
+        "parsed_score_rank_p50_ms": 83.24,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "clinical",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 39.93,
+        "parse_score_rank_p50_ms": 504.33,
+        "parsed_score_rank_p50_ms": 398.98,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "clinical",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 39.93,
+        "parse_score_rank_p50_ms": 1015.22,
+        "parsed_score_rank_p50_ms": 859.68,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "warehouse",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 41.92,
+        "parse_score_rank_p50_ms": 15.45,
+        "parsed_score_rank_p50_ms": 14.7,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "warehouse",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 41.92,
+        "parse_score_rank_p50_ms": 71.13,
+        "parsed_score_rank_p50_ms": 45.62,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "warehouse",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 41.92,
+        "parse_score_rank_p50_ms": 323,
+        "parsed_score_rank_p50_ms": 278.3,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "warehouse",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 41.92,
+        "parse_score_rank_p50_ms": 635.42,
+        "parsed_score_rank_p50_ms": 528.03,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "education",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 15.54,
+        "parse_score_rank_p50_ms": 9.37,
+        "parsed_score_rank_p50_ms": 6.1,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "education",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 15.54,
+        "parse_score_rank_p50_ms": 45.45,
+        "parsed_score_rank_p50_ms": 37.11,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "education",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 15.54,
+        "parse_score_rank_p50_ms": 228.46,
+        "parsed_score_rank_p50_ms": 161.07,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "education",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 15.54,
+        "parse_score_rank_p50_ms": 485.39,
+        "parsed_score_rank_p50_ms": 377,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "maintenance",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 38.34,
+        "parse_score_rank_p50_ms": 25.55,
+        "parsed_score_rank_p50_ms": 32.68,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "maintenance",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 38.34,
+        "parse_score_rank_p50_ms": 111.56,
+        "parsed_score_rank_p50_ms": 68.46,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "maintenance",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 38.34,
+        "parse_score_rank_p50_ms": 566.64,
+        "parsed_score_rank_p50_ms": 392.66,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "maintenance",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 38.34,
+        "parse_score_rank_p50_ms": 953.37,
+        "parsed_score_rank_p50_ms": 792.9,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "qa",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 22.24,
+        "parse_score_rank_p50_ms": 18.25,
+        "parsed_score_rank_p50_ms": 11.48,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "qa",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 22.24,
+        "parse_score_rank_p50_ms": 73.24,
+        "parsed_score_rank_p50_ms": 58.68,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "qa",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 22.24,
+        "parse_score_rank_p50_ms": 362.17,
+        "parsed_score_rank_p50_ms": 307.79,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "qa",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 22.24,
+        "parse_score_rank_p50_ms": 790.71,
+        "parsed_score_rank_p50_ms": 600.93,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      }
+    ]
+  },
+  "after": {
+    "scope": "Synthetic local CPU benchmark; seven occupations, five priorities, 3 samples per size; excludes network, uploads, extraction, UI and models. Repeated profiles are load fixtures, not a quality sample.",
+    "node": "v24.19.0",
+    "runs": 3,
+    "results": [
+      {
+        "occupation": "cloud",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 373.69,
+        "parse_score_rank_p50_ms": 37.72,
+        "parsed_score_rank_p50_ms": 25.22,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "cloud",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 373.69,
+        "parse_score_rank_p50_ms": 162.82,
+        "parsed_score_rank_p50_ms": 103.48,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "cloud",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 373.69,
+        "parse_score_rank_p50_ms": 658.49,
+        "parsed_score_rank_p50_ms": 470.23,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "cloud",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 373.69,
+        "parse_score_rank_p50_ms": 1327.25,
+        "parsed_score_rank_p50_ms": 943.45,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "accounting",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 355.83,
+        "parse_score_rank_p50_ms": 23.24,
+        "parsed_score_rank_p50_ms": 15.88,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "accounting",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 355.83,
+        "parse_score_rank_p50_ms": 123.36,
+        "parsed_score_rank_p50_ms": 66.98,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "accounting",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 355.83,
+        "parse_score_rank_p50_ms": 554.44,
+        "parsed_score_rank_p50_ms": 334.5,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "accounting",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 355.83,
+        "parse_score_rank_p50_ms": 1014,
+        "parsed_score_rank_p50_ms": 619.39,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "clinical",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 318.88,
+        "parse_score_rank_p50_ms": 46.54,
+        "parsed_score_rank_p50_ms": 19.63,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "clinical",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 318.88,
+        "parse_score_rank_p50_ms": 178.92,
+        "parsed_score_rank_p50_ms": 107.73,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "clinical",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 318.88,
+        "parse_score_rank_p50_ms": 888.58,
+        "parsed_score_rank_p50_ms": 486.24,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "clinical",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 318.88,
+        "parse_score_rank_p50_ms": 2191.66,
+        "parsed_score_rank_p50_ms": 1276.64,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "warehouse",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 64.35,
+        "parse_score_rank_p50_ms": 44.33,
+        "parsed_score_rank_p50_ms": 23.86,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "warehouse",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 64.35,
+        "parse_score_rank_p50_ms": 125.51,
+        "parsed_score_rank_p50_ms": 81.06,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "warehouse",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 64.35,
+        "parse_score_rank_p50_ms": 554.32,
+        "parsed_score_rank_p50_ms": 361.62,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "warehouse",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 64.35,
+        "parse_score_rank_p50_ms": 1103.39,
+        "parsed_score_rank_p50_ms": 700.27,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "education",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 316.56,
+        "parse_score_rank_p50_ms": 18.69,
+        "parsed_score_rank_p50_ms": 10.64,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "education",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 316.56,
+        "parse_score_rank_p50_ms": 86.86,
+        "parsed_score_rank_p50_ms": 50.18,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "education",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 316.56,
+        "parse_score_rank_p50_ms": 474.64,
+        "parsed_score_rank_p50_ms": 250.38,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "education",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 316.56,
+        "parse_score_rank_p50_ms": 888.71,
+        "parsed_score_rank_p50_ms": 567.83,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "maintenance",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 16.21,
+        "parse_score_rank_p50_ms": 33.66,
+        "parsed_score_rank_p50_ms": 17.4,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "maintenance",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 16.21,
+        "parse_score_rank_p50_ms": 146.53,
+        "parsed_score_rank_p50_ms": 75.34,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "maintenance",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 16.21,
+        "parse_score_rank_p50_ms": 1446.28,
+        "parsed_score_rank_p50_ms": 782.74,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "maintenance",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 16.21,
+        "parse_score_rank_p50_ms": 1838.53,
+        "parsed_score_rank_p50_ms": 1135.6,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "qa",
+        "priorities": 5,
+        "candidates": 20,
+        "rubric_ms": 85.29,
+        "parse_score_rank_p50_ms": 39.96,
+        "parsed_score_rank_p50_ms": 42.96,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "qa",
+        "priorities": 5,
+        "candidates": 100,
+        "rubric_ms": 85.29,
+        "parse_score_rank_p50_ms": 151.63,
+        "parsed_score_rank_p50_ms": 91.07,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "qa",
+        "priorities": 5,
+        "candidates": 500,
+        "rubric_ms": 85.29,
+        "parse_score_rank_p50_ms": 878.52,
+        "parsed_score_rank_p50_ms": 433.78,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      },
+      {
+        "occupation": "qa",
+        "priorities": 5,
+        "candidates": 1000,
+        "rubric_ms": 85.29,
+        "parse_score_rank_p50_ms": 1289.42,
+        "parsed_score_rank_p50_ms": 826.78,
+        "ai_calls": 0,
+        "provider_cost_usd": 0
+      }
+    ]
+  },
+  "limits": "Same local runtime; synthetic repeated profiles; 3 samples per size and occupation. CPU only, not HTTP/database/upload/extraction/UI latency or production percentiles."
+}

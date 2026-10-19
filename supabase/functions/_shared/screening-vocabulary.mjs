@@ -2,7 +2,7 @@
 // never direct substitutes unless the job explicitly offers them as alternatives.
 import {relationships,workflowRelationships} from './transferability.mjs';
 import {capabilityWorkflows} from './capability-workflows.mjs';
-export const vocabularyVersion='screening-vocabulary-v1';
+export const vocabularyVersion='screening-vocabulary-v2';
 export const normalize=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/[‐‑–—]/g,'-').replace(/\s+/g,' ').trim();
 export const escapeRE=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 export const hasTerm=(text,term)=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escapeRE(normalize(term))}(?=$|[^\\p{L}\\p{N}_])`,'u').test(normalize(text));
@@ -23,7 +23,7 @@ export const equivalentCapabilities=[
  ['account reconciliation','account reconciliations','reconciled accounts','reconciled bank accounts'],
  ['general ledger','gl'],['accounts payable','a/p'],['accounts receivable','a/r'],['journal entries','journal entry'],
  ['financial statements','financial reporting'],['financial close','month end close','month-end close','record to report'],
- ['patient assessment','patient assessments','assessed patients','assessing patients'],
+ ['patient assessment','patient assessments','assessed patients','assessing patients','assess patients','assesses patients'],
  ['bedside care','bedside nursing'],['medication administration','administered medications','administering medications'],
  ['care coordination','coordinated care','care planning','care plans'],['patient handoffs','clinical handoffs','handoffs'],['epic'],
  ['inventory control','inventory management','managed inventory','inventory tracking'],

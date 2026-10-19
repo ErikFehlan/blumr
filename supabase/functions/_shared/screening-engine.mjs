@@ -2,7 +2,8 @@
 import {evidenceTextRanges,isSourceInstruction} from './source-instructions.mjs';
 import {unsafeScreeningText} from './screening-rule-spec.mjs';
 import {validateQualification,qualificationProfile,evaluateQualification,matchQualificationEvidence} from './screening-qualifications.mjs';
-export const screeningVersion='screening-v3';
+import {evidencePassages,workEvidenceText} from './screening-evidence.mjs';
+export const screeningVersion='screening-v4';
 const norm=s=>String(s).normalize('NFKC').toLowerCase().replace(/[‐‑–—]/g,'-').replace(/\s+/g,' ').trim();
 const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const termRE=t=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escape(norm(t))}(?=$|[^\\p{L}\\p{N}_])`,'u');
@@ -59,9 +60,10 @@ export async function buildScreeningRubric({workspaceId,jobId,jobVersion,feedbac
 export function parseScreeningEvidence(text,{asOf}={}){
  if(typeof text!=='string'||text.length>1000000)throw Error('invalid_resume_text');
  const passages=[];
- for(const range of evidenceTextRanges(text))for(const raw of range.split(/\n+|(?<=[.!?;])\s+|,?\s+\b(?:but|however|whereas)\b\s+/i)){
-  const quote=raw.trim();if(!quote||personal.test(quote)||isSourceInstruction(quote))continue;
-  passages.push({sourceId:`screening-${passages.length+1}`,quote,normalized:norm(quote)});
+ for(const range of evidenceTextRanges(text))for(const quote of evidencePassages(range)){
+  const normalized=workEvidenceText(quote);
+  if(!quote||personal.test(normalized)||isSourceInstruction(quote))continue;
+  passages.push({sourceId:`screening-${passages.length+1}`,quote,normalized});
  }
  const profile=qualificationProfile(passages,asOf);
  return {passages,profile,reviewRequired:!passages.length,parserVersion:screeningVersion};
@@ -93,7 +95,9 @@ function evaluate(c,profile){
   const v=negative?0:direct?(substantive?1:0.35):(substantive?0.5:0.15);
   contradicted ||= negative&&direct;
   value=Math.max(value,v);
-  evidence.push({sourceId:p.sourceId,quote:p.quote,type:negative?'contradicted':direct?'direct':'inferred',depth:substantive?'practice':'mention',value:v});
+  const basis=matches.find(m=>m.substantive)||matches[0];
+  evidence.push({sourceId:p.sourceId,quote:p.quote,type:negative?'contradicted':direct?'direct':'inferred',depth:substantive?'practice':'mention',value:v,
+   interpretation:{actor:basis.actor,action:basis.action,depth:basis.depth,modality:basis.modality,negated:basis.negative}});
  }
  if(contradicted)value=Math.min(value,0.35);
  // Keep evidence responsible for the score even after many earlier mentions.

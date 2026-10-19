@@ -3,7 +3,7 @@ import {normalize,hasTerm,recognizedCapabilities,capabilityCondition,equivalentT
 import {durations,quantities} from './screening-qualifications.mjs';
 import {unsafeScreeningText} from './screening-rule-spec.mjs';
 
-export const requirementsVersion='job-requirements-v1';
+export const requirementsVersion='job-requirements-v2';
 const distinct=values=>[...new Set(values)];
 const all=nodes=>nodes.length===1?nodes[0]:{all:nodes};
 const any=nodes=>nodes.length===1?nodes[0]:{any:nodes};
@@ -12,9 +12,10 @@ export const excludedRequirement=text=>protectedText.test(text)||unsafeScreening
 export function requirementClauses(text){
  return String(text||'').split(/\n+|(?<=[.!?;])\s+|\s*;\s*/).map(s=>s.replace(/^\s*[-•*]+\s*/,'').trim()).filter(Boolean);
 }
+const notRequired=text=>/\b(not required|not mandatory|not necessary|no longer required|no requirement)\b|\bno\b(?:(?!\b(?:but|and|however|although)\b)[^.!?;]){1,100}\b(?:is|are) required\b/i.test(text);
 export function requirementType(text,fallback='inferred'){
  if(/\b(preferred|prefers?|preferably|nice.to.have|bonus|optional|a plus)\b/i.test(text))return 'preferred';
- if(/\b(not required|not mandatory|not necessary|no requirement)\b/i.test(text))return 'inferred';
+ if(notRequired(text))return 'inferred';
  if(/\b(must|required|requires?|mandatory|minimum|essential|at least)\b/i.test(text))return 'required';
  return fallback;
 }
@@ -47,7 +48,7 @@ function termList(condition){
  return (condition.all||condition.any||[]).flatMap(termList);
 }
 const occupationActivities=[
- ['software engineer',['software','application','applications','code','coding','api','apis','services','software development','software engineering']],
+ ['software engineer',['software','application','applications','code','coding','api','apis','services','software development','software engineering','backend','frontend','interfaces','interface','endpoints','integrations','etl pipelines','portals','test suite']],
  ['cloud engineer',['cloud','azure','aws','infrastructure','platform']],
  ['qa engineer',['testing','tests','test','defects','regression']],
  ['application security engineer',['security','sast','dast','vulnerabilities','threat modeling']],
@@ -74,6 +75,8 @@ function jurisdiction(text){
  const states='Alabama:AL|Alaska:AK|Arizona:AZ|Arkansas:AR|California:CA|Colorado:CO|Connecticut:CT|Delaware:DE|Florida:FL|Georgia:GA|Hawaii:HI|Idaho:ID|Illinois:IL|Indiana:IN|Iowa:IA|Kansas:KS|Kentucky:KY|Louisiana:LA|Maine:ME|Maryland:MD|Massachusetts:MA|Michigan:MI|Minnesota:MN|Mississippi:MS|Missouri:MO|Montana:MT|Nebraska:NE|Nevada:NV|New Hampshire:NH|New Jersey:NJ|New Mexico:NM|New York:NY|North Carolina:NC|North Dakota:ND|Ohio:OH|Oklahoma:OK|Oregon:OR|Pennsylvania:PA|Rhode Island:RI|South Carolina:SC|South Dakota:SD|Tennessee:TN|Texas:TX|Utah:UT|Vermont:VT|Virginia:VA|Washington:WA|West Virginia:WV|Wisconsin:WI|Wyoming:WY|District of Columbia:DC|Puerto Rico:PR|Ontario:ON|Quebec:QC|Alberta:AB|British Columbia:BC';
  const places=states.split('|').map(s=>s.split(':')),known=places.find(names=>hasTerm(text,names[0]));
  if(known)return known.map(normalize);
+ const abbreviated=places.find(([,code])=>new RegExp('\\b'+code+'(?=\\s+(?:RN|LPN|nursing|teaching|medical|license|licence|registration)\\b)|\\b(?:in|for)\\s+'+code+'\\b').test(text));
+ if(abbreviated)return abbreviated.map(normalize);
  // Preserve explicit unfamiliar regions as exact source terms instead of
  // assuming that an unrelated jurisdiction satisfies the requirement.
  const suffix=text.match(/\b(?:license|licence|registration)\s+(?:(?:required|valid|active|current)\s+)?(?:in|for)\s+(?:the state of\s+)?([a-z ]+?)(?=\s+(?:is|required|preferred|and|or)\b|[.!;,]|$)/i)?.[1];
@@ -99,7 +102,7 @@ function credentials(text){
  const degree=text.match(/\b(bachelor(?:[’']s)?|master(?:[’']s)?|doctorate|doctoral|ph\.?d\.?|associate(?:[’']s)?|diploma|BSc|MSc|MBA|BS|BA|MS)\b/i);
  if(degree){
   const word=normalize(degree[1]),level=/^(master|msc|mba|ms)/.test(word)?'masters':/^(doctor|ph)/.test(word)?'doctorate':/^associate|diploma/.test(word)?'associate':'bachelors';
-  const byLevel={bachelors:['bachelor','bachelors',"bachelor's",'bachelor’s','bsc','b.s.','bs','ba','b.a.'],masters:['master','masters',"master's",'master’s','msc','m.s.','ms','mba'],doctorate:['doctorate','doctoral','phd','ph.d.'],associate:['associate',"associate's",'associate’s','diploma']};
+  const byLevel={bachelors:['bachelor','bachelors',"bachelor's",'bachelor’s','bsc','b.sc.','b.s.','bs','ba','b.a.'],masters:['master','masters',"master's",'master’s','msc','m.sc.','m.s.','ms','mba'],doctorate:['doctorate','doctoral','phd','ph.d.'],associate:['associate',"associate's",'associate’s','diploma']};
   const field=text.match(/\b(?:degree|bachelor(?:[’']s)?|master(?:[’']s)?|BSc|BS|BA|MSc|MS)\s+(?:degree\s+)?in\s+([^,;.]+?)(?=\s+(?:is |required|preferred|or\b)|[,;.]|$)/i)?.[1]?.trim();
   found.push({credential:{terms:byLevel[level],current:false,jurisdiction:[],fieldTerms:field?[normalize(field)]:[],level}});
  }
@@ -132,7 +135,7 @@ function relevantSource(title,quote){
 export function compileRequirement({id,title,sourceQuote=title,requirementType:kind='inferred',weight=1,origin='job',spec,jobTitle='',question=''}){
  const source=origin==='recruiter'?sourceQuote:relevantSource(title,sourceQuote),type=requirementType(source,kind);
  if(excludedRequirement(title)||excludedRequirement(source))return {excluded:true,id,title,sourceQuote:source,reason:'non_job_related_or_instruction'};
- if(/\b(not required|not mandatory|not necessary|no requirement)\b/i.test(source)&&!/(preferred|optional|nice.to.have)/i.test(source))return {excluded:true,id,title,sourceQuote:source,reason:'explicitly_not_required'};
+ if(notRequired(source)&&!/(preferred|optional|nice.to.have)/i.test(source))return {excluded:true,id,title,sourceQuote:source,reason:'explicitly_not_required'};
  const allDurations=durations(source),recent=allDurations.find(d=>/\b(?:past|last|within)\s*(?:the\s*)?$/i.test(source.slice(0,d.start))),
   ds=allDurations.filter(d=>d!==recent&&(/\b(experience|experienced|background|practice|working|using)\b/i.test(source)||/\b(minimum|at least|required|mandatory)\b/i.test(source)&&recognizedCapabilities(source).length)),
   creds=credentials(source),role=occupation(source,jobTitle),workflow=workflowFor(title);
@@ -255,9 +258,9 @@ export function compileJobRequirements({job,priorities,managerSources=[]}){
   if(matches.length){
    for(const r of matches){
     if(emphasize&&['priority','recruiter'].includes(r.origin)){r.baseWeight??=r.weight;r.weight=r.baseWeight*2;adjustments.push({priorityId:r.id,sourceId:m.id,sourceQuote:m.quote,type:'explicit_emphasis',multiplier:2});}
-    const notRequired=/\b(not required|not mandatory|not necessary|no longer required)\b/i.test(m.text),updatedType=requirementType(m.text);
-    if(notRequired||updatedType!=='inferred'){
-     const previous=r.requirementType;r.requirementType=notRequired?(updatedType==='preferred'?'preferred':'inferred'):updatedType;
+    const optional=notRequired(m.text),updatedType=requirementType(m.text);
+    if(optional||updatedType!=='inferred'){
+     const previous=r.requirementType;r.requirementType=optional?(updatedType==='preferred'?'preferred':'inferred'):updatedType;
      if(previous!==r.requirementType)adjustments.push({priorityId:r.id,sourceId:m.id,sourceQuote:m.quote,type:'qualification_type',from:previous,to:r.requirementType});
     }
     // Only an explicit manager threshold changes a numerical requirement.

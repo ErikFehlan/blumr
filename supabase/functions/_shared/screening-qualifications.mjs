@@ -1,42 +1,31 @@
-import {interval,unionMonths,experienceAction} from './experience-intelligence.mjs';
-import {normalize,hasTerm,escapeRE,capabilityWorkflows,equivalentTitles} from './screening-vocabulary.mjs';
+import {interval,unionMonths} from './experience-intelligence.mjs';
+import {normalize,hasTerm,escapeRE,capabilityWorkflows,titleFamilies} from './screening-vocabulary.mjs';
+
+import {interpretEvidence,evidenceActionPattern} from './screening-evidence.mjs';
 
 const numbers={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20};
 const numberPattern='(?:\\d+(?:\\.\\d+)?|'+Object.keys(numbers).join('|')+')';
 export const durationPattern=new RegExp('\\b('+numberPattern+')(?:\\s*(?:[-–]|to)\\s*('+numberPattern+'))?\\s*(?:\\+|plus)?\\s*(years?|yrs?|months?)\\b','ig');
 export const numberValue=v=>numbers[normalize(v)]??Number(v);
 export function durations(text){
- return [...String(text).matchAll(new RegExp(durationPattern))].map(m=>({start:m.index,end:m.index+m[0].length,quote:m[0],months:numberValue(m[1])*(/^m/i.test(m[3])?1:12),maximumMonths:numberValue(m[2]||m[1])*(/^m/i.test(m[3])?1:12)}));
+ const explicit=[...String(text).matchAll(new RegExp(durationPattern))].map(m=>({start:m.index,end:m.index+m[0].length,quote:m[0],months:numberValue(m[1])*(/^m/i.test(m[3])?1:12),maximumMonths:numberValue(m[2]||m[1])*(/^m/i.test(m[3])?1:12)}));
+ for(const m of String(text).matchAll(/\bhalf a decade\b/ig))explicit.push({start:m.index,end:m.index+m[0].length,quote:m[0],months:60,maximumMonths:60});
+ return explicit.sort((a,b)=>a.start-b.start);
 }
 export function quantities(text){
  const values=[];
- const count=/\b(\d[\d,]*(?:\.\d+)?)\s*(?:[- ](?:person|member)|people|staff|employees|engineers|direct reports|team members|patients|accounts|sites|users|orders)\b/ig;
+ const count=new RegExp('\\b('+numberPattern+'|\\d[\\d,]*)\\s*(?:(?:software|platform|clinical|senior|junior)\\s+)?(?:[- ](?:person|member)|people|staff|employees|engineers|direct reports|team members|patients|accounts|sites|users|orders)\\b','ig');
  for(const m of String(text).matchAll(count)){
   const unit=/people|staff|employees|engineers|direct reports|team members|person|member/i.test(m[0])?'people':m[0].match(/patients|accounts|sites|users|orders/i)[0].toLowerCase();
-  values.push({amount:Number(m[1].replaceAll(',','')),unit,quote:m[0]});
+  values.push({amount:numberValue(m[1].replaceAll(',','')),unit,quote:m[0]});
  }
- for(const m of String(text).matchAll(/\bteam of\s+(\d+)\b/ig))values.push({amount:Number(m[1]),unit:'people',quote:m[0]});
+ for(const m of String(text).matchAll(new RegExp('\\bteam of\\s+('+numberPattern+')\\b','ig')))values.push({amount:numberValue(m[1]),unit:'people',quote:m[0]});
  for(const m of String(text).matchAll(/([$£€])\s*(\d[\d,]*(?:\.\d+)?)\s*(billion|million|thousand|bn|m|k)?\b/ig))values.push({amount:Number(m[2].replaceAll(',',''))*({billion:1e9,bn:1e9,million:1e6,m:1e6,thousand:1e3,k:1e3}[m[3]?.toLowerCase()]||1),unit:m[1],quote:m[0]});
  return values;
 }
 const requirementWording=/\b(?:required|preferred|must (?:have|hold)|candidates? (?:should|must)|job (?:description|requires?))\b/i;
-const actionWords=/\b(?:built|designed|implemented|developed|owned|led|managed|performed|reconciled|prepared|processed|operated|administered|delivered|maintained|tested|used|coordinated|negotiated|treated|assessed|sourced|screened|analyzed|analysed|taught|trained|repaired|inspected|monitored|resolved|documented|tracked|verified|planned|scheduled|facilitated|measured|reduced|increased|closed|restored|picked|packed|received|migrated|mentored|architected|supported|assisted|helped|shadowed|observed|contributed|collaborated)\b/ig;
-const limited=/\b(familiar|exposure|observed|studying|learning|interested|assisted|shadowed|participated|helped|supported|contributed)\b/i;
-export function matchQualificationEvidence(pattern,passage){
- const match=pattern.exec(passage.normalized);if(!match)return null;
- const at=match.index+(match[0].match(/^[^\p{L}\p{N}_]/u)?.[0].length||0);
- const before=passage.normalized.slice(0,at),after=passage.normalized.slice(match.index+match[0].length);
- const negatives=[...before.matchAll(/\b(no|not(?! only\b| just\b)|never|without|lack(?:s|ed|ing)?|haven't|hasn't|didn't|cannot|unfamiliar)\b/ig)],last=negatives.at(-1);
- const tail=last?before.slice(last.index+last[0].length):'';
- const newClause=/(?:,|\band\b)/.test(tail)&&[...tail.matchAll(actionWords)].some(m=>m.index>Math.max(tail.lastIndexOf(','),tail.lastIndexOf(' and ')));
- const negative=Boolean(last&&!newClause)||/^\s*(?:experience\s*)?(?:(?:is|was)\s+)?(?:not\b|none\b|only theoretical\b)/i.test(after);
- // Select the local action when a sentence contrasts assistance with ownership.
- const actions=[...before.matchAll(actionWords)],lastAction=actions.at(-1);
- const clause=lastAction?passage.quote.slice(Math.max(0,lastAction.index-18)):passage.quote;
- const depth=experienceAction(clause)||(/\b(restored|picked|packed|received|migrated)\b/i.test(clause)?'practice':/\b(mentored|architected)\b/i.test(clause)?'ownership':null);
- const substantive=!requirementWording.test(passage.quote)&&! /\b(?:would have|will have|plan to|hope to)\b/i.test(passage.quote)&&Boolean(depth)&&!['exposure','team_exposure','contribution'].includes(depth)&&!limited.test(clause);
- return {negative,substantive,depth:depth||'mention'};
-}
+const actionWords=evidenceActionPattern;
+export const matchQualificationEvidence=interpretEvidence;
 export const termPattern=term=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escapeRE(normalize(term))}(?=$|[^\\p{L}\\p{N}_])`,'u');
 const originalEvidence=(p,fields={})=>({sourceId:p.sourceId,quote:p.quote,type:'direct',...fields});
 
@@ -44,15 +33,25 @@ const originalEvidence=(p,fields={})=>({sourceId:p.sourceId,quote:p.quote,type:'
 // converted into years using every tool mentioned in the role.
 export function qualificationProfile(passages,asOf){
  const date=new Date(asOf||Date.now());if(Number.isNaN(date.getTime()))throw Error('invalid_assessment_date');
- const episodes=[];let episode=null,section='work';
+ const episodes=[],preceding=[];let episode=null,section='work';
  for(const p of passages){
-  if(/^(education|qualifications|certifications?|licen[cs]es?|professional credentials)\s*:?$/i.test(p.quote)){section='credentials';episode=null;}
+  if(/^(education(?: and certifications)?|qualifications|certifications?|licen[cs]es?|professional credentials)\s*:?$/i.test(p.quote)){section='credentials';episode=null;}
   if(/^(skills|technical skills|technologies|tools|interests|references)\s*:?$/i.test(p.quote)){section='list';episode=null;}
-  if(/^(work|professional|employment|relevant|consulting|project)\s+(history|experience|engagements|projects)\s*:?$/i.test(p.quote)){section='work';episode=null;}
-  const dates=section!=='credentials'?interval(p.quote,date):null;
-  if(dates){episode={id:'work-'+(episodes.length+1),...dates,header:p,passages:[]};episodes.push(episode);section='work';}
+  if(/^(?:(?:work|professional|employment|relevant|consulting|project)\s+(?:history|experience|engagements|projects)|experience|employment)\s*:?$/i.test(p.quote)){section='work';episode=null;}
+  const dates=section==='work'?interval(p.quote,date):null;
+  if(dates){
+   const adjacent=[];
+   for(const prior of preceding.slice(-2).reverse()){
+    if(prior.section!=='work'||interval(prior.quote,date)||prior.quote.length>160||/[.!?]$/.test(prior.quote))break;
+    const title=titleFamilies.some(names=>names.some(t=>hasTerm(prior.quote,t)));
+    if(title){adjacent.push(prior);break;}
+    if(new RegExp(actionWords.source,'i').test(prior.quote))break;
+   }
+   episode={id:'work-'+(episodes.length+1),...dates,header:p,titlePassages:adjacent,passages:[]};episodes.push(episode);
+  }
   p.episodeId=episode?.id||null;p.section=section;
   if(episode)episode.passages.push(p);
+  preceding.push(p);
  }
  return {asOf:date.toISOString().slice(0,10),passages,episodes};
 }
@@ -81,7 +80,7 @@ export function validateQualification(node){
 }
 const finding=(value,status,evidence=[],extra={})=>({value,status,evidence,...extra});
 function matches(p,terms){return terms.map(t=>matchQualificationEvidence(termPattern(t),p)).filter(Boolean);}
-function candidateFacts(profile,terms){return profile.passages.map(p=>({p,m:terms.length?matches(p,terms):[matchQualificationEvidence(new RegExp(actionWords.source,'i'),p)].filter(Boolean)})).filter(r=>r.m.length);}
+function candidateFacts(profile,terms){return profile.passages.map(p=>({p,m:terms.length?matches(p,terms):[matchQualificationEvidence(new RegExp(actionWords.source,'i'),p)].filter(Boolean)})).filter(r=>r.m.some(m=>m.actor==='applicant'&&m.modality==='asserted'));}
 function experienceFinding(q,profile){
  const evidence=[],claims=[];let denied=false;
  for(const {p,m} of candidateFacts(profile,q.terms)){
@@ -104,8 +103,8 @@ function experienceFinding(q,profile){
  if(best?.months>=q.months&&!short&&!denied)return finding(1,'supported',evidence,{months:best.months,basis:'resume_claim',verificationRequired:true});
  const relevant=[];
  if(q.kind!=='skill')for(const e of profile.episodes){
-  const titleMatch=q.kind==='general'||q.titles.some(t=>hasTerm(e.header.quote,t));
-  const practice=e.passages.some(p=>q.kind==='general'?Boolean(experienceAction(p.quote)):candidateFacts({passages:[p]},q.terms).some(r=>r.m.some(m=>m.substantive&&!m.negative)));
+  const titleMatch=q.kind==='general'||[e.header,...(e.titlePassages||[])].some(p=>q.titles.some(t=>hasTerm(p.quote,t)));
+  const practice=e.passages.some(p=>q.kind==='general'?candidateFacts({passages:[p]},[]).some(r=>r.m.some(m=>m.substantive&&!m.negative)):candidateFacts({passages:[p]},q.terms).some(r=>r.m.some(m=>m.substantive&&!m.negative)));
   if(titleMatch&&practice)relevant.push(e);
  }
  // For exact tools, only an explicitly dated activity establishes a period.
@@ -113,9 +112,11 @@ function experienceFinding(q,profile){
   const span=interval(p.quote,new Date(profile.asOf));
   if(span&&matches(p,q.terms).some(m=>m.substantive&&!m.negative))relevant.push({...span,header:p});
  }
- const precise=relevant.filter(e=>e.precision==='month'),documented=unionMonths([...precise]);
+ const ambiguousRole=e=>[e.header,...(e.titlePassages||[])].some(p=>/\b(other|various|multiple) roles\b/i.test(p.quote));
+ const precise=relevant.filter(e=>e.precision==='month'&&!ambiguousRole(e)),documented=unionMonths([...precise]);
  for(const e of relevant){
-  evidence.push(originalEvidence(e.header,{basis:e.precision==='month'?'documented_relevant_period':'partial_dates',startMonth:e.start_month,endMonth:e.end_month}));
+  for(const p of e.titlePassages||[])evidence.push(originalEvidence(p,{basis:'adjacent_role_title'}));
+  evidence.push(originalEvidence(e.header,{basis:ambiguousRole(e)?'ambiguous_role_duration':e.precision==='month'?'documented_relevant_period':'partial_dates',startMonth:e.start_month,endMonth:e.end_month}));
   for(const p of (e.passages||[]).filter(p=>candidateFacts({passages:[p]},q.terms).some(r=>r.m.some(m=>m.substantive&&!m.negative))).slice(0,2))evidence.push(originalEvidence(p,{basis:'relevant_work_in_period'}));
  }
  if(documented>=q.months&&!short&&!denied)return finding(1,'supported',evidence,{months:documented,basis:'documented_relevant_periods',verificationRequired:true});
@@ -123,12 +124,12 @@ function experienceFinding(q,profile){
  return finding(evidence.length?Math.min(0.7,(best?.months||documented||0)/q.months):0,evidence.length?'partial':'unknown',evidence,{months:best?.months||documented||null,verificationRequired:true});
 }
 function credentialFinding(q,profile){
- const rows=candidateFacts(profile,q.terms),evidence=[];let value=0,contradicted=false,pending=false;
+ const rows=candidateFacts(profile,q.terms),evidence=[],events=[];let value=0,contradicted=false,pending=false;
  for(const {p,m} of rows){
   if(requirementWording.test(p.quote))continue;
   if(q.fieldTerms?.length&&!q.fieldTerms.some(t=>hasTerm(p.quote,t)))continue;
   if(/\b(?:worked with|alongside|supported|supervised|managed|trained)\b.{0,35}\b(?:CPAs?|RNs?|nurses?|teachers?)\b/i.test(p.quote))continue;
-  const scope=q.jurisdiction?.length?q.jurisdiction.some(t=>hasTerm(p.quote,t)):true;
+  const scope=q.jurisdiction?.length?q.jurisdiction.some(t=>t.length===2?new RegExp('\\b'+escapeRE(t.toUpperCase())+'\\b').test(p.quote):hasTerm(p.quote,t)):true;
   const expiry=p.quote.match(/\b(?:expires?|expiration|valid (?:through|until))\s*:?\s*((?:20\d{2}-\d{2}-\d{2})|(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:\d{1,2},?\s+)?20\d{2})|20\d{2})/i);
   let expired=false,datedCurrent=false;
   if(expiry){
@@ -144,9 +145,25 @@ function credentialFinding(q,profile){
   const studying=/\b(pending|candidate for|studying|pursuing|in progress|scheduled|prepar(?:ing|ation)|coursework|training course|eligible|exam prep|(?:will|intend to|plan to|expect to) (?:earn|obtain|complete|receive)|working toward)\b/i.test(p.quote);
   const claimed=p.section==='credentials'||/\b(certifi\w*|licen[cs]\w*|holds?|earned|awarded|completed|bachelor\w*|master\w*|doctor\w*|degree|diploma|BSc|BA|BS|MSc|MBA|MS|PhD|current|active|valid)\b/i.test(p.quote);
   const current=/\b(current|active|valid|renewed)\b/i.test(p.quote)||datedCurrent;
-  const v=negative?0:!claimed||studying||!scope||q.current&&!current?0.35:1;
-  contradicted||=negative;pending||=studying;value=Math.max(value,v);
+  let v=negative?0:!claimed||studying||!scope||q.current&&!current?0.35:1;
+  const event=p.quote.match(/\b(renewed|reinstated|expired|revoked|suspended)\s+((?:20\d{2}-\d{2}-\d{2})|(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:\d{1,2},?\s+)?20\d{2})|20\d{2})/i);
+  const eventTime=event?Date.parse(event[2]):NaN;
+  const rawEvent=event?.[2]||'',eventEnd=/^\d{4}$/.test(rawEvent)?Date.UTC(Number(rawEvent),11,31):
+   /^[a-z]+\s+\d{4}$/i.test(rawEvent)?Date.UTC(new Date(eventTime).getUTCFullYear(),new Date(eventTime).getUTCMonth()+1,0):eventTime;
+  const futureEvent=Number.isFinite(eventTime)&&eventTime>Date.parse(profile.asOf);
+  if(futureEvent)v=Math.min(v,0.35);
+  pending||=studying||futureEvent;value=Math.max(value,v);
+  events.push({negative,time:eventTime,end:eventEnd,renewal:scope&&!studying&&!negative&&!futureEvent&&/^(renewed|reinstated)$/i.test(event?.[1]||''),sourceId:p.sourceId,scope});
   evidence.push(originalEvidence(p,{type:negative?'contradicted':'direct',value:v,credentialClaim:true,verificationRequired:true,...(expiry?{expiryText:expiry[0]}:{})}));
+ }
+ // Only a dated later renewal of the required credential/jurisdiction resolves
+ // an older invalidity. Undated conflicts and later revocations stay unresolved.
+ for(const event of events.filter(e=>e.negative)){
+  const renewal=Number.isFinite(event.end)&&event.scope&&events.find(e=>e.renewal&&e.time>event.end);
+  if(renewal){
+   const item=evidence.find(e=>e.sourceId===event.sourceId);
+   item.type='historical';item.supersededBy=renewal.sourceId;
+  }else contradicted=true;
  }
  if(contradicted)value=Math.min(value,0.35);
  return finding(value,contradicted?'contradicted':value===1?'supported':evidence.length?'partial':'unknown',evidence,{verificationRequired:true,independentlyVerified:false,...(pending?{pending:true}:{})});
@@ -154,10 +171,11 @@ function credentialFinding(q,profile){
 function depthFinding(q,profile){
  const evidence=[];let value=0,negative=false;
  for(const {p,m} of candidateFacts(profile,q.terms||[])){
-  const matches=m.filter(x=>!x.negative),depth=experienceAction(p.quote)||matches.find(x=>x.depth)?.depth;
+  const matches=m.filter(x=>!x.negative&&x.actor==='applicant'),depth=matches.find(x=>x.substantive)?.depth||matches.find(x=>x.depth)?.depth;
   if(!matches.length){negative=true;evidence.push(originalEvidence(p,{type:'contradicted',value:0}));continue;}
   const practice=matches.some(x=>x.substantive),team=/\b(collaborat\w*|partnered|alongside|with (?:the |a )?team|coordinated with)\b/i.test(p.quote);
-  const people=/\b(?:managed|supervised|led)\s+(?:(?:a|the)\s+)?(?:team|staff|people|employees|direct reports)\b|\b(?:hired|coached|mentored)\b.{0,50}\b(?:engineers|staff|employees|team|teachers|nurses)\b|\bperformance reviews\b/i.test(p.quote);
+  const people=/\b(?:manage[ds]?|managing|supervise[ds]?|supervising|led|leads?)\s+(?:(?:a|the)\s+)?(?:team|staff|people|employees|direct reports)\b|\b(?:hired|coached|mentored)\b.{0,50}\b(?:engineers|staff|employees|team|teachers|nurses)\b|\bperformance reviews\b/i.test(p.quote)||
+   matches.some(m=>/^(manage[ds]?|managing|supervise[ds]?|supervising|led|leads?)$/.test(m.action||'')&&quantities(m.clause).some(n=>n.unit==='people'));
   const ownership=practice&&(depth==='ownership'||/\b(accountable|owned|architected|decision|design authority)\b/i.test(p.quote));
   const implemented=practice&&(depth==='implementation'||/\b(implemented|designed|developed|built|migrated|configured|architected)\b/i.test(p.quote));
   const sufficient={practice,implementation:implemented,ownership,people_management:people&&practice,team_delivery:team&&(practice||depth==='contribution'),senior:(ownership||implemented)&&/\b(architect\w*|design\w*|led|owned|mentor\w*|complex|production|standards|decisions|enterprise)\b/i.test(p.quote),enterprise:practice&&/\b(enterprise|organization-wide|multi-site|multiple sites|company-wide|global)\b/i.test(p.quote)}[q.level];
@@ -204,14 +222,14 @@ function recencyFinding(q,profile){
 }
 function quantityFinding(q,profile){
  const evidence=[];let value=0,denied=false;
- for(const p of profile.passages)for(const quote of p.quote.split(new RegExp('\\s+(?:and|while)\\s+(?='+actionWords.source+')','i'))){
-  const local={...p,quote,normalized:normalize(quote)},found=quantities(quote).filter(m=>m.unit===q.unit);
-  if(!found.length||!experienceAction(quote))continue;
+ for(const p of profile.passages)for(const quote of p.quote.split(new RegExp('\\s+(?:and|while)\\s+(?=(?:I|we|my|our|the|their|he|she|they)\\b|'+actionWords.source+')','i'))){
+  const inheritedActor=interpretEvidence(new RegExp(escapeRE(normalize(quote)),'i'),p)?.actor;
+  const local={...p,quote,normalized:normalize(quote),inheritedActor},found=quantities(quote).filter(m=>m.unit===q.unit);
+  if(!found.length)continue;
   const m=candidateFacts({passages:[local]},q.terms||[])[0]?.m||[];
   if(m.length&&m.every(m=>m.negative)){denied=true;evidence.push(originalEvidence(p,{type:'contradicted',value:0}));continue;}
   if(!m.some(m=>m.substantive&&!m.negative))continue;
-  if(/\b(team_exposure|exposure|contribution)\b/.test(experienceAction(quote)))continue;
-  if(q.activity==='people_management'&&!/\b(managed|supervised|led)\b.{0,45}\b(team|people|staff|employees|engineers|direct reports)\b/i.test(quote))continue;
+  if(q.activity==='people_management'&&!/\b(manage[ds]?|managing|supervise[ds]?|supervising|led|leads?)\b.{0,45}\b(team|people|staff|employees|engineers|direct reports)\b/i.test(quote))continue;
   const amount=Math.max(...found.map(x=>x.amount)),negative=/\b(no|never|not|only)\b/i.test(quote)&&amount<q.amount;
   const v=negative?0:Math.min(1,amount/q.amount);value=Math.max(value,v);denied||=negative;
   evidence.push(originalEvidence(p,{type:negative?'contradicted':'direct',amount,unit:q.unit,value:v}));
