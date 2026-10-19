@@ -1,9 +1,10 @@
 import {fingerprint,withDirectIdempotency} from '../_shared/direct-idempotency.ts';
 import {reserveModelCall,recordProviderUsage,SecurityLimit,securityMessage} from '../_shared/security.ts';
-import {priorityInput,priorityVersion,generatePriorities} from './generate.ts';
+import {priorityInput,priorityGenerationVersion,generatePriorities} from './generate.ts';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Access-Control-Allow-Origin':'*'}});
 // Called only after real-user authentication and workspace membership checks.
 export async function handlePriorityDraft(raw:unknown,scope:{workspace:string;actor:string;base:string;serviceKey:string}) {
+  const priorityVersion=priorityGenerationVersion();
   let input;try{input=priorityInput(raw);}catch(error){return json({code:(error as Error).message,error:'Add a job title and a readable job description before preparing priorities.'},400);}
   const key=await fingerprint({version:priorityVersion,input}),headers={Authorization:'Bearer '+scope.serviceKey,apikey:scope.serviceKey,'Content-Type':'application/json'};
   const query=`workspace_id=eq.${encodeURIComponent(scope.workspace)}&actor_id=eq.${encodeURIComponent(scope.actor)}&fingerprint=eq.${key}`;

@@ -1,4 +1,5 @@
 import {handlePriorityDraft} from '../refine-job-criteria/drafts.ts';
+import {handleRulesScreening} from './screening.ts';
 import {boundedJSON, reserveModelCall, recordProviderUsage, SecurityLimit, securityMessage} from '../_shared/security.ts';
 import {withDirectIdempotency} from '../_shared/direct-idempotency.ts';
 import { handleAnalysis } from "../analyze-patterns-v2/analysis.ts";
@@ -52,6 +53,7 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   if (!serviceKey) return json({ error: "Analysis service configuration incomplete" }, 503);
 
   if(payload.analysis_type==='hiring_priorities')return handlePriorityDraft(payload.job,{workspace:workspaceId,actor:user.id,base:supabaseUrl,serviceKey});
+  if(payload.analysis_type==='rules_screening')return handleRulesScreening(payload,{workspace:workspaceId,base:supabaseUrl,serviceKey,headers});
 
   // Memory is resolved from reviewed server records, never trusted from the
   // browser's claimed approval status. The caller JWT enforces workspace access.

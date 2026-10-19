@@ -2,7 +2,9 @@ import {jobPassages, prioritiesSchema, priorityInstructions, validatePriorities}
 import {untrustedInputInstructions} from '../_shared/untrusted-input.mjs';
 import {analysisModel, modelReasoning} from '../_shared/model-routing.mjs';
 import {fetchWithRetry} from '../_shared/provider-retry.ts';
+import {screeningRuleInstructions} from '../_shared/screening-rule-spec.mjs';
 export const priorityVersion='role-priorities-v3';
+export const priorityGenerationVersion=()=>Deno.env.get('RULES_FIRST_SCREENING')==='true'?'role-priorities-v4-screening':priorityVersion;
 export type PriorityInput={title:string;description:string;manager_notes?:string};
 export function priorityInput(value:any):PriorityInput {
   if(!value||typeof value.title!=='string'||!value.title.trim()||typeof value.description!=='string'||!value.description.trim())throw Error('invalid_priority_input');
@@ -14,10 +16,11 @@ export async function generatePriorities(input:PriorityInput,options:{beforeMode
   if(!passages.length)return {hiring_priorities:[],model:priorityVersion};
   const apiKey=Deno.env.get('OPENAI_API_KEY');if(!apiKey)throw Error('ai_unavailable');
   const data={job:{title:input.title},job_description_sources:passages,manager_context:input.manager_notes||''};
-  const instructions=untrustedInputInstructions+priorityInstructions;
+  const screening=Deno.env.get('RULES_FIRST_SCREENING')==='true';
+  const instructions=untrustedInputInstructions+priorityInstructions+(screening?screeningRuleInstructions:'');
   await options.beforeModel(new TextEncoder().encode(JSON.stringify(data)+instructions).length,4000);
   let r:Response;
-  try{r=await fetchWithRetry('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model,...modelReasoning(model,'reassessment'),store:false,max_output_tokens:4000,instructions,input:JSON.stringify(data),text:{format:{type:'json_schema',name:'job_priorities',strict:true,schema:{type:'object',additionalProperties:false,required:['hiring_priorities'],properties:{hiring_priorities:prioritiesSchema(passages)}}}}})},{timeoutMs:90000,maxRetries:2,requestId:options.requestId,retryTransport:!options.retainAmbiguousFailures});}
+  try{r=await fetchWithRetry('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({model,...modelReasoning(model,'reassessment'),store:false,max_output_tokens:4000,instructions,input:JSON.stringify(data),text:{format:{type:'json_schema',name:'job_priorities',strict:true,schema:{type:'object',additionalProperties:false,required:['hiring_priorities'],properties:{hiring_priorities:prioritiesSchema(passages,{screening})}}}}})},{timeoutMs:90000,maxRetries:2,requestId:options.requestId,retryTransport:!options.retainAmbiguousFailures});}
   catch{throw Error(options.retainAmbiguousFailures?'provider_outcome_uncertain':'ai_unavailable');}
   if(!r.ok){
     const failure=await r.json().catch(()=>null);

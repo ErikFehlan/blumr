@@ -1,13 +1,14 @@
 // Shared, provider-free screening kernel. Callers must authorize workspace/job access.
 import {evidenceTextRanges,isSourceInstruction} from './source-instructions.mjs';
-export const screeningVersion='screening-v1';
+import {unsafeScreeningText} from './screening-rule-spec.mjs';
+export const screeningVersion='screening-v2';
 const norm=s=>String(s).normalize('NFKC').toLowerCase().replace(/[‐‑–—]/g,'-').replace(/\s+/g,' ').trim();
 const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const termRE=t=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escape(norm(t))}(?=$|[^\\p{L}\\p{N}_])`,'u');
-const negation=/\b(no|not|never|without|lack(?:s|ed)?|haven't|hasn't|didn't|cannot)\b/i;
-const limited=/\b(familiar|exposure|observed|studying|learning|interested|team used|team built|assisted)\b/i;
-const action=/\b(built|designed|implemented|developed|owned|led|managed|performed|reconciled|prepared|processed|operated|administered|delivered|maintained|tested|used|coordinated|negotiated|treated|assessed|sourced|screened)\b/i;
-const personal=/\b(date of birth|marital|religion|nationality|gender|ethnicity|race|disability|pregnan|sexual orientation|citizenship|postal code|zip code|graduation year)\b/i;
+const negation=/\b(no|not(?! only\b| just\b)|never|without|lack(?:s|ed|ing)?|haven't|hasn't|didn't|cannot|unfamiliar)\b/ig;
+const limited=/\b(familiar|exposure|observed|studying|learning|interested|assisted|shadowed|participated|helped|team\s+(?:used|built|implemented|designed|managed))\b/i;
+const action=/\b(built|designed|implemented|developed|owned|led|managed|performed|reconciled|prepared|processed|operated|administered|delivered|maintained|tested|used|coordinated|negotiated|treated|assessed|sourced|screened|analyzed|analysed|taught|trained|repaired|inspected|monitored|resolved|documented|tracked|verified|planned|scheduled|facilitated|measured|reduced|increased|closed)\b/i;
+const personal={test:unsafeScreeningText};
 const stable=x=>JSON.stringify(x,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
 export async function fingerprint(value){
  const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stable(value)));
@@ -49,11 +50,25 @@ export async function buildScreeningRubric({workspaceId,jobId,jobVersion,feedbac
 export function parseScreeningEvidence(text){
  if(typeof text!=='string'||text.length>1000000)throw Error('invalid_resume_text');
  const passages=[];
- for(const range of evidenceTextRanges(text))for(const raw of range.split(/\n+|(?<=[.!?;])\s+/)){
+ for(const range of evidenceTextRanges(text))for(const raw of range.split(/\n+|(?<=[.!?;])\s+|,?\s+\b(?:but|however|whereas)\b\s+/i)){
   const quote=raw.trim();if(!quote||personal.test(quote)||isSourceInstruction(quote))continue;
   passages.push({sourceId:`screening-${passages.length+1}`,quote,normalized:norm(quote)});
  }
  return {passages,reviewRequired:!passages.length,parserVersion:screeningVersion};
+}
+function matchEvidence(pattern,passage){
+ const match=pattern.exec(passage.normalized);if(!match)return null;
+ // Scope negation to the matched capability, not incidental outcomes such as
+ // "implemented Azure without downtime". Negative lists remain negative.
+ const at=match.index+(match[0].match(/^[^\p{L}\p{N}_]/u)?.[0].length||0);
+ const before=passage.normalized.slice(0,at),after=passage.normalized.slice(match.index+match[0].length);
+ const negatives=[...before.matchAll(negation)],last=negatives.at(-1);
+ const tail=last?before.slice(last.index+last[0].length):'';
+ const newClause=tail.includes(',')&&action.test(tail.slice(tail.lastIndexOf(',')+1));
+ const negative=Boolean(last&&!newClause)
+  || /^\s*(?:experience\s*)?(?:(?:is|was)\s+)?(?:not\b|none\b|only theoretical\b)/i.test(after);
+ const substantive=action.test(passage.quote)&&!limited.test(passage.quote);
+ return {negative,substantive};
 }
 function compile(c){
  if(c.all)return {all:c.all.map(compile)};
@@ -68,17 +83,19 @@ function evaluate(c,passages){
  }
  const evidence=[];let value=0,contradicted=false;
  for(const p of passages){
-  const direct=c.direct.some(rx=>rx.test(p.normalized)),related=c.related.some(rx=>rx.test(p.normalized));
+  const directMatches=c.direct.map(rx=>matchEvidence(rx,p)).filter(Boolean),relatedMatches=c.related.map(rx=>matchEvidence(rx,p)).filter(Boolean);
+  const direct=directMatches.length>0,related=relatedMatches.length>0;
   if(!direct&&!related)continue;
-  // Conservative sentence-level qualification: ambiguity stays visible for review.
-  const negative=negation.test(p.quote),substantive=action.test(p.quote)&&!limited.test(p.quote);
+  const matches=direct?directMatches:relatedMatches;
+  const negative=matches.every(m=>m.negative),substantive=matches.some(m=>!m.negative&&m.substantive);
   const v=negative?0:direct?(substantive?1:0.35):(substantive?0.5:0.15);
   contradicted ||= negative&&direct;
   value=Math.max(value,v);
   evidence.push({sourceId:p.sourceId,quote:p.quote,type:negative?'contradicted':direct?'direct':'inferred',depth:substantive?'practice':'mention',value:v});
  }
  if(contradicted)value=Math.min(value,0.35);
- return {value,status:contradicted?'contradicted':value===1?'supported':value>0?'partial':'unknown',evidence:evidence.slice(0,12)};
+ // Keep evidence responsible for the score even after many earlier mentions.
+ return {value,status:contradicted?'contradicted':value===1?'supported':value>0?'partial':'unknown',evidence:evidence.sort((a,b)=>(b.type==='contradicted')-(a.type==='contradicted')||b.value-a.value).slice(0,12)};
 }
 export function compileScreeningRubric(rubric){
  return {...rubric,compiled:rubric.rules.map(r=>({...r,compiledCondition:compile(r.condition)})),compiledTitles:rubric.titleTerms.map(termRE)};

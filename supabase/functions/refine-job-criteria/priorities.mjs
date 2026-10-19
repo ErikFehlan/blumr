@@ -1,11 +1,12 @@
 import {resumeSources} from '../analyze-patterns-v2/resume-sources.mjs';
 import {isSourceInstruction} from '../_shared/source-instructions.mjs';
+import {screeningRuleSchema,validateRuleSpec} from '../_shared/screening-rule-spec.mjs';
 const text=maxLength=>({type:'string',minLength:1,maxLength});
 export function jobPassages(input){return resumeSources(String(input.description||'')).filter(s=>s.text.trim().length>=12);}
-export function prioritiesSchema(passages){
+export function prioritiesSchema(passages,{screening=false}={}){
  return {type:'array',maxItems:passages.length?5:0,items:{type:'object',additionalProperties:false,
-  required:['title','reason','requirement_type','requirement_evidence','source_id','question'],properties:{title:text(140),reason:text(240),requirement_evidence:{type:'string',maxLength:240},
-   requirement_type:{type:'string',enum:['required','preferred','inferred']},source_id:passages.length?{type:'string',enum:passages.map(s=>s.id)}:text(80),question:text(220)}}};
+  required:['title','reason','requirement_type','requirement_evidence','source_id','question',...(screening?['screening_rule']:[])],properties:{title:text(140),reason:text(240),requirement_evidence:{type:'string',maxLength:240},
+   requirement_type:{type:'string',enum:['required','preferred','inferred']},source_id:passages.length?{type:'string',enum:passages.map(s=>s.id)}:text(80),question:text(220),...(screening?{screening_rule:screeningRuleSchema}:{})}}};
 }
 export const priorityInstructions=`
 HIRING PRIORITIES: RECRUITER QUALITY BAR
@@ -34,6 +35,11 @@ export function validatePriorities(items,passages){
   if(type==='required'&&/\b(not required|not mandatory|not necessary|no requirement)\b/i.test(evidence))type='inferred';
   if(type==='required'&&!/\b(must|required|requires?|mandatory|minimum|essential)\b/i.test(evidence))type='inferred';
   if(type==='preferred'&&!/\b(preferred|preferably|optional|plus|bonus|nice.to.have)\b/i.test(evidence))type='inferred';
-  return {id:'priority-'+(i+1),title,reason:p.reason.trim(),requirement_type:type,source_quote:source.text,question:p.question.trim()};
+  const item={id:'priority-'+(i+1),title,reason:p.reason.trim(),requirement_type:type,source_quote:source.text,question:p.question.trim()};
+  if(p.screening_rule){
+   try{item.screening_rule=validateRuleSpec(p.screening_rule,item);}
+   catch{item.screening_rule=validateRuleSpec({groups:[],unavailable_reason:'Rule validation failed.'},item);}
+  }
+  return item;
  });
 }
