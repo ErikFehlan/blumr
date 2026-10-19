@@ -1,5 +1,5 @@
-// Real authenticated staging requests; synthetic pre-extracted text, no uploads
-// and no paid model calls. Does not claim recruiter-validated ranking accuracy.
+// Real authenticated staging requests; private synthetic TXT files with known
+// extracted text and no paid model calls. No PDF/DOCX extraction is measured.
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -8,7 +8,7 @@ import {validateRuleSpec} from '../supabase/functions/_shared/screening-rule-spe
 import {rankScreeningCandidates} from '../supabase/functions/_shared/screening-engine.mjs';
 const f=await fixtures();
 if(process.argv[2]==='cleanup'){await f.cleanup();process.exit(0);}
-const report={scope:'Authenticated staging, synthetic stored text. Excludes document extraction, UI timing and real model quality.',runs:[],ai_calls:null,passed:false};
+const report={scope:'Authenticated staging, private synthetic TXT files. Ranking timings exclude fixture upload, document extraction, UI timing and real model quality.',runs:[],ai_calls:null,passed:false};
 let state;
 const call=(user,job,ids,extra={})=>f.request('/functions/v1/analyze-patterns-beta',user.access,'POST',{analysis_type:'rules_screening',workspace_id:user.workspace,job_id:job,candidate_ids:ids,...extra},false);
 try{
@@ -27,7 +27,14 @@ try{
  const candidates=Array.from({length:1000},(_,i)=>({id:randomUUID(),workspace_id:owner.workspace,job_id:job,name:'Synthetic screening '+i,role:'Synthetic evidence fixture',created_by:owner.id}));
  for(let n=0;n<candidates.length;n+=100){
   const chunk=candidates.slice(n,n+100);await f.request('/rest/v1/candidates',owner.access,'POST',chunk);
-  await f.request('/rest/v1/candidate_documents',owner.access,'POST',chunk.map((c,i)=>({id:randomUUID(),workspace_id:owner.workspace,job_id:job,candidate_id:c.id,storage_path:`${owner.workspace}/${job}/${c.id}/${randomUUID()}.txt`,file_name:'Synthetic.txt',mime_type:'text/plain',file_size:200,extracted_text:i%3?'Implemented Azure infrastructure. Maintained Terraform automation.':'Built AWS infrastructure. Skills: Terraform automation.',created_by:owner.id})));
+  const docs=chunk.map((c,i)=>{const text=i%3?'Implemented Azure infrastructure. Maintained Terraform automation.':'Built AWS infrastructure. Skills: Terraform automation.';return {id:randomUUID(),workspace_id:owner.workspace,job_id:job,candidate_id:c.id,storage_path:`${owner.workspace}/${job}/${c.id}/${randomUUID()}.txt`,file_name:'Synthetic.txt',mime_type:'text/plain',file_size:Buffer.byteLength(text),extracted_text:text,created_by:owner.id};});
+  // Preserve real document protections: metadata must match an owned private
+  // Storage object. Bound upload concurrency and settle every write before cleanup.
+  for(let offset=0;offset<docs.length;offset+=4){
+   const writes=await Promise.allSettled(docs.slice(offset,offset+4).map(d=>f.upload(owner,d.storage_path,Buffer.from(d.extracted_text),'text/plain')));
+   for(const write of writes)if(write.status==='rejected')throw write.reason;
+  }
+  await f.request('/rest/v1/candidate_documents',owner.access,'POST',docs);
  }
  // Fixtures never mark candidates "Resume awaiting analysis" and never queue
  // paid intake. Fail if any background assessment unexpectedly appears.
