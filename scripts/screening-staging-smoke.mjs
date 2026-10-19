@@ -71,6 +71,13 @@ try{
  const [doc]=await f.sql('select id from public.candidate_documents where candidate_id=$1',[candidates[0].id]);
  await f.request('/rest/v1/candidate_documents?id=eq.'+doc.id,owner.access,'PATCH',{extracted_text:'No Azure, AWS, Terraform or infrastructure experience is claimed.'});
  const changed=await call(owner,job,[candidates[0].id]);assert.equal(changed.data.metrics.cache_hits,0);assert.equal(changed.data.ranking.top[0].score,0);
+ // The workspace's existing 1,000-candidate safety quota remains intact.
+ // Finish and remove the load-test fixtures before the independent quality
+ // scenarios. Retain paths in the cleanup manifest for crash recovery.
+ await noPaidWork();
+ const loadPaths=owner.paths.filter(path=>path.startsWith(`${owner.workspace}/${job}/`));
+ await f.request('/storage/v1/object/resumes',owner.access,'DELETE',{prefixes:loadPaths});
+ await f.request('/rest/v1/jobs?id=eq.'+job,owner.access,'DELETE');
  report.qualification_pools=[];
  for(const pool of qualificationPools){
   const jobId=randomUUID(),draftId=randomUUID(),{job:qualityJob,priorities}=qualificationJob(pool,owner.workspace,jobId);
@@ -99,6 +106,5 @@ try{
  const usage=await noPaidWork();report.ai_calls=Number(usage.calls);report.passed=true;
 }finally{
  try{await f.cleanup();report.cleanup='passed';}catch(error){report.cleanup='failed';report.passed=false;throw error;}
- finally{await mkdir('test-results/screening',{recursive:true});await writeFile('test-results/screening/staging.json',JSON.stringify(report,null,2));}
+ finally{await mkdir('test-results/screening',{recursive:true});await writeFile('test-results/screening/staging.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));}
 }
-console.log(JSON.stringify(report,null,2));
