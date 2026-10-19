@@ -9,22 +9,23 @@ async function fixture({title='Implement Azure or AWS infrastructure',descriptio
 test('canonical grounded OR/AND rules compile without a provider and preserve priority identity',async()=>{
  const {buildJobIntelligence}=await import('../supabase/functions/_shared/job-intelligence.mjs'),e=await import('../supabase/functions/_shared/screening-engine.mjs');
  const input=await fixture(),i=await buildJobIntelligence(input);
- assert.equal(i.status,'ready');assert.equal(i.aiCalls,0);assert.equal(i.weightPolicy,'priority_order_v1');
+ assert.equal(i.status,'ready');assert.equal(i.aiCalls,0);assert.equal(i.weightPolicy,'priority_order_with_explicit_manager_emphasis_v1');
  assert.equal(i.rubric.rules[0].title,input.priorities.items[0].title);
  const session=e.createScreeningSession(i.rubric);
  assert.equal((await session.score('one','Implemented AWS infrastructure without outages.')).score,100);
  assert.equal((await session.score('two','Implemented Azure dashboards.')).score,0);
 });
-test('unsupported, edited, stale, protected and additional requirements cannot silently produce a complete rubric',async()=>{
+test('legacy and edited priorities recompile; stale sources still block and typed qualifications are retained',async()=>{
  const {buildJobIntelligence}=await import('../supabase/functions/_shared/job-intelligence.mjs');
- for(const change of [p=>delete p.priorities.items[0].screening_rule,p=>p.priorities.items[0].title='Lead a different operation',p=>p.priorities.items[0].reason='New responsibility',p=>p.job.description='Different description',p=>p.job.criteria=['A current license is required'],p=>p.job.knockouts=['Must have a license'],p=>p.job.manager_feedback='Hands-on testing matters most',p=>p.priorities.items[0].screening_rule.groups[0].alternatives=['female']]){
-  const input=await fixture();change(input);const r=await buildJobIntelligence(input);assert.equal(r.status,'needs_review');assert.equal(r.rubric,null);
+ for(const change of [p=>delete p.priorities.items[0].screening_rule,p=>p.priorities.items[0].title='Maintain inventory control',p=>p.priorities.items[0].reason='New responsibility',p=>p.job.criteria=['A current license is required'],p=>p.job.knockouts=['Must have a license'],p=>p.job.manager_feedback='Hands-on testing matters most',p=>p.priorities.items[0].screening_rule.groups[0].alternatives=['female']]){
+  const input=await fixture();change(input);const r=await buildJobIntelligence(input);assert.equal(r.status,'ready');assert.equal(r.aiCalls,0);assert.doesNotMatch(JSON.stringify(r.rubric),/female/);
  }
+ const stale=await fixture();stale.job.description='Different description';assert.equal((await buildJobIntelligence(stale)).status,'needs_review');
  const senior=await fixture({title:'Minimum 5 years of Azure infrastructure experience'});
- assert.equal((await buildJobIntelligence(senior)).status,'needs_review');
+ assert.equal((await buildJobIntelligence(senior)).status,'ready');
  for(const description of ['Five years of Azure experience.','3–5 yrs Azure experience.','Azure certification required.','Use Azure with independent responsibility.']){
   const abbreviated=await fixture({title:'Azure',description,groups:[['Azure']]});
-  assert.equal((await buildJobIntelligence(abbreviated)).status,'needs_review',description);
+  const result=await buildJobIntelligence(abbreviated);assert.equal(result.status,'ready',description);assert.match(JSON.stringify(result.rubric.rules),/experience|credential|depth/);
  }
 });
 test('priority order determines transparent default weights; source and feedback versions invalidate caches',async()=>{

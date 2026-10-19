@@ -31,15 +31,21 @@ function dateValue(text,asOf){
  if(/^\d{4}$/.test(text))return {month:Number(text)*12,precision:'year'};
  return null;
 }
-function interval(text,asOf){
+export function interval(text,asOf){
  const m=text.match(rangeRE);if(!m)return null;
  const start=dateValue(m[1],asOf),end=dateValue(m[2],asOf);
  if(!start||!end||start.month>end.month||end.month>asOf.getUTCFullYear()*12+asOf.getUTCMonth())return null;
  return {start_month:start.month,end_month:end.month+1,precision:start.precision==='month'&&end.precision==='month'?'month':'year',current:Boolean(end.current),source_date_text:m[0]};
 }
-function unionMonths(ranges){
+export function unionMonths(ranges){
  const sorted=ranges.filter(r=>r.precision==='month').sort((a,b)=>a.start_month-b.start_month);let total=0,end=-1;
  for(const r of sorted){total+=Math.max(0,r.end_month-Math.max(r.start_month,end));end=Math.max(end,r.end_month);}return total;
+}
+
+// Shared with deterministic screening; these describe an action, never a title.
+export function experienceAction(text){
+ const group=actionGroups.find(([,pattern])=>pattern.test(text));
+ return team.test(text)||/\b(?:our|the|their|my)\s+team\s+(?:designed|configured|operated|maintained|tested|created|reconciled|assessed|restored|reproduced|validated)\b/i.test(text)?'team_exposure':group?.[0]||(/\b(restored|picked|packed|received|migrated|reproduced|validated|diagnosed|calibrated|dispensed)\b/i.test(text)?'practice':null);
 }
 
 export function buildExperienceIntelligence(sources,job={},options={}){

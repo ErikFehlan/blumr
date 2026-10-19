@@ -4,7 +4,7 @@ import {analysisModel, modelReasoning} from '../_shared/model-routing.mjs';
 import {fetchWithRetry} from '../_shared/provider-retry.ts';
 import {screeningRuleInstructions} from '../_shared/screening-rule-spec.mjs';
 export const priorityVersion='role-priorities-v3';
-export const priorityGenerationVersion=()=>Deno.env.get('RULES_FIRST_SCREENING')==='true'?'role-priorities-v4-screening':priorityVersion;
+export const priorityGenerationVersion=()=>Deno.env.get('RULES_FIRST_SCREENING')==='true'?'role-priorities-v5-screening':priorityVersion;
 export type PriorityInput={title:string;description:string;manager_notes?:string};
 export function priorityInput(value:any):PriorityInput {
   if(!value||typeof value.title!=='string'||!value.title.trim()||typeof value.description!=='string'||!value.description.trim())throw Error('invalid_priority_input');

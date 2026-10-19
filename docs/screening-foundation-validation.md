@@ -2,6 +2,8 @@
 
 Development branch: `feat/rules-first-screening`, PR #120. No production deployment authorized or performed. Issues #118 and #119 remain open.
 
+This is the historical first-integration report. The subsequent [qualification milestone](screening-qualifications-validation.md) supersedes its conservative blocks on numeric experience, credentials, recruiter edits and manager context. Its latency observations remain historical measurements.
+
 ## Assessment and implementation sequence
 
 Reuse the existing static frontend, canonical hiring-priority drafts, source quotation controls, transferability relationships, durable intake/reassessment workers, provider budgeting and workspace RLS. The existing paid resume intake still runs a full AI assessment; this milestone does not change that default. PR #117 independently contains accounting fixes and has not been merged into this work.

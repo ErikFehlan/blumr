@@ -1,7 +1,7 @@
 // A small source-grounded contract shared by priority generation and screening.
 // Alternatives within a group are OR; groups are AND. No model-provided regex.
 import {isSourceInstruction} from './source-instructions.mjs';
-export const ruleSpecVersion='grounded-rules-v1';
+export const ruleSpecVersion='grounded-rules-v2';
 export const normalizeTerm=value=>String(value||'').normalize('NFKC').toLowerCase().replace(/[‐‑–—]/g,'-').replace(/\s+/g,' ').trim();
 const escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 export const containsTerm=(text,term)=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escape(normalizeTerm(term))}(?=$|[^\\p{L}\\p{N}_])`,'u').test(normalizeTerm(text));
@@ -11,7 +11,7 @@ export const screeningRuleSchema=obj({groups:{type:'array',maxItems:6,items:obj(
  unavailable_reason:{type:'string',maxLength:180}});
 export const screeningRuleInstructions=`
 Also return screening_rule for each priority in THIS response; do not create another priority list.
-Use up to six AND groups, each with up to six OR alternatives. Every alternative must be an exact capability phrase from that priority's cited original job passage. Select all material parts of the capability, not just its easiest tool keyword. Preserve explicit alternatives: Azure OR AWS must be one alternative group, not two mandatory groups. Do not add synonyms or related tools yourself; the server owns those relationships. Never use titles, generic action verbs, personal traits, or demographic proxies as qualification terms. Do not turn a numerical experience, recency, credential, scope, or supervision requirement into a simple keyword match. For those, or when the complete priority cannot safely be represented with capability groups, return groups:[] and a concise unavailable_reason. A populated rule has an empty unavailable_reason. These rules find resume evidence, never establish complete qualification or reject a person.`;
+Use up to six AND groups, each with up to six OR alternatives. Every alternative must be an exact capability phrase from that priority's cited original job passage. Select all material capabilities, not just the easiest tool keyword. Preserve explicit alternatives: Azure OR AWS must be one alternative group, not two mandatory groups. Do not add synonyms or related tools yourself; the server owns those relationships. Never use titles, generic action verbs, personal traits, or demographic proxies as qualification terms. Retain numerical experience, credentials, scope and supervision in the priority wording and original source; the server separately evaluates them with typed qualification rules. Capability groups never establish years, licensing or seniority. For a credential-only priority or one with no extractable capability phrase, return groups:[] and a concise unavailable_reason. A populated rule has an empty unavailable_reason. These rules find resume evidence, never establish independently verified qualification or reject a person.`;
 export function validateRuleSpec(raw,priority){
  if(!raw||!Array.isArray(raw.groups)||raw.groups.length>6||typeof raw.unavailable_reason!=='string'||raw.unavailable_reason.length>180)throw Error('invalid_screening_spec');
  if(!raw.groups.length){
@@ -19,11 +19,8 @@ export function validateRuleSpec(raw,priority){
   return {version:ruleSpecVersion,bound_title:priority.title,bound_reason:priority.reason,bound_question:priority.question,groups:[],unavailable_reason:'This priority needs additional evidence review.'};
  }
  if(raw.unavailable_reason||unsafeScreeningText(priority.title)||unsafeScreeningText(priority.source_quote))throw Error('unsafe_screening_spec');
- // These cannot be established by a term match, even when a model supplied one.
- // A shortened priority label must not erase constraints in its explanation or
- // cited source. Written-out numbers and ranges also need depth-aware review.
- const constrained=/\b(?:\d+(?:\.\d+)?(?:\s*[-–]\s*\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*\+?\s*(?:years?|yrs?|months?)\b|\b(licen[cs]\w*|certifi\w*|degree|diploma|minimum|recent|senior|independent\w*|supervis\w*|CPA|RN|LPN|CDL)\b/i.test([priority.title,priority.reason,priority.source_quote].join(' '));
- if(constrained)return {version:ruleSpecVersion,bound_title:priority.title,bound_reason:priority.reason,bound_question:priority.question,groups:[],unavailable_reason:'Experience, credential, or scope requirements need additional evidence review.'};
+ // These groups describe capabilities only. The requirement compiler always
+ // reads the canonical source again for duration, credential and scope checks.
  const groups=raw.groups.map(group=>{
   if(!Array.isArray(group?.alternatives)||!group.alternatives.length||group.alternatives.length>6)throw Error('invalid_screening_spec');
   const alternatives=group.alternatives.map(term=>{

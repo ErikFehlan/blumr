@@ -1,12 +1,13 @@
 // Real authenticated staging requests; private synthetic TXT files with known
 // extracted text and no paid model calls. No PDF/DOCX extraction is measured.
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {fixtures} from './readiness-fixtures.mjs';
 import {validateRuleSpec} from '../supabase/functions/_shared/screening-rule-spec.mjs';
 import {rankScreeningCandidates} from '../supabase/functions/_shared/screening-engine.mjs';
 import {screeningResume} from '../tests/fixtures/screening-resumes.mjs';
+import {qualificationPools,qualificationJob} from '../tests/fixtures/screening-qualification-pools.mjs';
 import {screenCandidatePool} from '../supabase/functions/_shared/screening-pool.mjs';
 const f=await fixtures();
 if(process.argv[2]==='cleanup'){await f.cleanup();process.exit(0);}
@@ -70,6 +71,31 @@ try{
  const [doc]=await f.sql('select id from public.candidate_documents where candidate_id=$1',[candidates[0].id]);
  await f.request('/rest/v1/candidate_documents?id=eq.'+doc.id,owner.access,'PATCH',{extracted_text:'No Azure, AWS, Terraform or infrastructure experience is claimed.'});
  const changed=await call(owner,job,[candidates[0].id]);assert.equal(changed.data.metrics.cache_hits,0);assert.equal(changed.data.ranking.top[0].score,0);
+ report.qualification_pools=[];
+ for(const pool of qualificationPools){
+  const jobId=randomUUID(),draftId=randomUUID(),{job:qualityJob,priorities}=qualificationJob(pool,owner.workspace,jobId);
+  const input={title:qualityJob.title,description:qualityJob.description,manager_notes:''};
+  await f.sql('insert into public.hiring_priority_drafts(id,workspace_id,actor_id,fingerprint,input,items,model) values($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)',[draftId,owner.workspace,owner.id,createHash('sha256').update(JSON.stringify(input)).digest('hex'),JSON.stringify(input),JSON.stringify(priorities.items),'synthetic-no-provider']);
+  await f.request('/rest/v1/jobs',owner.access,'POST',{...qualityJob,priority_draft_id:draftId,created_by:owner.id});
+  await f.sql("update public.job_criteria_tasks set status='ready',result=jsonb_build_object('criteria','[]'::jsonb,'hiring_priorities',$2::jsonb,'model','synthetic-no-provider'),lease_id=null,lease_until=null where job_id=$1 and workspace_id=$3",[jobId,JSON.stringify(priorities.items),owner.workspace]);
+  const fixtureIds=new Map();
+  for(const candidate of pool.candidates){
+   const id=randomUUID();fixtureIds.set(candidate.id,id);
+   await f.request('/rest/v1/candidates',owner.access,'POST',{id,workspace_id:owner.workspace,job_id:jobId,name:'Synthetic qualification '+candidate.id,role:'Synthetic evidence fixture',created_by:owner.id});
+   const path=`${owner.workspace}/${jobId}/${id}/${randomUUID()}.txt`;
+   await f.upload(owner,path,Buffer.from(candidate.text),'text/plain');
+   await f.request('/rest/v1/candidate_documents',owner.access,'POST',{id:randomUUID(),workspace_id:owner.workspace,job_id:jobId,candidate_id:id,storage_path:path,file_name:'Synthetic.txt',mime_type:'text/plain',file_size:Buffer.byteLength(candidate.text),extracted_text:candidate.text,created_by:owner.id});
+  }
+  const result=await call(owner,jobId,[...fixtureIds.values()]);assert.equal(result.status,200,JSON.stringify(result.data));
+  assert.equal(result.data.intelligence.coverage.priorities,5);assert.equal(result.data.metrics.cache_hits,0);
+  const ranked=result.data.ranking,rows=[...ranked.top,...ranked.nearMiss,...ranked.remaining],byId=new Map(rows.map(r=>[r.candidateId,r]));
+  for(const [a,b] of pool.pairs)assert.ok(byId.get(fixtureIds.get(a)).score>byId.get(fixtureIds.get(b)).score,`${pool.id}: ${a} must outrank ${b}`);
+  for(const [id,status] of Object.entries(pool.requiredStatus||{}))assert.equal(byId.get(fixtureIds.get(id)).requiredStatus,status);
+  const small=rankScreeningCandidates(rows,{top:1,nearMiss:2});assert.equal(small.top[0].candidateId,fixtureIds.get('documented'));assert.ok(small.nearMiss.some(r=>r.candidateId===fixtureIds.get('transfer')));
+  for(const candidate of pool.candidates)for(const finding of byId.get(fixtureIds.get(candidate.id)).findings)for(const evidence of finding.evidence)assert.ok(candidate.text.includes(evidence.quote),'Evidence not in source resume');
+  const warm=await call(owner,jobId,[...fixtureIds.values()]);assert.equal(warm.data.metrics.cache_hits,pool.candidates.length);
+  report.qualification_pools.push({occupation:pool.id,candidates:rows.length,priorities:5,expected_pair_orderings:pool.pairs.length,source_quotes_verified:true,near_miss_retained:true,warm_cache_hits:warm.data.metrics.cache_hits,ai_calls:0});
+ }
  const usage=await noPaidWork();report.ai_calls=Number(usage.calls);report.passed=true;
 }finally{
  try{await f.cleanup();report.cleanup='passed';}catch(error){report.cleanup='failed';report.passed=false;throw error;}
