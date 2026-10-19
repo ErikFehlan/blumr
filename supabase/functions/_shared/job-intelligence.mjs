@@ -1,7 +1,7 @@
 import {buildScreeningRubric,fingerprint,screeningVersion} from './screening-engine.mjs';
 import {relationships,workflowRelationships} from './transferability.mjs';
 import {normalizeTerm,ruleSpecVersion,validateRuleSpec} from './screening-rule-spec.mjs';
-export const jobIntelligenceVersion='job-intelligence-v1';
+export const jobIntelligenceVersion='job-intelligence-v2';
 // True spelling/name equivalents only. Adjacent technologies stay inferred.
 const equivalents=[['ci/cd','continuous integration and continuous delivery'],['infrastructure as code','iac'],['general ledger','gl'],['accounts payable','a/p'],['accounts receivable','a/r'],['standard operating procedures','sops'],['google cloud','gcp'],['secure sdlc','ssdlc','secure software development lifecycle']];
 function conditionFor(spec){

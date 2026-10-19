@@ -22,6 +22,10 @@ test('unsupported, edited, stale, protected and additional requirements cannot s
  }
  const senior=await fixture({title:'Minimum 5 years of Azure infrastructure experience'});
  assert.equal((await buildJobIntelligence(senior)).status,'needs_review');
+ for(const description of ['Five years of Azure experience.','3–5 yrs Azure experience.','Azure certification required.','Use Azure with independent responsibility.']){
+  const abbreviated=await fixture({title:'Azure',description,groups:[['Azure']]});
+  assert.equal((await buildJobIntelligence(abbreviated)).status,'needs_review',description);
+ }
 });
 test('priority order determines transparent default weights; source and feedback versions invalidate caches',async()=>{
  const {buildJobIntelligence}=await import('../supabase/functions/_shared/job-intelligence.mjs');

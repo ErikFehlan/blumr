@@ -20,7 +20,9 @@ export function validateRuleSpec(raw,priority){
  }
  if(raw.unavailable_reason||unsafeScreeningText(priority.title)||unsafeScreeningText(priority.source_quote))throw Error('unsafe_screening_spec');
  // These cannot be established by a term match, even when a model supplied one.
- const constrained=/\b\d+\s*\+?\s*(?:years?|months?)\b|\b(licen[cs]\w*|certifi\w*|degree|diploma|minimum|recent|senior|independent\w*|supervis\w*|CPA|RN|LPN|CDL)\b/i.test(priority.title);
+ // A shortened priority label must not erase constraints in its explanation or
+ // cited source. Written-out numbers and ranges also need depth-aware review.
+ const constrained=/\b(?:\d+(?:\.\d+)?(?:\s*[-–]\s*\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*\+?\s*(?:years?|yrs?|months?)\b|\b(licen[cs]\w*|certifi\w*|degree|diploma|minimum|recent|senior|independent\w*|supervis\w*|CPA|RN|LPN|CDL)\b/i.test([priority.title,priority.reason,priority.source_quote].join(' '));
  if(constrained)return {version:ruleSpecVersion,bound_title:priority.title,bound_reason:priority.reason,bound_question:priority.question,groups:[],unavailable_reason:'Experience, credential, or scope requirements need additional evidence review.'};
  const groups=raw.groups.map(group=>{
   if(!Array.isArray(group?.alternatives)||!group.alternatives.length||group.alternatives.length>6)throw Error('invalid_screening_spec');
