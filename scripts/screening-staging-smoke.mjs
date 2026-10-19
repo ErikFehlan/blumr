@@ -7,6 +7,7 @@ import {fixtures} from './readiness-fixtures.mjs';
 import {validateRuleSpec} from '../supabase/functions/_shared/screening-rule-spec.mjs';
 import {rankScreeningCandidates} from '../supabase/functions/_shared/screening-engine.mjs';
 import {screeningResume} from '../tests/fixtures/screening-resumes.mjs';
+import {screenCandidatePool} from '../supabase/functions/_shared/screening-pool.mjs';
 const f=await fixtures();
 if(process.argv[2]==='cleanup'){await f.cleanup();process.exit(0);}
 const report={scope:'Authenticated staging, private synthetic resume-shaped TXT files, six evidence archetypes. Ranking timings exclude fixture upload, PDF/DOCX extraction, UI timing and real model quality.',fixture_bytes:{min:Math.min(...Array.from({length:6},(_,i)=>Buffer.byteLength(screeningResume(i).text))),max:Math.max(...Array.from({length:6},(_,i)=>Buffer.byteLength(screeningResume(i).text)))},runs:[],ai_calls:null,passed:false};
@@ -49,19 +50,18 @@ try{
   // Clear only derived fixture caches to measure a cold run at each size.
   await f.sql('delete from public.candidate_screening_cache where workspace_id=$1',[owner.workspace]);
   for(let repeat=0;repeat<3;repeat++){
-   const started=performance.now(),rows=[];let hits=0,first=null;
-   for(let n=0;n<ids.length;n+=100){
-    const r=await call(owner,job,ids.slice(n,n+100),{complete:true});assert.equal(r.status,200,JSON.stringify(r.data));assert.equal(r.data.status,'provisional');assert.equal(r.data.metrics.ai_calls,0);
-    if(first===null)first=performance.now()-started;
-    hits+=r.data.metrics.cache_hits;rows.push(...r.data.ranking.top,...r.data.ranking.nearMiss,...r.data.ranking.remaining);
-   }
+   const started=performance.now();let first=null;
+   const pool=await screenCandidatePool({candidateIds:ids,concurrency:2,onProgress:p=>{if(first===null&&p.processed>0)first=performance.now()-started;},request:async page=>{
+    const r=await call(owner,job,page,{complete:true});assert.equal(r.status,200,JSON.stringify(r.data));return r.data;
+   }});
+   const hits=pool.metrics.cache_hits,rows=[...pool.ranking.top,...pool.ranking.nearMiss,...pool.ranking.remaining];
    assert.equal(rows.length,size);assert.equal(hits,repeat===0?0:size);
    const ranking=rankScreeningCandidates(rows,{complete:true});assert.equal(ranking.top.length,20);
    const byId=new Map(rows.map(r=>[r.candidateId,r]));
    assert.ok(byId.get(candidates[0].id).score>byId.get(candidates[2].id).score,'Keyword-only profile outranked direct practice');
    assert.ok(byId.get(candidates[3].id).score>byId.get(candidates[4].id).score,'Transferable evidence was lost');
    assert.equal(byId.get(candidates[5].id).score,0,'Explicit missing experience became positive evidence');
-   report.runs.push({candidates:size,path:repeat===0?'cold':'warm',duration_ms:Math.round((performance.now()-started)*100)/100,time_to_first_page_ms:Math.round(first*100)/100,cache_hits:hits,ai_calls:0});
+   report.runs.push({candidates:size,path:repeat===0?'cold':'warm',concurrency:2,duration_ms:Math.round((performance.now()-started)*100)/100,time_to_first_page_ms:Math.round(first*100)/100,cache_hits:hits,ai_calls:0});
   }
  }
  // Foreign workspace and forged client sources cannot access or alter results.
