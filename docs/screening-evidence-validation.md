@@ -54,8 +54,8 @@ full support for all seven unestablished qualifications. It remains a source
 evidence audit, not a whole-job assessment. No private names, identifiers, resumes
 or quotations are in this repository.
 
-The complete local Node suite passes **472/472** tests, including 15 additional
-code-review boundary checks and their parent. All returned challenge/private
+The complete local Node suite passes **473/473** tests, including 15 additional
+code-review boundary checks and their parent, plus a report-portability check. All returned challenge/private
 evidence quotes occur in their sources. Screening provider calls: **0**; screening
 provider cost: **$0**. These figures exclude the coding assistant's own operation.
 
@@ -105,6 +105,15 @@ The repaired results and source hashes are in
 When generated before committing, the report explicitly identifies modified
 working-tree sources and records their hashes instead of attributing them to the
 old commit. All public fixtures are invented.
+
+## Hosted validation and report portability
+
+The first hosted rules-validation job passed the Node, Deno and PostgreSQL gates.
+The separate browser container rejected Git ownership metadata while building the
+diagnostic report. The reporter now marks revision metadata unavailable when Git
+cannot provide it, retaining file hashes and executing every quality assertion.
+It does not change Git ownership protections. A regression runs all 70 checks from
+a directory without Git metadata. Final hosted run status is tracked on PR #120.
 
 ## Remaining release gates
 

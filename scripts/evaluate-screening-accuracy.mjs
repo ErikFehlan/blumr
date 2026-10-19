@@ -52,8 +52,17 @@ export async function runChallenge(){
  }catch(e){rows.push({kind:'invariance',...c,passed:false,error:String(e)});}
  const engineFiles=['screening-engine.mjs','screening-evidence.mjs','screening-qualifications.mjs','screening-requirements.mjs','screening-vocabulary.mjs','job-intelligence.mjs','experience-intelligence.mjs','transferability.mjs','source-instructions.mjs','screening-rule-spec.mjs','capability-workflows.mjs'];
  const engineHashes=Object.fromEntries(await Promise.all(engineFiles.map(async file=>[file,createHash('sha256').update(await readFile(new URL('../supabase/functions/_shared/'+file,import.meta.url))).digest('hex')])));
- const base=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),dirty=Boolean(execFileSync('git',['status','--porcelain','--','supabase/functions/_shared'],{encoding:'utf8'}).trim());
- return {definition,executed_at:new Date().toISOString(),engine_commit:dirty?null:base,base_commit:base,engine_worktree_modified:dirty,engineHashes,fixture_sha256:createHash('sha256').update(await readFile(new URL('../tests/fixtures/screening-accuracy-challenge-v1.mjs',import.meta.url))).digest('hex'),ai_calls:0,scope:'Deterministic engine; canonical source requirements. Does not test live AI priority generation, original PDF/DOCX extraction, or recruiter-labeled full-pool Top 20 quality.',summary:summarize(rows),acceptance_passed:rows.every(r=>r.passed&&r.quotes_preserved!==false),rows};
+ let base=null,dirty=null,revisionUnavailable=false;
+ try{
+  const options={encoding:'utf8',stdio:['ignore','pipe','pipe']};
+  base=execFileSync('git',['rev-parse','HEAD'],options).trim();
+  dirty=Boolean(execFileSync('git',['status','--porcelain','--','supabase/functions/_shared'],options).trim());
+ }catch{
+  // Container ownership restrictions or source archives must not suppress the
+  // quality assertions. Do not alter Git safety settings; hashes still bind code.
+  base=null;dirty=null;revisionUnavailable=true;
+ }
+ return {definition,executed_at:new Date().toISOString(),engine_commit:dirty===false?base:null,base_commit:base,engine_worktree_modified:dirty,revision_unavailable:revisionUnavailable,engineHashes,fixture_sha256:createHash('sha256').update(await readFile(new URL('../tests/fixtures/screening-accuracy-challenge-v1.mjs',import.meta.url))).digest('hex'),ai_calls:0,scope:'Deterministic engine; canonical source requirements. Does not test live AI priority generation, original PDF/DOCX extraction, or recruiter-labeled full-pool Top 20 quality.',summary:summarize(rows),acceptance_passed:rows.every(r=>r.passed&&r.quotes_preserved!==false),rows};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){
  const report=await runChallenge();console.log(JSON.stringify(report,null,2));
