@@ -6,9 +6,10 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {fixtures} from './readiness-fixtures.mjs';
 import {validateRuleSpec} from '../supabase/functions/_shared/screening-rule-spec.mjs';
 import {rankScreeningCandidates} from '../supabase/functions/_shared/screening-engine.mjs';
+import {screeningResume} from '../tests/fixtures/screening-resumes.mjs';
 const f=await fixtures();
 if(process.argv[2]==='cleanup'){await f.cleanup();process.exit(0);}
-const report={scope:'Authenticated staging, private synthetic TXT files. Ranking timings exclude fixture upload, document extraction, UI timing and real model quality.',runs:[],ai_calls:null,passed:false};
+const report={scope:'Authenticated staging, private synthetic resume-shaped TXT files, six evidence archetypes. Ranking timings exclude fixture upload, PDF/DOCX extraction, UI timing and real model quality.',fixture_bytes:{min:Math.min(...Array.from({length:6},(_,i)=>Buffer.byteLength(screeningResume(i).text))),max:Math.max(...Array.from({length:6},(_,i)=>Buffer.byteLength(screeningResume(i).text)))},runs:[],ai_calls:null,passed:false};
 let state;
 const call=(user,job,ids,extra={})=>f.request('/functions/v1/analyze-patterns-beta',user.access,'POST',{analysis_type:'rules_screening',workspace_id:user.workspace,job_id:job,candidate_ids:ids,...extra},false);
 try{
@@ -27,7 +28,7 @@ try{
  const candidates=Array.from({length:1000},(_,i)=>({id:randomUUID(),workspace_id:owner.workspace,job_id:job,name:'Synthetic screening '+i,role:'Synthetic evidence fixture',created_by:owner.id}));
  for(let n=0;n<candidates.length;n+=100){
   const chunk=candidates.slice(n,n+100);await f.request('/rest/v1/candidates',owner.access,'POST',chunk);
-  const docs=chunk.map((c,i)=>{const text=i%3?'Implemented Azure infrastructure. Maintained Terraform automation.':'Built AWS infrastructure. Skills: Terraform automation.';return {id:randomUUID(),workspace_id:owner.workspace,job_id:job,candidate_id:c.id,storage_path:`${owner.workspace}/${job}/${c.id}/${randomUUID()}.txt`,file_name:'Synthetic.txt',mime_type:'text/plain',file_size:Buffer.byteLength(text),extracted_text:text,created_by:owner.id};});
+  const docs=chunk.map((c,i)=>{const {text}=screeningResume(n+i);return {id:randomUUID(),workspace_id:owner.workspace,job_id:job,candidate_id:c.id,storage_path:`${owner.workspace}/${job}/${c.id}/${randomUUID()}.txt`,file_name:'Synthetic.txt',mime_type:'text/plain',file_size:Buffer.byteLength(text),extracted_text:text,created_by:owner.id};});
   // Preserve real document protections: metadata must match an owned private
   // Storage object. Bound upload concurrency and settle every write before cleanup.
   for(let offset=0;offset<docs.length;offset+=4){
@@ -56,6 +57,10 @@ try{
    }
    assert.equal(rows.length,size);assert.equal(hits,repeat===0?0:size);
    const ranking=rankScreeningCandidates(rows,{complete:true});assert.equal(ranking.top.length,20);
+   const byId=new Map(rows.map(r=>[r.candidateId,r]));
+   assert.ok(byId.get(candidates[0].id).score>byId.get(candidates[2].id).score,'Keyword-only profile outranked direct practice');
+   assert.ok(byId.get(candidates[3].id).score>byId.get(candidates[4].id).score,'Transferable evidence was lost');
+   assert.equal(byId.get(candidates[5].id).score,0,'Explicit missing experience became positive evidence');
    report.runs.push({candidates:size,path:repeat===0?'cold':'warm',duration_ms:Math.round((performance.now()-started)*100)/100,time_to_first_page_ms:Math.round(first*100)/100,cache_hits:hits,ai_calls:0});
   }
  }
