@@ -1,0 +1,111 @@
+{
+  "scope": "Generated synthetic evidence diagnostics. Correlated templates, not 1,008 independent human judgments or production accuracy. Canonical requirements; excludes extraction and AI priority generation.",
+  "executed_at": "2026-10-19T19:08:39.590Z",
+  "actions": 28,
+  "contexts": 12,
+  "layouts": 3,
+  "checks": 1008,
+  "passed": 1008,
+  "missed_supported": 0,
+  "unsupported_awarded": 0,
+  "quote_failures": 0,
+  "by_occupation": {
+    "cloud": {
+      "checks": 144,
+      "passed": 144
+    },
+    "accounting": {
+      "checks": 144,
+      "passed": 144
+    },
+    "clinical": {
+      "checks": 144,
+      "passed": 144
+    },
+    "warehouse": {
+      "checks": 144,
+      "passed": 144
+    },
+    "education": {
+      "checks": 144,
+      "passed": 144
+    },
+    "maintenance": {
+      "checks": 144,
+      "passed": 144
+    },
+    "qa": {
+      "checks": 144,
+      "passed": 144
+    }
+  },
+  "by_context": {
+    "past": {
+      "checks": 84,
+      "passed": 84
+    },
+    "present": {
+      "checks": 84,
+      "passed": 84
+    },
+    "bullet": {
+      "checks": 84,
+      "passed": 84
+    },
+    "mixed-self": {
+      "checks": 84,
+      "passed": 84
+    },
+    "project": {
+      "checks": 84,
+      "passed": 84
+    },
+    "other": {
+      "checks": 84,
+      "passed": 84
+    },
+    "team": {
+      "checks": 84,
+      "passed": 84
+    },
+    "future": {
+      "checks": 84,
+      "passed": 84
+    },
+    "conditional": {
+      "checks": 84,
+      "passed": 84
+    },
+    "negative": {
+      "checks": 84,
+      "passed": 84
+    },
+    "assistance": {
+      "checks": 84,
+      "passed": 84
+    },
+    "mixed-other": {
+      "checks": 84,
+      "passed": 84
+    }
+  },
+  "duration_ms": 1864.22,
+  "ai_calls": 0,
+  "provider_cost_usd": 0,
+  "fixture_sha256": "fefbaa19df13f35a84c4b5dcce650111d4931a76ed30db4cfda25b1968c34a4e",
+  "engine_hashes": {
+    "screening-engine.mjs": "9056de1c5b4907b671d3ee72b5e49c243fdc37f34c30848deedb29e428babb1a",
+    "screening-evidence.mjs": "6a984417aa9f8dbea6701ed9af1c688ad015b5bd3d4f3a757eaa518feffd23ad",
+    "screening-qualifications.mjs": "5c31cda4af0e782838fccf23709d6a229b0261f92b1f338b2ec7babbde3195d6",
+    "screening-requirements.mjs": "20e098b0667dbd9f86f7cb189f23a74b17b968230011f88410011894b132da94",
+    "screening-vocabulary.mjs": "5aed9af5830c950afb333bd5016e9a78b99559b54e60f87f5bcc2335efdb4673",
+    "job-intelligence.mjs": "4ebfe93d20c7e1cf6e5756f99a8ae21977ad8b4bf3fc35969da05ed9f20c4fd2",
+    "experience-intelligence.mjs": "691d0d10891940e5718a634ff689e5b56b4ff1b9c5d09884d9b173b8fa9e65e9",
+    "transferability.mjs": "d64429c38f350290824e64048fdafe7e3c7a1d05c51f24b756ea02318aec62eb",
+    "source-instructions.mjs": "148b3c7db4ba5ea687d36bbeede84f9a0148b616d00c31fe7c13ebc863732843",
+    "screening-rule-spec.mjs": "0b45fa68d13db7b83f2b0f102d915990297b044ec01e238849e09e0cae85b38b",
+    "capability-workflows.mjs": "47b5a407a5c00c302f43c78cd41f53a068fb63dfaffd5581dcdd92c67f74510d"
+  },
+  "failed_rows": [],
+  "report_format": "Aggregate of evaluate-screening-volume.mjs output; full per-case results are reproducible from the committed labeled fixture."
+}
