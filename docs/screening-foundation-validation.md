@@ -23,10 +23,12 @@ Reuse the existing static frontend, canonical hiring-priority drafts, source quo
 - The route always labels its requested subset provisional. It returns top candidates, near misses, every remaining candidate, document-attention cases, source evidence, timing and zero-provider-call metrics. No candidate is rejected and no existing candidate fit score is overwritten.
 - One current rubric cache per job and one score cache per candidate bound retention. Version keys include job, priorities, feedback revision, engine version, rule contract and relationships. A changed resume hash, latest document, or rubric misses the score cache. Cache hits omit full resume text from the database response. All caches are workspace scoped, client read-only and cascade on source deletion.
 - Fixed term-local negation and retained the strongest/contradictory evidence even after many earlier mentions.
+- A shared pool coordinator sends two 100-candidate requests concurrently, immediately reports provisional progress, combines every page, and settles in-flight requests on errors/cancellation. A changed rubric, missing candidate or failed page cannot become a complete ranking. Completion describes only the explicitly requested candidate snapshot; unreadable documents keep the ranking provisional. It is ready for frontend integration; actual browser acknowledgment time has not been measured.
+- The cache migration is included in the normal core-backend release sequence. Deployment remains behind existing release checks and explicit production authorization; installing the schema does not enable the feature flag.
 
 ## Local verification
 
-- 319 JavaScript tests passed (312 pre-existing plus 7 new integration/accuracy regression tests).
+- 321 JavaScript tests passed (312 pre-existing plus 7 new integration/accuracy regression tests and 2 pool-coordination regression tests).
 - 14 focused Deno backend tests passed, including four new route/generation tests. The rule-generation test uses a mocked provider and verifies one accounted request, not live model quality.
 - Deno type checks passed for the authenticated route and priority worker.
 - Actual migration executed twice on local embedded PostgreSQL 17 (PGlite 0.3.14); `tests/screening-cache.sql` passed. Tests cover foreign-workspace/job/candidate access, read-only cache permissions, anonymous denial, request limits, changed text/rubric, newer documents, cross-candidate FK integrity and deletion cleanup. CI repeats against PostgreSQL 17.
@@ -48,7 +50,20 @@ The extra evidence checks were slower for the 500-resume cold run. Do not advert
 
 Workflow `Validate rules screening foundation` runs the SQL and backend gates, then deploys only to the existing staging project. Its provider-free smoke uses disposable authenticated users and 20/100/500/1,000 stored synthetic text resumes, exercises cold/warm reads, foreign-workspace denial, forged input, changed content, and verifies zero provider ledger entries and zero queued paid assessments. It removes fixtures and disables the flag afterwards. No production resources are changed.
 
-Status at initial commit: prepared, not yet executed. The Actions artifact and subsequent progress update are authoritative; code existence is not a passed staging test.
+Completed successfully on October 19, 2026. The final measured code is `ea69bb4ec8b9546cb792033a382c23335b8880af`; [staging and screening CI run](https://github.com/ErikFehlan/blumr/actions/runs/39252097199). Cleanup passed and the experimental flag was disabled. No fixture assessments were queued and the provider usage ledger contained zero calls.
+
+The initial benchmark used very short phrases. It was replaced with 2,173–2,224-byte synthetic resume-shaped documents and six evidence archetypes: direct practice, an explicit JD alternative, keyword-only mentions, transferable technologies, unrelated work, and explicit missing experience. The hosted assertions check their relative order and preserve explicit contradictions. This is still synthetic evidence testing, not a recruiter-labeled quality study.
+
+The baseline below sends 100-candidate pages sequentially; the updated coordinator uses two concurrent requests. Both use the same authenticated screening backend, matching rules, fixture generator and hosting project. These are separate runs, not controlled production percentiles. Each size has one cold and two warm observations. Raw measurements are in `screening-staging-before.json` and `screening-staging-after.json`.
+
+| Pool | Sequential cold s | Concurrent cold s | Sequential warm s | Concurrent warm s | Concurrent first warm result s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 20 | 2.44 | 2.65 | 0.85–0.92 | 0.96–1.09 | 0.96–1.09 |
+| 100 | 1.49 | 1.82 | 0.80–1.26 | 1.07–1.09 | 1.07–1.09 |
+| 500 | 7.09 | 4.53 | 4.23–4.89 | 2.23–2.66 | 0.84–1.00 |
+| 1,000 | 12.81 | 6.30 | 8.28–8.62 | 4.17–6.70 | 0.72–0.83 |
+
+Warm runs hit the cache for every candidate. All observations used zero provider calls. The 500-candidate cached target is encouraging; variability at 1,000 candidates still needs optimization. Pools of 100 or fewer use one request, so concurrency cannot improve them. Do not infer a universal speedup from these measurements. Timings include actual authentication, HTTP, database access and result ranking, but exclude upload, document extraction, user-interface acknowledgment and deep AI. The existing paid production intake was not benchmarked end to end or replaced by this milestone.
 
 ## Cost comparison and remaining gates
 
