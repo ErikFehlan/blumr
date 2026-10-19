@@ -10,7 +10,10 @@ negation and modality of source statements. It distinguishes personal work from
 team/manager/vendor statements; present tense, inflections and ordinary work verbs
 from tool lists; and performed work from requirements or hypothetical plans.
 Repeated capability mentions are checked so an earlier team mention does not hide
-a later personal statement. Term evidence exposes these interpretation fields.
+a later personal statement. Typed qualifications use the applicant clause too: a
+manager’s tenure, jurisdiction, ownership or recent work cannot supply those facts
+for the applicant. Contribution rules require personal contribution. Term evidence
+exposes these interpretation fields.
 
 Source quotations remain exact substrings. Conservative line continuation keeps
 wrapped prose together without joining separate bullets. Adjacent role titles
@@ -30,7 +33,7 @@ erases valid assessment work; applicant protected characteristics remain exclude
 Manager statements such as “No CPA certification is required” remove the mandatory
 classification. No applicant is automatically rejected.
 
-Versions `screening-v4`, `job-requirements-v2` and `screening-vocabulary-v2` enter
+Versions `screening-v5`, `job-requirements-v2` and `screening-vocabulary-v2` enter
 the existing rubric fingerprints, invalidating older cached interpretations.
 Parsing and interpretation caches are bounded or tied to passage lifetimes.
 No new provider requests, schema migrations, auth exceptions or dependencies.
@@ -54,7 +57,7 @@ full support for all seven unestablished qualifications. It remains a source
 evidence audit, not a whole-job assessment. No private names, identifiers, resumes
 or quotations are in this repository.
 
-The complete local Node suite passes **473/473** tests, including 15 additional
+The complete local Node suite passes **479/479** tests, including 21 additional
 code-review boundary checks and their parent, plus a report-portability check. All returned challenge/private
 evidence quotes occur in their sources. Screening provider calls: **0**; screening
 provider cost: **$0**. These figures exclude the coding assistant's own operation.
@@ -73,13 +76,13 @@ benchmark measured the following medians for 1,000 resumes with five priorities:
 
 | Occupation | Before: parse + score + rank | After: parse + score + rank | After: already parsed |
 | --- | ---: | ---: | ---: |
-| cloud | 1.04 s | 1.33 s | 0.94 s |
-| accounting | 0.96 s | 1.01 s | 0.62 s |
-| clinical | 1.02 s | 2.19 s | 1.28 s |
-| warehouse | 0.64 s | 1.10 s | 0.70 s |
-| education | 0.49 s | 0.89 s | 0.57 s |
-| maintenance | 0.95 s | 1.84 s | 1.14 s |
-| qa | 0.79 s | 1.29 s | 0.83 s |
+| cloud | 1.04 s | 1.29 s | 0.93 s |
+| accounting | 0.96 s | 1.03 s | 0.66 s |
+| clinical | 1.02 s | 2.12 s | 1.58 s |
+| warehouse | 0.64 s | 1.27 s | 0.98 s |
+| education | 0.49 s | 1.09 s | 0.58 s |
+| maintenance | 0.95 s | 1.81 s | 0.83 s |
+| qa | 0.79 s | 1.36 s | 0.92 s |
 
 These are three samples per occupation/size, synthetic repeated profiles and local
 CPU timings. They exclude database, network, upload, document extraction, UI and
@@ -113,7 +116,12 @@ The separate browser container rejected Git ownership metadata while building th
 diagnostic report. The reporter now marks revision metadata unavailable when Git
 cannot provide it, retaining file hashes and executing every quality assertion.
 It does not change Git ownership protections. A regression runs all 70 checks from
-a directory without Git metadata. Final hosted run status is tracked on PR #120.
+a directory without Git metadata. The browser workflow then passed on a189bea. The two large staging attempts
+returned Storage HTTP 429 during fixture upload before ranking; logs for the first
+attempt identify SQLSTATE 08P01 and max_client_conn exhaustion. Cleanup passed and
+the experimental route was disabled after both attempts. Connection protections
+and quotas were not bypassed. Final hosted run status is tracked on PR #120;
+full staged load validation remains blocked until capacity/recovery is resolved.
 
 ## Remaining release gates
 

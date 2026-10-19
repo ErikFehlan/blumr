@@ -3,7 +3,7 @@ import {evidenceTextRanges,isSourceInstruction} from './source-instructions.mjs'
 import {unsafeScreeningText} from './screening-rule-spec.mjs';
 import {validateQualification,qualificationProfile,evaluateQualification,matchQualificationEvidence} from './screening-qualifications.mjs';
 import {evidencePassages,workEvidenceText} from './screening-evidence.mjs';
-export const screeningVersion='screening-v4';
+export const screeningVersion='screening-v5';
 const norm=s=>String(s).normalize('NFKC').toLowerCase().replace(/[‐‑–—]/g,'-').replace(/\s+/g,' ').trim();
 const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const termRE=t=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escape(norm(t))}(?=$|[^\\p{L}\\p{N}_])`,'u');
@@ -91,7 +91,7 @@ function evaluate(c,profile){
   const direct=directMatches.length>0,related=relatedMatches.length>0;
   if(!direct&&!related)continue;
   const matches=direct?directMatches:relatedMatches;
-  const negative=matches.every(m=>m.negative),substantive=matches.some(m=>!m.negative&&(m.substantive||c.minimumDepth==='contribution'&&m.depth==='contribution'));
+  const negative=matches.every(m=>m.negative),substantive=matches.some(m=>!m.negative&&m.actor==='applicant'&&m.modality==='asserted'&&(m.substantive||c.minimumDepth==='contribution'&&m.depth==='contribution'));
   const v=negative?0:direct?(substantive?1:0.35):(substantive?0.5:0.15);
   contradicted ||= negative&&direct;
   value=Math.max(value,v);

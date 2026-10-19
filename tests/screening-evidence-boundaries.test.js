@@ -16,6 +16,12 @@ const examples=[
  ['imprecise dates cannot establish the renewal happened later','Active Ohio RN license required.','Ohio RN license revoked 2026.\nOhio RN license renewed January 2026.','not_supported'],
  ['old unrelated license cannot become the requested jurisdiction','Active California RN license required.','California RN license expired January 2020.\nOhio RN license renewed January 2026.','not_supported'],
  ['literal negated technology stays negated','Implement Azure infrastructure.','I never implemented Azure infrastructure, but I implemented AWS.','not_supported'],
+ ['support from another person is not applicant contribution','Support manual testing.','My manager supported manual testing.','not_supported'],
+ ['team support is not applicant contribution','Support manual testing.','Our team supported manual testing.','not_supported'],
+ ['duration belongs to the applicant clause','5 years of Azure experience required.','My manager has 8 years of Azure experience while I have 2 years of Azure experience.','not_supported'],
+ ['jurisdiction belongs to the applicant credential','Active California RN license required.','My manager holds an active California RN license while I hold an active Ohio registered nursing license.','not_supported'],
+ ['ownership cannot come from another clause','Own Azure infrastructure.','My manager owned AWS infrastructure while I maintained Azure infrastructure.','not_supported'],
+ ['recent dates cannot come from another actor','Azure experience within the last 2 years required.','My manager implemented Azure infrastructure in 2025 while I implemented Azure infrastructure in 2018.','not_supported'],
 ];
 test('evidence attribution, layout and chronology boundaries',async t=>{
  const {evaluateCase}=await import('../scripts/evaluate-screening-accuracy.mjs');

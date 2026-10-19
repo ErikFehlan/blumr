@@ -27,7 +27,7 @@ const requirementWording=/\b(?:required|preferred|must (?:have|hold)|candidates?
 const actionWords=evidenceActionPattern;
 export const matchQualificationEvidence=interpretEvidence;
 export const termPattern=term=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escapeRE(normalize(term))}(?=$|[^\\p{L}\\p{N}_])`,'u');
-const originalEvidence=(p,fields={})=>({sourceId:p.sourceId,quote:p.quote,type:'direct',...fields});
+const originalEvidence=(p,fields={})=>({sourceId:p.sourceId,quote:p.originalQuote||p.quote,type:'direct',...fields});
 
 // Use the existing date parser and interval union. Work dates are not silently
 // converted into years using every tool mentioned in the role.
@@ -80,7 +80,19 @@ export function validateQualification(node){
 }
 const finding=(value,status,evidence=[],extra={})=>({value,status,evidence,...extra});
 function matches(p,terms){return terms.map(t=>matchQualificationEvidence(termPattern(t),p)).filter(Boolean);}
-function candidateFacts(profile,terms){return profile.passages.map(p=>({p,m:terms.length?matches(p,terms):[matchQualificationEvidence(new RegExp(actionWords.source,'i'),p)].filter(Boolean)})).filter(r=>r.m.some(m=>m.actor==='applicant'&&m.modality==='asserted'));}
+function candidateFacts(profile,terms){
+ return profile.passages.flatMap(p=>{
+  const found=(terms.length?matches(p,terms):[matchQualificationEvidence(new RegExp(actionWords.source,'i'),p)].filter(Boolean))
+   .filter(m=>m.actor==='applicant'&&m.modality==='asserted');
+  // Typed checks must use the applicant's clause too, not borrow a manager's
+  // duration, jurisdiction, ownership or date elsewhere in the quoted sentence.
+  // The original quote remains the only text returned as source evidence.
+  return [...new Set(found.map(m=>m.clause))].map(clause=>({
+   p:{...p,quote:found.find(m=>m.clause===clause).sourceClause||clause,normalized:clause,originalQuote:p.originalQuote||p.quote},
+   m:found.filter(m=>m.clause===clause)
+  }));
+ });
+}
 function experienceFinding(q,profile){
  const evidence=[],claims=[];let denied=false;
  for(const {p,m} of candidateFacts(profile,q.terms)){

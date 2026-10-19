@@ -1,6 +1,6 @@
 // Deterministic interpretation of source statements, not independent verification.
 // Keep quotations unchanged. Interpretations are cached per passage, never per person.
-import {normalize} from './screening-vocabulary.mjs';
+import {normalize,escapeRE} from './screening-vocabulary.mjs';
 const forms=[
  ['exposure','shadow shadowed shadowing shadows observe observed observing observes'],
  ['contribution','assist assisted assisting assists support supported supporting supports help helped helping helps contribute contributed contributing contributes participate participated participating participates collaborate collaborated collaborating collaborates'],
@@ -33,7 +33,9 @@ function clausesFor(p){
  const append=end=>{
   const raw=text.slice(start,end),activity=actions(raw),own=actorRE.test(raw)||/\bi\b/i.test(raw);
   const actor=own?actorOf(raw,activity):inherited;
-  spans.push({start,end,text:raw,actor,actions:activity});
+  const sourcePattern=escapeRE(raw.trim()).replace(/ /g,'\\s+').replace(/-/g,'[-‐‑–—]');
+  const sourceClause=sourcePattern?(p.originalQuote||p.quote).match(new RegExp(sourcePattern,'iu'))?.[0]:null;
+  spans.push({start,end,text:raw,sourceClause,actor,actions:activity});
   inherited=actor;
  };
  for(const m of text.matchAll(boundary)){append(m.index);start=m.index+m[0].length;}
@@ -90,7 +92,7 @@ function interpretMatch(match,p){
  const negative=actor==='applicant'&&(Boolean(last)||/^[\s\S]{0,80}?\b(?:experience\s+)?(?:is|was)\s+(?:not|none|only theoretical)\b/i.test(after));
  const depth=uncertain?'exposure':limited?.depth||action?.depth||(/\b(?:responsible|accountable) for\b/i.test(local)?'ownership':'mention');
  const substantive=actor==='applicant'&&!negative&&!hypothetical&&!requirement&&!['mention','exposure','contribution'].includes(depth);
- return {actor,negative,substantive,depth,action:action?.word||null,modality:hypothetical?'hypothetical':requirement?'requirement':'asserted',clause:segment.text};
+ return {actor,negative,substantive,depth,action:action?.word||null,modality:hypothetical?'hypothetical':requirement?'requirement':'asserted',clause:segment.text,sourceClause:segment.sourceClause};
 }
 // Only remove population descriptors from clinical/teaching objects. Applicant
 // characteristics remain excluded by the caller; no trait is a scoring signal.
