@@ -146,14 +146,21 @@ jobs:
 
   staging:
     needs: validate
+    # Reuse the paid-PR gate proposed in #117. Release commits still run the
+    # complete paid staging suite; PRs keep deterministic and isolated checks.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     uses: ./.github/workflows/staging-backend.yml
     secrets: inherit
 
   core-backend:
     needs: [validate, staging]
+    if: >-
+      always() && !cancelled() && needs.validate.result == 'success' &&
+      (needs.staging.result == 'success' ||
+       (github.event_name == 'pull_request' && needs.staging.result == 'skipped'))
     uses: ./.github/workflows/core-backend.yml
     with:
-      staging_verified: true
+      staging_verified: ${{ needs.staging.result == 'success' }}
     secrets: inherit
 
   live-site:

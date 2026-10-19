@@ -1,6 +1,6 @@
 # Rules-first screening: foundation milestone
 
-Status: development module, locally verified; not integrated, staged, or deployed. Related: #118, #119. Neither issue is complete.
+Status: foundation extended with canonical priority rule generation, an authenticated screening request path, and durable caches. Local checks pass; hosted validation is tracked in [screening-foundation-validation.md](screening-foundation-validation.md). The experimental route is disabled by default. Related: #118, #119. Neither issue is complete. The original milestone record below is retained as historical evidence.
 
 ## Existing architecture inspected
 
