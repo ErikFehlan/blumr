@@ -7,8 +7,10 @@ on:
       - 'supabase/migrations/*screening*'
       - 'tests/*screening*'
       - 'tests/job-intelligence.test.js'
-      - 'tests/fixtures/screening-resumes.mjs'
+      - 'tests/fixtures/screening-*.mjs'
       - 'scripts/*screening*'
+      - 'scripts/readiness-fixtures.mjs'
+      - 'scripts/fixture-storage.mjs'
       - '.github/workflows/rules-screening.yml'
 permissions:
   contents: read
@@ -58,6 +60,8 @@ jobs:
         with:
           version: 2.95.3
       - run: node scripts/screening-backend.mjs
+      - name: Recover known failed synthetic fixture
+        run: node scripts/recover-screening-fixture.mjs
       - name: Deploy experimental route to staging only
         run: |
           supabase functions deploy analyze-patterns-beta --project-ref "$SUPABASE_PROJECT_REF"

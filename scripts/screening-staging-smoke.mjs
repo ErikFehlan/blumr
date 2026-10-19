@@ -28,17 +28,21 @@ try{
  // Ensure criteria completion cannot unexpectedly fan out after candidates exist.
  await f.sql("update public.job_criteria_tasks set status='ready',result=jsonb_build_object('criteria','[]'::jsonb,'hiring_priorities',$2::jsonb,'model','synthetic-no-provider'),lease_id=null,lease_until=null where job_id=$1 and workspace_id=$3",[job,JSON.stringify(items),owner.workspace]);
  const candidates=Array.from({length:1000},(_,i)=>({id:randomUUID(),workspace_id:owner.workspace,job_id:job,name:'Synthetic screening '+i,role:'Synthetic evidence fixture',created_by:owner.id}));
+ const uploadStarted=performance.now();report.fixture_upload={concurrency:1,minimum_gap_ms:500,uploaded:0};
  for(let n=0;n<candidates.length;n+=100){
   const chunk=candidates.slice(n,n+100);await f.request('/rest/v1/candidates',owner.access,'POST',chunk);
   const docs=chunk.map((c,i)=>{const {text}=screeningResume(n+i);return {id:randomUUID(),workspace_id:owner.workspace,job_id:job,candidate_id:c.id,storage_path:`${owner.workspace}/${job}/${c.id}/${randomUUID()}.txt`,file_name:'Synthetic.txt',mime_type:'text/plain',file_size:Buffer.byteLength(text),extracted_text:text,created_by:owner.id};});
-  // Preserve real document protections: metadata must match an owned private
-  // Storage object. Bound upload concurrency and settle every write before cleanup.
-  for(let offset=0;offset<docs.length;offset+=4){
-   const writes=await Promise.allSettled(docs.slice(offset,offset+4).map(d=>f.upload(owner,d.storage_path,Buffer.from(d.extracted_text),'text/plain')));
-   for(const write of writes)if(write.status==='rejected')throw write.reason;
+  // Respect Storage backpressure after observed max_client_conn exhaustion.
+  // This deliberately paced fixture setup is not an upload-throughput benchmark.
+  for(const d of docs){
+   await f.upload(owner,d.storage_path,Buffer.from(d.extracted_text),'text/plain');
+   report.fixture_upload.uploaded++;
+   await new Promise(resolve=>setTimeout(resolve,500));
   }
   await f.request('/rest/v1/candidate_documents',owner.access,'POST',docs);
+  console.log('Fixture upload progress '+report.fixture_upload.uploaded+'/1000');
  }
+ report.fixture_upload.duration_ms=Math.round(performance.now()-uploadStarted);
  // Fixtures never mark candidates "Resume awaiting analysis" and never queue
  // paid intake. Fail if any background assessment unexpectedly appears.
  const noPaidWork=async()=>{
@@ -76,7 +80,7 @@ try{
  // scenarios. Retain paths in the cleanup manifest for crash recovery.
  await noPaidWork();
  const loadPaths=owner.paths.filter(path=>path.startsWith(`${owner.workspace}/${job}/`));
- await f.request('/storage/v1/object/resumes',owner.access,'DELETE',{prefixes:loadPaths});
+ for(let n=0;n<loadPaths.length;n+=100)await f.request('/storage/v1/object/resumes',owner.access,'DELETE',{prefixes:loadPaths.slice(n,n+100)});
  await f.request('/rest/v1/jobs?id=eq.'+job,owner.access,'DELETE');
  report.qualification_pools=[];
  for(const pool of qualificationPools){
@@ -104,6 +108,8 @@ try{
   report.qualification_pools.push({occupation:pool.id,candidates:rows.length,priorities:5,expected_pair_orderings:pool.pairs.length,source_quotes_verified:true,near_miss_retained:true,warm_cache_hits:warm.data.metrics.cache_hits,ai_calls:0});
  }
  const usage=await noPaidWork();report.ai_calls=Number(usage.calls);report.passed=true;
+}catch(error){
+ report.failure={name:error.name,message:error.message};throw error;
 }finally{
  try{await f.cleanup();report.cleanup='passed';}catch(error){report.cleanup='failed';report.passed=false;throw error;}
  finally{await mkdir('test-results/screening',{recursive:true});await writeFile('test-results/screening/staging.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));}
