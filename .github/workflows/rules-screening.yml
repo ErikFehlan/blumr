@@ -6,6 +6,9 @@ on:
       - 'supabase/functions/**'
       - 'supabase/migrations/*screening*'
       - 'tests/*screening*'
+      - 'assets/bulk-*'
+      - 'tests/bulk-*'
+      - 'scripts/bulk-*'
       - 'tests/job-intelligence.test.js'
       - 'tests/fixtures/screening-*.mjs'
       - 'scripts/*screening*'
@@ -33,8 +36,11 @@ jobs:
         with:
           deno-version: v2.x
       - run: node --test tests/*.test.js
-      - run: deno test --allow-env tests/rules-screening-routing.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
+      - run: deno test --allow-env tests/rules-screening-routing.test.ts tests/bulk-screening-backend.test.ts tests/job-reassessment-worker.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
       - run: psql -h localhost -U postgres -d postgres -f tests/screening-cache.sql
+        env:
+          PGPASSWORD: postgres
+      - run: createdb -h localhost -U postgres bulk_screening && psql -h localhost -U postgres -d bulk_screening -f tests/bulk-screening.sql
         env:
           PGPASSWORD: postgres
       - run: node scripts/benchmark-screening.mjs
@@ -46,7 +52,7 @@ jobs:
     concurrency:
       group: staging-backend
       cancel-in-progress: false
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
@@ -65,11 +71,12 @@ jobs:
       - name: Deploy experimental route to staging only
         run: |
           supabase functions deploy analyze-patterns-beta --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy reassess-job --project-ref "$SUPABASE_PROJECT_REF"
           supabase secrets set RULES_FIRST_SCREENING=true --project-ref "$SUPABASE_PROJECT_REF"
-      - run: node scripts/screening-staging-smoke.mjs
+      - run: node scripts/bulk-screening-staging-smoke.mjs
       - name: Clean disposable fixtures
         if: always()
-        run: node scripts/screening-staging-smoke.mjs cleanup
+        run: node scripts/bulk-screening-staging-smoke.mjs cleanup
       - name: Disable experimental route
         if: always()
         run: supabase secrets set RULES_FIRST_SCREENING=false --project-ref "$SUPABASE_PROJECT_REF"
@@ -77,5 +84,5 @@ jobs:
         if: always()
         with:
           name: rules-screening-staging
-          path: test-results/screening/
+          path: test-results/bulk-screening/
           if-no-files-found: ignore

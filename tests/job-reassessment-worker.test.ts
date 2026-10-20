@@ -13,7 +13,9 @@ Deno.test('reassessment worker resolves evidence selections and keeps unsupporte
    if(path.endsWith('/claim_account_deletions')||(path.endsWith('/claim_assessment_work')&&body.p_kind==='intake'))return json([]);
    if(path.endsWith('/claim_assessment_work')&&body.p_kind==='reassessment')return json([task]);
    if(path.endsWith('/begin_assessment_provider')||path.endsWith('/end_assessment_provider')||path.endsWith('/heartbeat_assessment_work'))return json(true);
-   if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
+   if(path.endsWith('/reserve_ai_budget')||path.endsWith('/reserve_screening_ai'))return json({allowed:true});
+   if(path.endsWith('/next_screening_batches'))return json([]);
+   if(path.endsWith('/record_screening_ai_usage'))return json(null);
    if(path==='/v1/responses'){
     assert(new Headers(init?.headers).get('X-Client-Request-Id')?.startsWith('durable-lease-')===true,'durable reassessment request identity missing');
     const format=body.text.format.schema,support=format.properties.evidence_support.items.properties;
@@ -68,7 +70,9 @@ Deno.test('saved resumes start while job edits are still coalescing and retain t
    const path=new URL(String(url)).pathname,body=JSON.parse(String(init?.body||'{}'));
    const json=(data:unknown)=>new Response(JSON.stringify(data));
    if(path.endsWith('/begin_assessment_provider')||path.endsWith('/end_assessment_provider')||path.endsWith('/heartbeat_assessment_work'))return json(true);
-   if(path.endsWith('/reserve_ai_budget'))return json({allowed:true});
+   if(path.endsWith('/reserve_ai_budget')||path.endsWith('/reserve_screening_ai'))return json({allowed:true});
+   if(path.endsWith('/next_screening_batches'))return json([]);
+   if(path.endsWith('/record_screening_ai_usage'))return json(null);
    if(path.endsWith('/claim_account_deletions'))return json([]);
    if(path.endsWith('/claim_assessment_work')&&body.p_kind==='intake')return json([task]);
    if(path==='/v1/responses'){

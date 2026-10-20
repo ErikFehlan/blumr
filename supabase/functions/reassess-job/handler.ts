@@ -1,3 +1,4 @@
+import {processBulkScreeningBatch} from '../_shared/bulk-screening.ts';
 import {experienceInstructions} from '../_shared/experience-intelligence.mjs';
 import {untrustedInputInstructions} from '../_shared/untrusted-input.mjs';
 import {reserveModelCall, recordProviderUsage, SecurityLimit} from '../_shared/security.ts';
@@ -34,7 +35,22 @@ export async function handleReassessment(request:Request){
     // A saved resume can start immediately. Its lease and revision protect
     // concurrent workers and later edits without delaying every upload.
     const intakeTasks=await rpc('claim_assessment_work',{p_kind:'intake',p_job:jobId});
-    intakeWork=processIntakes(intakeTasks,{rpc,analyze:(request:Request,workspace:string,actor:string|null,_runId:string|null,providerFetch:(input:RequestInfo|URL,init?:RequestInit)=>Promise<Response>)=>handleAnalysis(request,{providerFetch,retainAmbiguousFailures:true,beforeModel:(bytes,tokens)=>reserveModelCall(workspace,null,bytes,tokens),onUsage:result=>recordProviderUsage(workspace,'resume_intake',result,actor)})});
+    intakeWork=processIntakes(intakeTasks,{rpc,analyze:(request:Request,workspace:string,actor:string|null,_runId:string|null,providerFetch:(input:RequestInfo|URL,init?:RequestInit)=>Promise<Response>,leaseId:string)=>handleAnalysis(request,{providerFetch,retainAmbiguousFailures:true,beforeModel:async(bytes,tokens)=>{
+      const reservation=await rpc('reserve_screening_ai',{p_lease:leaseId,p_model:analysisModel('resume',name=>Deno.env.get(name)),p_input_bytes:bytes,p_output_tokens:tokens});
+      if(reservation?.allowed!==true)throw new SecurityLimit(reservation?.code||'usage_check_unavailable',429);
+      await reserveModelCall(workspace,null,bytes,tokens);
+    },onUsage:async(result:any)=>{
+      await recordProviderUsage(workspace,'resume_intake',result,actor);
+      // Only provider metadata, never resume text or model output, enters costs.
+      try{await rpc('record_screening_ai_usage',{p_lease:leaseId,p_response:{id:result.id,model:result.model,usage:result.usage}});}catch{console.warn('Batch usage pending; conservative reservation retained');}
+    }})});
+    // Rules pages use the same authenticated worker lifecycle without AI calls.
+    const screeningWork=(async()=>{try{
+      const ids=await rpc('next_screening_batches',{p_job:jobId});
+      for(const id of ids)for(let page=0;page<4;page++){
+        const result=await processBulkScreeningBatch(id,rpc);if(result.processed<100)break;
+      }
+    }catch{console.warn('Bulk screening will resume on the next worker tick');}})();
     // Job edits still coalesce while resume analysis is already running.
     await new Promise(resolve=>setTimeout(resolve,3500));
     const tasks=await rpc('claim_assessment_work',{p_kind:'reassessment',p_job:jobId});
@@ -70,6 +86,7 @@ export async function handleReassessment(request:Request){
       }finally{await lease.close();}
     }));
     if(tasks.length)await rpc('continue_job_reassessments',{p_job:jobId});
+    await screeningWork;
     const intakeResults=await intakeWork;
     return json({status:tasks.length||intakeTasks.length?'processed':'idle',results,intakeResults});
   }catch{return json({error:'Worker temporarily unavailable'},503);}
