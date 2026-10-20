@@ -6,9 +6,12 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
  const {processBulkScreeningBatch,summarizeBulkScreening}=await import('../supabase/functions/_shared/bulk-screening.ts');
  const {qualificationPools,qualificationJob}=await import('./fixtures/screening-qualification-pools.mjs');
  const pool=qualificationPools.find(p=>p.id==='qa'),source={...qualificationJob(pool,'workspace','job-a'),workspaceId:'workspace',feedback:[],assessments:[],lessons:[],sourceVersion:'source'};
- let batch=null,docs=new Map(),candidates=new Map(),failedOnce=false,deepCalls=0;
- const assessment=c=>({status:'ready',result:{name:'Candidate',score:c.result.score/10,manager_score:c.result.score/10,jd_reason:'Verified synthetic testing evidence.',manager_reason:'No additional manager preferences supplied.',resume_evidence:[{claim:'Testing work',quote:c.text.split('\n').find(t=>/Performed|Owned/.test(t))||c.text}],concerns:['Verify scope on a phone screen.'],screening_questions:['What testing did you personally own?']}});
+ let batch=null,docs=new Map(),candidates=new Map(),failedOnce=false,deepCalls=0,legacyCalls=0,approvals=0;
+ const assessment=c=>({status:'ready',revision:'current',result:{name:'Candidate',score:c.result.score/10,manager_score:c.result.score/10,jd_reason:'Verified synthetic testing evidence.',manager_reason:'No additional manager preferences supplied.',resume_evidence:[{claim:'Testing work',quote:c.text.split('\n').find(t=>/Performed|Owned/.test(t))||c.text}],concerns:['Verify scope on a phone screen.'],screening_questions:['What testing did you personally own?']}});
  async function operation(op,args){
+  if(op==='load')return {jobs:[{id:'job-a',title:'QA Engineer',description:'Perform manual testing.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1}],candidates:[...candidates.values()].map(c=>({id:c.candidateId,jobId:'job-a',name:c.name,short:c.name,role:c.approved?'QA Engineer':'Resume awaiting analysis',screeningManaged:true,jdScore:c.approved?c.assessment.result.score:0,resumeJDScore:c.approved?c.assessment.result.score:0,managerScore:c.approved?c.assessment.result.manager_score:0,originalManagerScore:0,stage:'Sourced',strengths:[],concerns:[],tags:[],screeningQuestions:[],createdAt:1,updatedAt:1,aiReview:c.approved?{source:'resume_intake',verdict:'Accurate',assessment:c.assessment.result}:null})),feedback:[],interviewOutcomes:[]};
+  if(op==='legacy'){legacyCalls++;throw Error('Bulk candidate entered legacy AI intake');}
+  if(op==='approve'){const c=candidates.get(args[0]);assert.equal(args[1],c.assessment.revision);c.approved=true;c.assessment.status='approved';approvals++;return true;}
   if(op==='list')return batch?[batch]:[];
   if(op==='create'){const [id,job,manifest,budget]=args;batch={id,job_id:job,created_at:new Date().toISOString(),sealed:false,selected_ids:[],selection_version:0,budget_usd:budget,manifest};batch.items=manifest.map((f,ordinal)=>({ordinal,file_name:f.name,file_size:f.size,status:'pending'}));return id;}
   if(op==='prepare'){const [,ordinal,text]=args,id=crypto.createHash('sha256').update(text.toLowerCase().replace(/\s+/g,' ').trim()).digest('hex').slice(0,32),item=batch.items[ordinal];item.candidate_id=id;
@@ -43,7 +46,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.route('**/assets/data.js*',r=>r.fulfill({contentType:'application/javascript',body:''}));
   await page.addInitScript(()=>{
    const rpc=async(op,...args)=>{const r=await fetch('/__bulk',{method:'POST',body:JSON.stringify({op,args})});const value=await r.json();if(!r.ok)throw Error(value.error);return value;};
-   window.AncalagonData={create:()=>({load:async()=>({jobs:[{id:'job-a',title:'QA Engineer',description:'Perform manual testing.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1}],candidates:[],feedback:[],interviewOutcomes:[]}),schedule:(_,__,done)=>done('saved'),flush:async()=>{},trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin');},
+   window.AncalagonData={create:()=>({load:()=>rpc('load'),requestResumeIntake:()=>rpc('legacy'),loadResumeIntakes:async()=>[],reviewResumeIntake:(...a)=>rpc('approve',...a),schedule:(_,__,done)=>done('saved'),flush:async()=>{},trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin');},
     screeningCapabilities:async()=>({enabled:true}),listScreeningBatches:()=>rpc('list'),createScreeningBatch:(...a)=>rpc('create',...a),prepareScreeningUpload:(...a)=>rpc('prepare',...a),updateScreeningItem:(...a)=>rpc('mark',...a),sealScreeningBatch:(...a)=>rpc('seal',...a),refreshScreeningBatch:(...a)=>rpc('refresh',...a),selectScreeningFinalists:(...a)=>rpc('select',...a),uploadResume:(c,f,t)=>rpc('upload',c,t,f.name),loadResumeText:c=>rpc('text',c),loadResumeDocument:async()=>null})};
    window.ancalagonAuth={session:{user:{id:'test'},access_token:'test-token'},workspace:{id:'workspace'}};
   });
@@ -64,8 +67,11 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.locator('[data-bulk-start]').click();await page.waitForTimeout(250);assert.equal(deepCalls,20,'Repeated shortlist created duplicate model calls');
   await page.locator('[data-bulk-resume]').first().click();await page.locator('dialog[open]').waitFor();assert.ok((await page.locator('[data-resume-text]').textContent()).length>40);await page.locator('dialog [data-close]').click();
   await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(deepCalls,20);
+  assert.equal(legacyCalls,0,'Reload started legacy full AI');
+  await page.locator('[data-bulk-review]').first().click();await page.locator('#page-detail.active').waitFor();assert.equal(approvals,1);assert.notEqual((await page.locator('#detailJDScore').textContent()).trim(),'—');
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(legacyCalls,0);assert.equal(deepCalls,20);
   await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Mobile overflow');
   fs.mkdirSync('test-results/bulk-screening',{recursive:true});await page.screenshot({path:'test-results/bulk-screening/mobile.png',fullPage:true});await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'test-results/bulk-screening/desktop.png',fullPage:true});
-  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,pdf_docx_zip:true,passed:true}));
+  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,legacy_calls:legacyCalls,pdf_docx_zip:true,passed:true}));
  }finally{await browser?.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

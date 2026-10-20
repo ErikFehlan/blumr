@@ -142,3 +142,11 @@ test('legacy .doc resumes pass file validation and enter the normal intake flow'
  const f=fixture();const c=await f.flow.upload({...f.file,name:'Alex.doc'});await until(()=>c.resumeIntake.phase==='ready');
  assert.equal(f.candidates.length,1);assert.equal(f.calls.length,1);assert.equal(c.resumeIntake.fileName,'Alex.doc');
 });
+
+
+test('rules-only candidates stay outside reviewed score rankings before approval',()=>{
+ const {pending}=require('../assets/resume-intake.js');
+ assert.equal(pending({role:'Resume awaiting analysis'}),true);
+ assert.equal(pending({screeningManaged:true,role:'Candidate'}),true);
+ assert.equal(pending({screeningManaged:true,role:'QA',aiReview:{source:'resume_intake'}}),false);
+});

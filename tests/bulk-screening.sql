@@ -39,6 +39,21 @@ end $$;
 select update_screening_item('b0000000-0000-0000-0000-000000000001',2,'failed');
 select update_screening_item('b0000000-0000-0000-0000-000000000001',2,'excluded');
 select seal_screening_batch('b0000000-0000-0000-0000-000000000001');
+reset role;
+set role service_role;
+do $$declare first jsonb;begin
+ first:=next_screening_batches('00000000-0000-0000-0000-000000000011');
+ if jsonb_array_length(first)<>1 then raise exception 'Background batch was not claimed';end if;
+ if next_screening_batches('00000000-0000-0000-0000-000000000011')<>'[]'::jsonb then raise exception 'Concurrent worker reclaimed the same batch';end if;
+end $$;
+reset role;
+update screening_batches set worker_claimed_at=now()-interval '3 minutes';
+set role service_role;
+do $$begin
+ if jsonb_array_length(next_screening_batches('00000000-0000-0000-0000-000000000011'))<>1 then raise exception 'Interrupted background batch did not recover';end if;
+end $$;
+reset role;
+set role authenticated;
 set test.workspace='00000000-0000-0000-0000-000000000002';
 do $$begin
  if exists(select from screening_batches) then raise exception 'Workspace isolation failed';end if;

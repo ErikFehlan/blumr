@@ -168,7 +168,7 @@
     const list=api.root.querySelector('#workspaceQuestions');if(list)list.innerHTML=questionsFor(c).map(q=>'<li>'+escape(q)+'</li>').join('');
     if(c.resumeIntake?.phase==='ready'&&!drafts.has(c.id)&&!c.submissionDraft){const draft=api.root.querySelector('#submissionDraft');if(draft){const text=summary(c,api.job());if(draft.value!==text){draft.value=text;refreshDraft();}}}
     const points=api.root.querySelector('#workspaceAssessmentPoints');if(points){points.innerHTML=assessmentPointsHTML(c);bindAssessmentPoints(api.root.querySelector('#candidateWorkspace'),c);}
-    const ready=global.AncalagonIntake?.pending(c)?c.resumeIntake.phase==='ready':(api.reviewReady?.(c)||api.canReview(c));api.guidance?.(c,ready?'approval':'assessment');
+    const ready=global.AncalagonIntake?.pending(c)?c.resumeIntake?.phase==='ready':(api.reviewReady?.(c)||api.canReview(c));api.guidance?.(c,ready?'approval':'assessment');
     const reasons=api.root.querySelector('#workspaceAssessmentReasons');
     if(reasons){
       const latest=c.aiReview?.notes,screen=c.screeningInsight?.assessment,brief=c.resumeIntake?.brief;
@@ -182,10 +182,10 @@
     const fit=api.root.querySelector('#workspaceFit');if(fit)fit.innerHTML=global.AncalagonIntake?.pending(c)?'':fitHTML(c);
     const card=api.root.querySelector('.rf-workspace-overview');if(card)card.hidden=!api.root.querySelector('#workspaceIntake').hidden||(!api.root.querySelector('#workspaceEvaluation').hidden&&api.root.querySelector('#workspaceEvaluation').dataset.replacesAssessment==='true');
     if(overview&&global.AncalagonIntake?.pending(c)){
-      const failed=c.resumeIntake.phase==='error',ready=c.resumeIntake.phase==='ready';
-      overview.querySelector('h3').textContent=failed?'Retry the resume assessment':ready?'Review the screening brief':'Preparing the resume assessment';
-      overview.querySelector('p').textContent=failed?'Use Try again above to continue with this candidate. No assessment scores have been applied.':ready?'Check the evidence and proposed assessment, then use the questions below in your screen.':'You can keep working while the screening brief is prepared.';
-      if(points&&!ready)points.innerHTML='<p class="rf-sub">'+(failed?'Assessment unavailable. Resume evidence has not been confirmed.':'Resume evidence is being checked.')+'</p>';
+      const rules=c.screeningManaged||!c.resumeIntake,failed=c.resumeIntake?.phase==='error',ready=c.resumeIntake?.phase==='ready';
+      overview.querySelector('h3').textContent=rules?'Review this candidate in bulk screening':failed?'Retry the resume assessment':ready?'Review the screening brief':'Preparing the resume assessment';
+      overview.querySelector('p').textContent=rules?'Open the job’s bulk screening results to review the evidence and select finalists for deep analysis.':failed?'Use Try again above to continue with this candidate. No assessment scores have been applied.':ready?'Check the evidence and proposed assessment, then use the questions below in your screen.':'You can keep working while the screening brief is prepared.';
+      if(points&&!ready)points.innerHTML='<p class="rf-sub">'+(rules?'AI scores have not been approved. Review the rules evidence in the bulk shortlist.':failed?'Assessment unavailable. Resume evidence has not been confirmed.':'Resume evidence is being checked.')+'</p>';
     }
   }
   function refreshEvaluation(){if(!api||!current)return;return preserve(()=>{const candidate=api.candidate(current);if(candidate){renderEvaluation(candidate);refreshIntake();}});}

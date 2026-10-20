@@ -2,7 +2,7 @@
  'use strict';
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const prose=global.AncalagonPresentation||(typeof require==='function'?require('./presentation.js'):null);
- const pending=c=>!!c.resumeIntake&&!c.resumeIntake.reviewedAt&&!c.aiReview;
+ const pending=c=>!c.aiReview&&Boolean(c.screeningManaged||c.role==='Resume awaiting analysis'||c.resumeIntake&&!c.resumeIntake.reviewedAt);
  const reviewed=c=>!!(c.aiReview||c.resumeIntake?.reviewedAt);
  const active=c=>!['Rejected','Withdrew','Hired'].includes(c.stage);
  const score=v=>Number.isFinite(v)?v.toFixed(1):'—';
@@ -10,7 +10,7 @@
  function priorities(job){const p=job?.hiringPriorities;return p?.source_title===job.title&&p.source_description===(job.description||'')?p.items?.slice(0,5)||[]:[];}
  function assessment(c){return c.aiReview?.assessment||c.screeningInsight?.assessment||c.resumeIntake?.brief||null;}
  function reviewState(c,signature){
-  if(pending(c)){const phase=c.resumeIntake.phase||c.resumeIntake.status;return {label:['error','failed'].includes(phase)?'Needs another try':phase==='ready'?'Awaiting review':'Processing',tone:phase==='ready'?'review':'neutral',pending:true};}
+  if(pending(c)){if(c.screeningManaged||!c.resumeIntake)return {label:'Bulk screening',tone:'neutral',pending:true,rules:true};const phase=c.resumeIntake.phase||c.resumeIntake.status;return {label:['error','failed'].includes(phase)?'Needs another try':phase==='ready'?'Awaiting review':'Processing',tone:phase==='ready'?'review':'neutral',pending:true};}
   if(signature&&c.aiReview?.contextSignature&&signature!==c.aiReview.contextSignature)return {label:'Context changed',tone:'warning',stale:true};
   return {label:reviewed(c)?'Assessment reviewed':'Recorded profile',tone:reviewed(c)?'reviewed':'neutral'};
  }
@@ -31,8 +31,8 @@
  function selection(ids,candidates,jobId){const valid=new Set(candidates.filter(c=>c.jobId===jobId).map(c=>c.id));return [...new Set(ids)].filter(id=>valid.has(id)).slice(0,4);}
  function summary(job,candidates,canReview=()=>false){
   const list=candidates.filter(c=>c.jobId===job.id&&active(c));
-  const needsReview=list.filter(c=>canReview(c)||(pending(c)&&c.resumeIntake.phase==='ready'));
-  const working=list.filter(c=>pending(c)&&['uploading','queued','processing'].includes(c.resumeIntake.phase));
+  const needsReview=list.filter(c=>canReview(c)||(pending(c)&&!c.screeningManaged&&c.resumeIntake?.phase==='ready'));
+  const working=list.filter(c=>pending(c)&&!c.screeningManaged&&['uploading','queued','processing'].includes(c.resumeIntake?.phase));
   const drafts=list.filter(c=>c.stage==='Screened'&&reviewed(c)&&!needsReview.includes(c)&&!working.includes(c));
   return {list,needsReview,working,drafts,reviewed:list.filter(reviewed)};
  }
@@ -46,6 +46,7 @@
   return `<div class="rf-candidate-fit" aria-label="${state.stale?'Previously saved':'Saved'} fit scores">${[['JD Fit',c.jdScore],['Manager Fit',c.managerScore]].map(([label,value])=>`<div><span>${label}</span><strong>${score(value)}<small> / 10</small></strong></div>`).join('')}</div>`;
  }
  function highlights(c,state){
+  if(state.rules)return '<p class="rf-candidate-context">Review the rules evidence and finalist selection in bulk screening.</p>';
   if(state.pending)return '<p class="rf-candidate-context">Open the assessment to check the proposed evidence and scores.</p>';
   if(state.stale)return '<p class="rf-candidate-context">Context changed. Recheck the saved assessment before using these scores.</p>';
   const strength=(c.strengths||[]).map(prose.evidence).find(e=>prose.supportedPoint(c,e));

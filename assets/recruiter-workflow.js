@@ -3,6 +3,7 @@
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const pending=c=>!!c.resumeIntake&&!c.resumeIntake.reviewedAt&&!c.aiReview;
  function phase(c){
+  if(!c.aiReview&&(c.screeningManaged||!c.resumeIntake&&c.role==='Resume awaiting analysis'))return 'screening';
   if(pending(c))return c.resumeIntake.phase||c.resumeIntake.status||'queued';
   return c.feedbackEvaluation?.status==='ready'?'ready':'reviewed';
  }

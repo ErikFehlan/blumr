@@ -16,6 +16,8 @@ create table if not exists public.screening_batches(
  foreign key(job_id,workspace_id) references public.jobs(id,workspace_id) on delete cascade,
  unique(id,job_id,workspace_id)
 );
+alter table public.screening_batches add column if not exists worker_requested_at timestamptz;
+alter table public.screening_batches add column if not exists worker_claimed_at timestamptz;
 create index if not exists screening_batches_job on public.screening_batches(workspace_id,job_id,created_at desc);
 create table if not exists public.screening_batch_items(
  batch_id uuid not null,ordinal integer not null check(ordinal between 0 and 999),job_id uuid not null,workspace_id uuid not null,
@@ -148,7 +150,12 @@ begin
  if i.status='saved' and p_status<>'excluded' then return;end if;
  if p_status='saved' and not exists(select from public.candidate_documents d where d.candidate_id=i.candidate_id and d.workspace_id=b.workspace_id and d.job_id=b.job_id and public.resume_content_hash(d.extracted_text)=i.content_hash) then raise exception 'Resume not saved' using errcode='PT409';end if;
  update public.screening_batch_items set status=p_status,error_code=case when p_status='failed' then 'document_needs_attention' else null end where batch_id=p_batch and ordinal=p_ordinal;
- if p_status='saved' then perform public.wake_job_reassessments(b.job_id);end if;
+ if p_status='saved' then
+  -- Coalesce upload notifications; a 500-file import must not launch 500 workers.
+  update public.screening_batches set worker_requested_at=now() where id=p_batch
+   and (worker_requested_at is null or worker_requested_at<now()-interval '15 seconds');
+  if found then perform public.wake_job_reassessments(b.job_id);end if;
+ end if;
 end $$;
 create or replace function public.seal_screening_batch(p_batch uuid) returns void
 language plpgsql security definer set search_path='' as $$
@@ -193,12 +200,15 @@ begin
  b:=public.require_screening_batch(p_batch);
  if public.bulk_screening_source(p_batch)->>'sourceVersion' is distinct from p_source then return false;end if;
  if jsonb_array_length(p_rows)>100 then raise exception 'Invalid page';end if;
- for r in select value from jsonb_array_elements(p_rows) loop
+ -- Foreground refresh and background pages share one short, ordered write lock.
+ perform pg_advisory_xact_lock(hashtextextended(b.job_id::text,202610202));
+ for r in select value from jsonb_array_elements(p_rows) order by value->>'candidate_id' loop
   if not exists(select from public.screening_batch_items i join public.candidate_documents d on d.candidate_id=i.candidate_id and d.id=(r->>'document_id')::uuid
    where i.batch_id=p_batch and i.status='saved' and i.candidate_id=(r->>'candidate_id')::uuid and r->>'resume_hash'=encode(sha256(convert_to(d.extracted_text,'UTF8')),'hex')) then return false;end if;
   insert into public.candidate_screening_cache(candidate_id,job_id,workspace_id,document_id,rubric_key,resume_hash,result)
   values((r->>'candidate_id')::uuid,b.job_id,b.workspace_id,(r->>'document_id')::uuid,p_intelligence#>>'{rubric,key}',r->>'resume_hash',r->'result')
-  on conflict(candidate_id) do update set document_id=excluded.document_id,rubric_key=excluded.rubric_key,resume_hash=excluded.resume_hash,result=excluded.result,updated_at=now();
+  on conflict(candidate_id) do update set document_id=excluded.document_id,rubric_key=excluded.rubric_key,resume_hash=excluded.resume_hash,result=excluded.result,updated_at=now()
+  where (candidate_screening_cache.document_id,candidate_screening_cache.rubric_key,candidate_screening_cache.resume_hash) is distinct from (excluded.document_id,excluded.rubric_key,excluded.resume_hash);
  end loop;
  update public.screening_batches set source_version=p_source,intelligence=p_intelligence,screened_at=now() where id=p_batch;
  return true;
@@ -355,11 +365,16 @@ begin
 end $$;
 create or replace function public.next_screening_batches(p_job uuid default null) returns jsonb
 language sql volatile security invoker set search_path='' as $$
- select coalesce(jsonb_agg(id),'[]'::jsonb) from (
+ with eligible as (
  select b.id from public.screening_batches b join public.jobs j on j.id=b.job_id
  where j.status='active' and (p_job is null or b.job_id=p_job) and exists(select from public.screening_feature_config where enabled)
  and exists(select from public.screening_batch_items i where i.batch_id=b.id and i.status='saved')
- and (b.screened_at is null or b.screened_at<now()-interval '1 minute') order by b.screened_at nulls first,b.created_at limit 2) q;
+ and (b.screened_at is null or b.screened_at<now()-interval '1 minute')
+ and (b.worker_claimed_at is null or b.worker_claimed_at<now()-interval '2 minutes')
+ order by b.screened_at nulls first,b.created_at limit 2 for update of b skip locked
+ ), claimed as (
+ update public.screening_batches b set worker_claimed_at=now() from eligible e where b.id=e.id returning b.id
+ ) select coalesce(jsonb_agg(id),'[]'::jsonb) from claimed;
 $$;
 
 -- Private functions are never a second client write path around authorization.
