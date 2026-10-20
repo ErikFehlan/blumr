@@ -74,6 +74,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   assert.equal(legacyCalls,0,'Reload started legacy full AI');
   await page.locator('[data-bulk-review]').first().click();await page.locator('#page-detail.active').waitFor();assert.equal(approvals,1);assert.notEqual((await page.locator('#detailJDScore').textContent()).trim(),'—');
   await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(legacyCalls,0);assert.equal(deepCalls,20);
+  assert.equal(await page.locator('#candidateCards').isHidden(),true,'Legacy cards remained visible under bulk results');
   await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Mobile overflow');
   fs.mkdirSync('test-results/bulk-screening',{recursive:true});await page.screenshot({path:'test-results/bulk-screening/mobile.png',fullPage:true});await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'test-results/bulk-screening/desktop.png',fullPage:true});
   assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,legacy_calls:legacyCalls,pdf_docx_zip:true,passed:true}));
