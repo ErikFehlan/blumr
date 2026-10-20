@@ -32,8 +32,8 @@ jobs:
           deno-version: v2.x
       - name: Verify private configuration transfer permissions before use
         run: deno test --allow-env tests/staging-provider-bridge.test.ts
-      - name: Configure provider access privately for the owned staging project
-        run: node scripts/staging-provider-setup.mjs
+      - name: Verify existing isolated staging provider configuration
+        run: node scripts/staging-provider-setup.mjs --existing
       - name: Prepare the same application migrations in staging
         run: |
           node scripts/staging-foundation.mjs

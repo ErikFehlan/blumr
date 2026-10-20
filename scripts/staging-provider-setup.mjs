@@ -3,6 +3,12 @@ import {randomBytes} from 'node:crypto';
 const token=process.env.SUPABASE_ACCESS_TOKEN,stage=process.env.SUPABASE_PROJECT_REF,source='zqiqjzxcpznhzjengfff';
 if(stage!=='momfzjmycveqginxmqib'||!token)throw Error('Provider setup is restricted to the owned staging project');
 async function api(ref,path,method='GET',body){const r=await fetch(`https://api.supabase.com/v1/projects/${ref}${path}`,{method,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('Provider setup evidence unavailable ('+r.status+') for '+method+' '+path);return r.json().catch(()=>null);}
+if(process.argv.includes('--existing')){
+ const configured=await api(stage,'/secrets');
+ if(!configured.some(s=>s.name==='OPENAI_API_KEY'))throw Error('Existing staging provider configuration is required. Production was not accessed.');
+ console.log('Existing staging provider configuration verified. Production was not accessed.');
+ process.exit(0);
+}
 const cli=args=>new Promise((resolve,reject)=>{const p=spawn('supabase',args,{stdio:['ignore','ignore','ignore']});p.on('error',reject);p.on('close',code=>code===0?resolve():reject(Error('Private provider setup CLI operation failed')));});
 const name='STAGING_PROVIDER_BRIDGE_SECRET';
 async function cleanupBridge(){
