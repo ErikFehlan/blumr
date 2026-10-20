@@ -86,3 +86,8 @@ jobs:
           name: rules-screening-staging
           path: test-results/bulk-screening/
           if-no-files-found: ignore
+  release-staging:
+    needs: staging
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/rules-first-screening'
+    uses: ./.github/workflows/staging-backend.yml
+    secrets: inherit
