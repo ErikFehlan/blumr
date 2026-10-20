@@ -82,6 +82,7 @@ create or replace function public.resume_content_hash(p_text text) returns text
 language sql immutable parallel safe set search_path='' as $$
  select encode(sha256(convert_to(lower(trim(regexp_replace(normalize(p_text,NFKC),'\s+',' ','g'))),'UTF8')),'hex');
 $$;
+create index if not exists screening_document_latest on public.candidate_documents(candidate_id,created_at desc,id desc);
 create index if not exists screening_resume_dedupe on public.candidate_documents(job_id,public.resume_content_hash(extracted_text));
 
 create or replace function public.create_screening_batch(p_id uuid,p_job uuid,p_manifest jsonb,p_budget numeric default 5) returns uuid
@@ -357,12 +358,18 @@ begin
  b:=public.require_screening_batch(p_batch);s:=public.bulk_screening_source(p_batch);
  return jsonb_build_object('batch',to_jsonb(b)-'manifest','source_current',b.source_version=s->>'sourceVersion' and b.intelligence->>'asOf'=current_date::text,
  'items',coalesce((select jsonb_agg(to_jsonb(i) order by i.ordinal) from public.screening_batch_items i where i.batch_id=p_batch),'[]'::jsonb),
- 'candidates',coalesce((select jsonb_agg(jsonb_build_object('candidateId',c.id,'name',c.name,'result',case when k.document_id=d.id and k.resume_hash=encode(sha256(convert_to(d.extracted_text,'UTF8')),'hex') and k.rubric_key=b.intelligence#>>'{rubric,key}' then k.result else null end,
-  'assessment',case when c.id=any(b.selected_ids) then case when t.revision=public.resume_intake_revision(public.screening_finalist_input(c.id)) then jsonb_build_object('status',t.status,'result',t.result,'revision',t.revision,'error',t.error_code) else null end else null end))
+ 'candidates',coalesce((with pool as materialized (
+  select c.id,c.name,case when k.document_id=d.id and k.resume_hash=encode(sha256(convert_to(d.extracted_text,'UTF8')),'hex') and k.rubric_key=b.intelligence#>>'{rubric,key}' then k.result else null end as result,
+   t.status,t.result as assessment_result,t.revision,t.error_code
   from public.candidates c left join public.candidate_screening_cache k on k.candidate_id=c.id
   left join lateral(select doc.* from public.candidate_documents doc where doc.candidate_id=c.id order by doc.created_at desc,doc.id desc limit 1) d on true
-  left join public.resume_intake_tasks t on t.candidate_id=c.id
-  where exists(select from public.screening_batch_items i where i.batch_id=p_batch and i.status='saved' and i.candidate_id=c.id)),'[]'::jsonb),
+  left join public.resume_intake_tasks t on t.candidate_id=c.id and c.id=any(b.selected_ids)
+  where exists(select from public.screening_batch_items i where i.batch_id=p_batch and i.status='saved' and i.candidate_id=c.id)
+ ), ranked as (
+  select *,row_number() over(order by case when result is null then 3 when result->>'requiredStatus' in ('not_applicable','evidenced') then 0 when result->>'requiredStatus'='conflicting' then 2 else 1 end,(result->>'score')::numeric desc nulls last,id) as position from pool
+ ) select jsonb_agg(jsonb_build_object('candidateId',id,'name',name,
+  'result',case when result is null then null when position<=40 or id=any(b.selected_ids) then result else jsonb_build_object('candidateId',id,'rubricKey',result->'rubricKey','score',result->'score','requiredStatus',result->'requiredStatus') end,
+  'assessment',case when id=any(b.selected_ids) and revision is not null then case when revision=public.resume_intake_revision(public.screening_finalist_input(id)) then jsonb_build_object('status',status,'result',assessment_result,'revision',revision,'error',error_code) else null end else null end)) from ranked),'[]'::jsonb),
  'cost', (select jsonb_build_object('provider_calls_reserved',count(*),'reserved_usd',coalesce(sum(reserved_usd),0),'actual_usd',coalesce(sum(actual_usd),0),'unsettled_calls',count(*) filter(where actual_usd is null),'input_tokens',coalesce(sum(input_tokens),0),'output_tokens',coalesce(sum(output_tokens),0),'budget_usd',b.budget_usd) from public.screening_ai_charges where batch_id=p_batch));
 end $$;
 create or replace function public.next_screening_batches(p_job uuid default null) returns jsonb

@@ -4,12 +4,13 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {fixtures} from './readiness-fixtures.mjs';
+import {screeningRead} from './screening-read-retry.mjs';
 import {qualificationPools,qualificationJob} from '../tests/fixtures/screening-qualification-pools.mjs';
 const f=await fixtures();
 if(process.argv[2]==='cleanup'){await f.cleanup();await f.sql('update public.screening_feature_config set enabled=false');process.exit(0);}
-const report={scope:'Authenticated staging, 500 synthetic TXT imports through bulk RPCs, real Storage and rules engine. One selected Top 20 uses the existing real provider with a $10 reservation cap. Synthetic evidence checks do not establish recruiter-labeled accuracy.',started_at:new Date().toISOString(),runs:[],passed:false};
+const report={scope:'Authenticated staging, 500 synthetic TXT imports through bulk RPCs, real Storage and rules engine. One selected Top 20 uses the existing real provider with a $10 reservation cap. Synthetic evidence checks do not establish recruiter-labeled accuracy.',started_at:new Date().toISOString(),runs:[],snapshot_retries:0,passed:false};
 const rpc=async(user,name,args)=> (await f.request('/rest/v1/rpc/'+name,user.access,'POST',args)).data;
-const snapshot=async(user,batch,action='refresh')=>(await f.request('/functions/v1/analyze-patterns-beta',user.access,'POST',{analysis_type:'bulk_screening',workspace_id:user.workspace,batch_id:batch,action})).data;
+const snapshot=async(user,batch,action='refresh')=>{const response=await screeningRead(()=>f.request('/functions/v1/analyze-patterns-beta',user.access,'POST',{analysis_type:'bulk_screening',workspace_id:user.workspace,batch_id:batch,action},false),{onRetry:status=>{report.snapshot_retries++;console.log('Retrying idempotent screening read: '+status);}});if(!response.ok)throw Error('Screening read failed after bounded recovery: '+response.status);return response.data;};
 let originalError;
 try{
  const state=await f.create(),user=state.users[0],foreign=state.users[1],job=randomUUID(),draft=randomUUID(),batch=randomUUID();

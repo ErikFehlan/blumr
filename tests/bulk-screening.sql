@@ -96,3 +96,27 @@ do $$declare b uuid:='b0000000-0000-0000-0000-000000000001';s jsonb;rows jsonb;i
  update jobs set manager_feedback='' where id=(select job_id from screening_batches where id=b);
  if exists(select from resume_intake_tasks where candidate_id=cid and status='queued') then raise exception 'Reverted edit silently restarted AI';end if;
 end $$;
+
+-- Full evidence is bounded without dropping candidates or unprocessed records.
+insert into jobs(id,workspace_id,title,description) values('f0000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000001','Manual QA snapshot','Manual regression testing');
+do $$declare b uuid:='b0000000-0000-0000-0000-000000000002';j uuid:='f0000000-0000-0000-0000-000000000012';manifest jsonb;prepared jsonb;rows jsonb;payload jsonb;snapshot jsonb;source text;i integer;begin
+ select jsonb_agg(jsonb_build_object('name','Synthetic-'||n||'.txt','size',100)) into manifest from generate_series(0,59) n;
+ perform create_screening_batch(b,j,manifest,1);
+ for i in 0..59 loop
+  payload:=to_jsonb('Synthetic snapshot record '||i||'. Owned manual testing and reproduced defects in billing systems.');
+  prepared:=prepare_screening_upload(b,i,payload#>>'{}');
+  insert into candidate_documents(workspace_id,job_id,candidate_id,storage_path,file_name,extracted_text)
+   values('00000000-0000-0000-0000-000000000001',j,(prepared->>'candidate_id')::uuid,'00000000-0000-0000-0000-000000000001/'||j||'/'||(prepared->>'candidate_id')||'/source.txt','Synthetic.txt',payload#>>'{}');
+  perform update_screening_item(b,i,'saved');
+ end loop;
+ perform seal_screening_batch(b);
+ source:=bulk_screening_source(b)->>'sourceVersion';rows:=bulk_screening_page(b,repeat('b',64),100);
+ select jsonb_agg(value||jsonb_build_object('result',jsonb_build_object('candidateId',value->>'candidate_id','rubricKey',repeat('b',64),'score',100-n,'requiredStatus','conflicting','findings',jsonb_build_array(jsonb_build_object('title','Synthetic finding'))))) into rows
+ from jsonb_array_elements(rows) with ordinality a(value,n) where n<=55;
+ if not save_bulk_screening_page(b,source,jsonb_build_object('status','ready','asOf',current_date::text,'rubric',jsonb_build_object('key',repeat('b',64))),rows) then raise exception 'Snapshot fixture rejected';end if;
+ snapshot:=screening_batch_snapshot(b);
+ if jsonb_array_length(snapshot->'candidates')<>60 then raise exception 'Compact snapshot dropped candidates';end if;
+ if (select count(*) from jsonb_array_elements(snapshot->'candidates') r where (r->'result')?'findings')<>40 then raise exception 'Snapshot did not bound full evidence';end if;
+ if (select count(*) from jsonb_array_elements(snapshot->'candidates') r where r->'result'='null'::jsonb)<>5 then raise exception 'Unprocessed candidates received fabricated scores';end if;
+ if (select count(*) from jsonb_array_elements(snapshot->'candidates') r where (r->'result')?'rubricKey')<>55 then raise exception 'Brief scores lost their rubric binding';end if;
+end $$;

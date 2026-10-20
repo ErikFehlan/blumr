@@ -14,12 +14,12 @@
   async function open(){
    if(!enabled||!api.job()){host.hidden=true;return;}host.hidden=false;
    const target=api.job().id,g=generation;
-   if(jobId===target){render();return;}jobId=target;batchId=null;snapshot=null;selected=[];dirty=false;list=[];search='';render();
+   if(jobId===target){render();if(batchId)void refresh();return;}jobId=target;batchId=null;snapshot=null;selected=[];dirty=false;list=[];search='';render();
    try{const rows=await api.data().listScreeningBatches(target);if(!current(g)||jobId!==target)return;list=rows;batchId=rows[0]?.id||null;render();if(batchId)await refresh();}catch{status('Saved batches could not load. Reopen this page to retry.');jobId=null;}
   }
-  async function refresh(){
+  async function refresh(force=false){
    if(!batchId||loading)return;const id=batchId,g=generation,service=api.data();loading=true;
-   try{const value=await service.refreshScreeningBatch(id);if(!current(g)||batchId!==id)return;snapshot=value;
+   try{const value=await service.refreshScreeningBatch(id,force||snapshot?.status!=='complete');if(!current(g)||batchId!==id)return;snapshot=value;
     if(!dirty)selected=value.batch.selected_ids.length?[...value.batch.selected_ids]:value.ranking.top.map(c=>c.candidateId);
     message='';render();
    }catch(e){if(current(g)&&batchId===id)status(e.message);}finally{loading=false;if(current(g))schedule();}
@@ -102,7 +102,7 @@
   host.addEventListener('click',async event=>{
    const button=event.target.closest('button');if(!button)return;const d=button.dataset;
    try{
-    if('bulkRefresh' in d)await refresh();
+    if('bulkRefresh' in d)await refresh(true);
     if(d.bulkToggle){if(selected.includes(d.bulkToggle))selected=selected.filter(id=>id!==d.bulkToggle);else if(selected.length<20)selected.push(d.bulkToggle);else{api.toast('Remove one finalist before adding another.','error');return;}dirty=true;render();}
     if(d.bulkUp){const i=selected.indexOf(d.bulkUp);if(i>0)[selected[i-1],selected[i]]=[selected[i],selected[i-1]];dirty=true;render();}
     if('bulkExclude' in d){await api.data().updateScreeningItem(batchId,Number(d.bulkExclude),'excluded');try{await api.data().sealScreeningBatch(batchId);}catch{}await refresh();}

@@ -1,0 +1,52 @@
+{
+  "scope": "Authenticated staging, 500 synthetic TXT imports through bulk RPCs, real Storage and rules engine. One selected Top 20 uses the existing real provider with a $10 reservation cap. Synthetic evidence checks do not establish recruiter-labeled accuracy.",
+  "started_at": "2026-10-20T12:51:31.848Z",
+  "runs": [
+    {
+      "stage": "incremental",
+      "saved": 20,
+      "ranked": 20,
+      "duration_ms": 1171
+    },
+    {
+      "stage": "incremental",
+      "saved": 100,
+      "ranked": 100,
+      "duration_ms": 1983
+    },
+    {
+      "stage": "incremental",
+      "saved": 500,
+      "ranked": 500,
+      "duration_ms": 2779
+    },
+    {
+      "stage": "finish",
+      "ranked": 500,
+      "duration_ms": 2203
+    },
+    {
+      "stage": "warm",
+      "ranked": 500,
+      "duration_ms": 1827
+    },
+    {
+      "stage": "warm",
+      "ranked": 500,
+      "duration_ms": 1708
+    },
+    {
+      "stage": "warm",
+      "ranked": 500,
+      "duration_ms": 1474
+    }
+  ],
+  "passed": false,
+  "batch_ack_ms": 152,
+  "upload_ms": 284784,
+  "provider_calls": 0,
+  "error": "Fixture request failed: 503 /functions/v1/analyze-patterns-beta",
+  "cleanup_passed": true,
+  "commit": "09ecf50723eb54aa071f9418dbc36e4c89ac5190",
+  "workflow": "https://github.com/ErikFehlan/blumr/actions/runs/39425265775"
+}
