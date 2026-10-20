@@ -57,9 +57,10 @@
         query('screening_insights', 'id,job_id,candidate_id,can_do_job,culture_working_style_fit,notes,resulting_jd_score,resulting_manager_score,assessment_summary,assessment_source,source_updated_at,created_at,previous_jd_score,previous_manager_score'),
         query('candidate_assessments', 'id,job_id,candidate_id,assessment_type,evidence,created_at,updated_at'),
         query('job_criteria_tasks','job_id,priority_suggestions,priority_review,priority_version'),
-        screeningCapabilities().then(c=>c?.enabled?query('screening_managed_candidates','candidate_id'):[]).catch(()=>[])
+        screeningCapabilities().then(c=>c?query('screening_managed_candidates','candidate_id'):[]).catch(()=>[])
       ]);
       const benchmarkIds = new Set(benchmarkRows.map(row => row.candidate_id));
+      const managedIds=new Set(managedRows.map(row=>row.candidate_id));
       const screeningByCandidate = new Map(screeningRows.sort((a, b) => epoch(a.created_at) - epoch(b.created_at)).map(row => [row.candidate_id, row]));
       const reviewByCandidate = new Map(reviewRows.filter(row => row.assessment_type === 'manual_correction').sort((a, b) => epoch(a.created_at) - epoch(b.created_at)).map(row => [row.candidate_id, row]));
       const preferenceByFeedback = new Map(reviewRows.filter(row => row.assessment_type === 'manager_feedback' && row.evidence?.feedback_id).map(row => [row.evidence.feedback_id, row.evidence]));
@@ -78,7 +79,7 @@
           const screening = screeningByCandidate.get(row.id);
           const review = reviewByCandidate.get(row.id);
           return {
-            id: row.id, jobId: row.job_id, name: row.name, short: row.name, role: row.role || '', screeningManaged:managedRows.some(m=>m.candidate_id===row.id),
+            id: row.id, jobId: row.job_id, name: row.name, short: row.name, role: row.role || '', screeningManaged:managedIds.has(row.id),
             initials: row.name.split(/\s+/).map(x => x[0]).join('').slice(0, 2).toUpperCase(), stage: row.stage,
             score: Number(row.jd_score ?? row.resume_jd_score ?? 0), resumeJDScore: Number(row.resume_jd_score ?? row.jd_score ?? 0),
             jdScore: Number(row.jd_score ?? 0), originalManagerScore: Number(row.original_manager_score ?? row.manager_score ?? 0),

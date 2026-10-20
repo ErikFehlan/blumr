@@ -229,6 +229,26 @@ begin
  return public.standard_resume_intake_input(p_candidate);
 end $$;
 
+-- Unselected bulk resumes never enter the legacy intake fan-out. Revoke stale
+-- consent permanently, while retaining completed results as revision-bound cache.
+do $$begin
+ if to_regprocedure('public.standard_enqueue_resume_intake(uuid)') is null then alter function public.enqueue_resume_intake(uuid) rename to standard_enqueue_resume_intake;end if;
+end $$;
+create or replace function public.enqueue_resume_intake(p_candidate uuid) returns void
+language plpgsql security definer set search_path='' as $$
+begin
+ if exists(select from public.screening_managed_candidates where candidate_id=p_candidate) then
+  if not exists(select from public.screening_finalists f where f.candidate_id=p_candidate and f.revision=public.resume_intake_revision(public.screening_finalist_input(p_candidate))) then
+   delete from public.screening_finalists where candidate_id=p_candidate;
+   update public.resume_intake_tasks set status='cancelled',lease_id=null,lease_until=null,result=null,updated_at=now()
+    where candidate_id=p_candidate and status in ('queued','processing','failed');
+   return;
+  end if;
+ end if;
+ perform public.standard_enqueue_resume_intake(p_candidate);
+end $$;
+revoke all on function public.enqueue_resume_intake(uuid),public.standard_enqueue_resume_intake(uuid) from public,anon,authenticated;
+
 create or replace function public.select_screening_finalists(p_batch uuid,p_ids uuid[],p_source text,p_version integer) returns integer
 language plpgsql security definer set search_path='' as $$
 declare b public.screening_batches;cid uuid;payload jsonb;rev text;t public.resume_intake_tasks;f public.screening_finalists;
@@ -402,6 +422,9 @@ end $$;
 
 
 grant execute on function public.resume_intake_input(uuid),public.resume_intake_revision(jsonb) to service_role;
+-- The immutable expression index evaluates under the inserting user. This
+-- function hashes only its argument and reads no records.
+grant execute on function public.resume_content_hash(text) to authenticated,service_role;
 
 -- Include batch progress and advisory results in the existing authenticated export.
 do $$begin
@@ -429,5 +452,24 @@ grant execute on function public.get_account_export() to authenticated;
 -- days fail closed for bulk admission; no indefinite promotional-price assumption.
 insert into public.ai_model_rates(model,input_usd_per_million,cached_input_usd_per_million,output_usd_per_million,updated_at)
  values('gpt-5.6-sol',4,0.4,20,'2026-10-20T00:00:00Z') on conflict(model) do nothing;
+
+create or replace function public.intake_source_changed() returns trigger language plpgsql security definer set search_path='' as $$
+declare j uuid;c record;
+begin
+ if tg_table_name='jobs' then
+  if row(new.title,new.description,new.criteria,new.manager_feedback,new.knockouts,new.weights,new.status)
+    is not distinct from row(old.title,old.description,old.criteria,old.manager_feedback,old.knockouts,old.weights,old.status) then return new;end if;
+  j:=new.id;
+ elsif tg_op='DELETE' then j:=old.job_id;else j:=new.job_id;end if;
+ -- Revisions decide which candidates changed. Candidate-only notes do not
+ -- invalidate another candidate; approved preferences do.
+ for c in select id from public.candidates where job_id=j and
+  (role='Resume awaiting analysis' or exists(select 1 from public.resume_intake_tasks t where t.candidate_id=candidates.id))
+  and (not exists(select from public.screening_managed_candidates m where m.candidate_id=candidates.id)
+   or exists(select from public.screening_finalists f where f.candidate_id=candidates.id)) loop
+  perform public.enqueue_resume_intake(c.id);
+ end loop;
+ if tg_op='DELETE' then return old;end if;return new;
+end $$;
 
 commit;

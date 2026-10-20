@@ -26,6 +26,8 @@ do $$begin
  if (select count(distinct candidate_id) from screening_batch_items where batch_id='b0000000-0000-0000-0000-000000000001')<>1 then raise exception 'Duplicate candidate created';end if;
  if exists(select from resume_intake_tasks t join screening_managed_candidates m using(candidate_id)) then raise exception 'Upload queued paid work';end if;
 end $$;
+grant insert on public.candidate_documents to authenticated;
+set role authenticated;
 insert into candidate_documents(workspace_id,job_id,candidate_id,storage_path,file_name,extracted_text)
  select workspace_id,job_id,candidate_id,workspace_id||'/'||job_id||'/'||candidate_id||'/source.txt','Synthetic.txt','Synthetic Applicant. Owned manual regression testing and documented defects in billing systems.' from screening_batch_items where ordinal=0 and batch_id='b0000000-0000-0000-0000-000000000001';
 set role authenticated;
@@ -74,4 +76,7 @@ do $$declare b uuid:='b0000000-0000-0000-0000-000000000001';s jsonb;rows jsonb;i
  if resume_intake_input(cid) is not null then raise exception 'Source edit reused obsolete approval';end if;
  if exists(select from job_reassessment_tasks where candidate_id=cid and status='queued') or exists(select from resume_intake_tasks where candidate_id=cid and status='queued') then raise exception 'Source edit triggered paid bulk fanout';end if;
  if screening_batch_snapshot(b)->>'source_current'<>'false' then raise exception 'Changed source shown as current';end if;
+ if exists(select from screening_finalists where candidate_id=cid) then raise exception 'Stale finalist consent retained';end if;
+ update jobs set manager_feedback='' where id=(select job_id from screening_batches where id=b);
+ if exists(select from resume_intake_tasks where candidate_id=cid and status='queued') then raise exception 'Reverted edit silently restarted AI';end if;
 end $$;
