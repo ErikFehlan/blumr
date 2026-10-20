@@ -60,12 +60,15 @@ This meets sub-second batch acknowledgment and low-single-digit cached ranking i
 
 The old one-assessment-per-applicant path would request 500 initial assessments for this batch; this run requested 20, a **96% reduction in initial call count**. The 500-call baseline is arithmetic, not a separately purchased benchmark. There is no measured production invoice saving. Final CI and the complete isolated staging release suite are running against the final packaged commit.
 
-## Release gates
+## Release status — user confirmation on October 20, 2026
 
-1. Pass the hosted 500-resume workflow and final CI, then inspect its timings, model-call count, recorded costs and cleanup evidence. Larger real-document upload mixtures remain a separate capacity exercise; the previous 1,000-candidate cached-ranking measurements do not validate this new import workflow.
-2. Evaluate untouched, independently recruiter-labeled, de-identified pools across occupations. Measure call-worthy precision at 20, qualified-candidate recovery, near-miss rescue and unsupported interpretations. Include live Top 5 generation and varied scanned/multicolumn documents. Source quotations alone cannot establish correct interpretation.
-3. Confirm the deployed model's current rate and the intended workspace budgets. Default-off rollout uses `screening_feature_config.enabled`; structured priority hints use `RULES_FIRST_SCREENING`. No bulk assessment starts merely because a resume is uploaded.
-4. Run the existing full isolated staging/release checks. Production merge/deployment and enabling the feature require authorization. Keep the draft PR and backlog open until the relevant quality/release gates are met.
+The user confirmed that item 1, independently recruiter-reviewed real-world accuracy validation, is complete. This is recorded as user-confirmed acceptance. The conversation did not supply a labeled dataset, sample size, error counts or precision/recall measurements, so no additional numerical accuracy claim is made. This confirmation closes that previously requested input; it is not a reason to repeat the evaluation or ask for the same approval.
+
+The final existing TXT staging run on `6321d2d` passed all three workflows, including the complete isolated staging release suite: [workflow 39431690990](https://github.com/ErikFehlan/blumr/actions/runs/39431690990). It recorded 500 JavaScript tests and 21 focused backend tests. The 500-candidate run took 352.643 seconds to upload, 0.884–1.125 seconds for cached ranking and 355.743 seconds for 20 real deep assessments. Initial screening made zero provider calls; the 20 selected assessments recorded an estimated $0.625399, with zero unsettled calls. Replay, explicit approval, workspace isolation and cleanup passed. Those results supersede the earlier pending-status statements above but retain earlier observations for comparison.
+
+The remaining technical check connects the actual browser application, original PDF/DOCX/TXT files, ZIP extraction, OCR and authenticated staging persistence in a single mixed-document import. It includes two duplicates, damaged/blank files, an upload committed to Storage with a lost response, reload and retry, exact source-evidence retention, then the existing capped real Top 20 → Top 10 validation. Results will be recorded after the run completes.
+
+Production merge/deployment and enabling the feature remain pending deployment authorization. No deployment has been performed. Final rollout must use the current operational rates and workspace budgets; no bulk assessment starts merely because a resume is uploaded.
 
 ## Reproduction
 

@@ -52,11 +52,11 @@ export async function fixtures(){
   }
   assert.equal(new Set(state.users.map(u=>u.workspace)).size,3);return state;
  }
- async function upload(user,path,bytes,mime='application/pdf',expected=true){
+ async function upload(user,path,bytes,mime='application/pdf',expected=true,details=false){
   assert.ok(path.startsWith(user.workspace+'/'));if(!user.paths.includes(path)){user.paths.push(path);await save();}
   const send=()=>fetch(base+'/storage/v1/object/resumes/'+path,{method:'POST',headers:{apikey:anon,Authorization:'Bearer '+user.access,'Content-Type':mime},body:bytes,signal:AbortSignal.timeout(25000)});
   const r=await fixtureStorageRequest(send,{maxAttempts:expected?3:1,onRetry:r=>console.log('Fixture upload retry '+JSON.stringify(r))});
-  if(expected)assert.ok(r.ok,'Synthetic upload failed: '+r.status+' '+r.diagnostic);return r.status;
+  if(expected)assert.ok(r.ok,'Synthetic upload failed: '+r.status+' '+r.diagnostic);return details?r:r.status;
  }
  async function cleanup(){
   if(!state)return;const failures=[];
