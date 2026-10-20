@@ -4,6 +4,7 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {readFile,writeFile,mkdir,rm,rename} from 'node:fs/promises';
 import {dirname} from 'node:path';
 import {managementFetch} from './supabase-management.mjs';
+import {fixtureStorageRequest} from './fixture-storage.mjs';
 export const STAGING='momfzjmycveqginxmqib';
 export async function fixtures(){
  const ref=process.env.SUPABASE_PROJECT_REF,token=process.env.SUPABASE_ACCESS_TOKEN,file=process.env.READINESS_STATE_FILE;
@@ -28,7 +29,13 @@ export async function fixtures(){
   pendingSave=saved.catch(()=>{});return saved;
  }
  async function request(path,access,method='GET',body,expected=true){
-  const r=await fetch(base+path,{method,headers:{apikey:access===service?service:anon,Authorization:'Bearer '+(access||anon),'Content-Type':'application/json',Prefer:'return=representation'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(path.startsWith('/functions/')?110000:25000)});
+  const send=()=>fetch(base+path,{method,headers:{apikey:access===service?service:anon,Authorization:'Bearer '+(access||anon),'Content-Type':'application/json',Prefer:'return=representation'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(path.startsWith('/functions/')?110000:25000)});
+  if(path.startsWith('/storage/')){
+   const r=await fixtureStorageRequest(send);
+   if(expected&&!r.ok)throw Error('Fixture storage request failed: '+r.status+' '+r.diagnostic);
+   return r;
+  }
+  const r=await send();
   const data=await r.json().catch(()=>null);
   if(expected&&!r.ok)throw Error('Fixture request failed: '+r.status+' '+path.split('?')[0]);
   return {status:r.status,data,ok:r.ok};
@@ -45,10 +52,11 @@ export async function fixtures(){
   }
   assert.equal(new Set(state.users.map(u=>u.workspace)).size,3);return state;
  }
- async function upload(user,path,bytes,mime='application/pdf',expected=true){
+ async function upload(user,path,bytes,mime='application/pdf',expected=true,details=false){
   assert.ok(path.startsWith(user.workspace+'/'));if(!user.paths.includes(path)){user.paths.push(path);await save();}
-  const r=await fetch(base+'/storage/v1/object/resumes/'+path,{method:'POST',headers:{apikey:anon,Authorization:'Bearer '+user.access,'Content-Type':mime},body:bytes,signal:AbortSignal.timeout(25000)});
-  if(expected)assert.ok(r.ok,'Synthetic upload failed: '+r.status);await r.arrayBuffer();return r.status;
+  const send=()=>fetch(base+'/storage/v1/object/resumes/'+path,{method:'POST',headers:{apikey:anon,Authorization:'Bearer '+user.access,'Content-Type':mime},body:bytes,signal:AbortSignal.timeout(25000)});
+  const r=await fixtureStorageRequest(send,{maxAttempts:expected?3:1,onRetry:r=>console.log('Fixture upload retry '+JSON.stringify(r))});
+  if(expected)assert.ok(r.ok,'Synthetic upload failed: '+r.status+' '+r.diagnostic);return details?r:r.status;
  }
  async function cleanup(){
   if(!state)return;const failures=[];
@@ -60,7 +68,7 @@ export async function fixtures(){
     for(const w of spaces){
      const members=await sql('select user_id from public.workspace_members where workspace_id=$1',[w.id]);assert.ok(members.every(m=>m.user_id===found[0].id),'Unexpected member; refusing cleanup');
      const objects=await sql("select name from storage.objects where bucket_id='resumes' and name like $1",[w.id+'/%']);assert.ok(objects.every(o=>user.paths.includes(o.name)),'Unexpected object; refusing cleanup');
-     if(objects.length)await request('/storage/v1/object/resumes',service,'DELETE',{prefixes:objects.map(o=>o.name)});
+     for(let start=0;start<objects.length;start+=100)await request('/storage/v1/object/resumes',service,'DELETE',{prefixes:objects.slice(start,start+100).map(o=>o.name)});
      assert.equal((await sql("select name from storage.objects where bucket_id='resumes' and name like $1",[w.id+'/%'])).length,0);
      await request('/rest/v1/workspaces?id=eq.'+w.id,service,'DELETE');
     }

@@ -119,12 +119,12 @@ jobs:
       - name: Prepare durable processing
         run: |
           node scripts/job-reassessment-backend.mjs prepare
-          node scripts/core-backend.mjs
           node scripts/account-controls-backend.mjs
           node scripts/usage-analytics-backend.mjs
           node scripts/learning-backend.mjs
           node scripts/security-backend.mjs prepare
           node scripts/email-branding.mjs
+          node scripts/core-backend.mjs
       - name: Deploy authenticated analysis and durable worker
         run: |
           supabase functions deploy analyze-patterns-v2 --project-ref "$SUPABASE_PROJECT_REF"

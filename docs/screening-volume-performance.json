@@ -1,0 +1,810 @@
+{
+  "scope": "Local CPU, seven occupations, five canonical priorities, unique text built from five semantic archetypes per occupation. Not independent accuracy, not end-to-end upload latency, and existing-results reranking is not a database cache read.",
+  "executed_at": "2026-10-19T19:22:43.728Z",
+  "node": "v24.19.0",
+  "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "logical_cpus": 9,
+  "host_memory_mib": 9967.27,
+  "gc_exposed": true,
+  "samples": 3,
+  "engine_hashes": {
+    "screening-engine.mjs": "9056de1c5b4907b671d3ee72b5e49c243fdc37f34c30848deedb29e428babb1a",
+    "screening-evidence.mjs": "6a984417aa9f8dbea6701ed9af1c688ad015b5bd3d4f3a757eaa518feffd23ad",
+    "screening-qualifications.mjs": "5c31cda4af0e782838fccf23709d6a229b0261f92b1f338b2ec7babbde3195d6",
+    "screening-requirements.mjs": "20e098b0667dbd9f86f7cb189f23a74b17b968230011f88410011894b132da94",
+    "screening-vocabulary.mjs": "5aed9af5830c950afb333bd5016e9a78b99559b54e60f87f5bcc2335efdb4673",
+    "job-intelligence.mjs": "4ebfe93d20c7e1cf6e5756f99a8ae21977ad8b4bf3fc35969da05ed9f20c4fd2",
+    "experience-intelligence.mjs": "691d0d10891940e5718a634ff689e5b56b4ff1b9c5d09884d9b173b8fa9e65e9",
+    "transferability.mjs": "d64429c38f350290824e64048fdafe7e3c7a1d05c51f24b756ea02318aec62eb",
+    "source-instructions.mjs": "148b3c7db4ba5ea687d36bbeede84f9a0148b616d00c31fe7c13ebc863732843",
+    "screening-rule-spec.mjs": "0b45fa68d13db7b83f2b0f102d915990297b044ec01e238849e09e0cae85b38b",
+    "capability-workflows.mjs": "47b5a407a5c00c302f43c78cd41f53a068fb63dfaffd5581dcdd92c67f74510d"
+  },
+  "passed": true,
+  "results": [
+    {
+      "occupation": "cloud",
+      "candidates": 500,
+      "semantic_archetypes": 5,
+      "unique_texts": 500,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3128,
+      "cold_samples_ms": [
+        810.47,
+        692.51,
+        648.62
+      ],
+      "parsed_samples_ms": [
+        653.71,
+        475.99,
+        407.37
+      ],
+      "parse_score_rank_p50_ms": 692.51,
+      "parsed_score_rank_p50_ms": 475.99,
+      "existing_results_rerank_p50_ms": 0.1,
+      "process_rss_max_mib": 246.99,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "cloud",
+      "candidates": 1000,
+      "semantic_archetypes": 5,
+      "unique_texts": 1000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3128,
+      "cold_samples_ms": [
+        1257.05,
+        1240.64,
+        1201.58
+      ],
+      "parsed_samples_ms": [
+        986.54,
+        919.08,
+        830.3
+      ],
+      "parse_score_rank_p50_ms": 1240.64,
+      "parsed_score_rank_p50_ms": 919.08,
+      "existing_results_rerank_p50_ms": 0.27,
+      "process_rss_max_mib": 361.22,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "cloud",
+      "candidates": 5000,
+      "semantic_archetypes": 5,
+      "unique_texts": 5000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3165,
+      "cold_samples_ms": [
+        6063.16,
+        6017.56,
+        6364.83
+      ],
+      "parsed_samples_ms": [
+        5107.42,
+        4758.39,
+        4337.04
+      ],
+      "parse_score_rank_p50_ms": 6063.16,
+      "parsed_score_rank_p50_ms": 4758.39,
+      "existing_results_rerank_p50_ms": 3.3,
+      "process_rss_max_mib": 950.57,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "cloud",
+      "candidates": 10000,
+      "semantic_archetypes": 5,
+      "unique_texts": 10000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3165,
+      "cold_samples_ms": [
+        12968.32,
+        14785.12,
+        12489.79
+      ],
+      "parsed_samples_ms": [
+        10526.9,
+        10011.23,
+        8666.07
+      ],
+      "parse_score_rank_p50_ms": 12968.32,
+      "parsed_score_rank_p50_ms": 10011.23,
+      "existing_results_rerank_p50_ms": 9.43,
+      "process_rss_max_mib": 1532.17,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "accounting",
+      "candidates": 500,
+      "semantic_archetypes": 5,
+      "unique_texts": 500,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3108,
+      "cold_samples_ms": [
+        973.61,
+        882.24,
+        782.9
+      ],
+      "parsed_samples_ms": [
+        1034.6,
+        580.87,
+        507.44
+      ],
+      "parse_score_rank_p50_ms": 882.24,
+      "parsed_score_rank_p50_ms": 580.87,
+      "existing_results_rerank_p50_ms": 0.09,
+      "process_rss_max_mib": 1527.36,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "accounting",
+      "candidates": 1000,
+      "semantic_archetypes": 5,
+      "unique_texts": 1000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3108,
+      "cold_samples_ms": [
+        1443.49,
+        1313.36,
+        2153.34
+      ],
+      "parsed_samples_ms": [
+        976.18,
+        1137.68,
+        745.34
+      ],
+      "parse_score_rank_p50_ms": 1443.49,
+      "parsed_score_rank_p50_ms": 976.18,
+      "existing_results_rerank_p50_ms": 0.18,
+      "process_rss_max_mib": 1526.41,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "accounting",
+      "candidates": 5000,
+      "semantic_archetypes": 5,
+      "unique_texts": 5000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3145,
+      "cold_samples_ms": [
+        5497.68,
+        4999.04,
+        5333.67
+      ],
+      "parsed_samples_ms": [
+        4322.96,
+        3761.96,
+        2855.37
+      ],
+      "parse_score_rank_p50_ms": 5333.67,
+      "parsed_score_rank_p50_ms": 3761.96,
+      "existing_results_rerank_p50_ms": 1.43,
+      "process_rss_max_mib": 1526.66,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "accounting",
+      "candidates": 10000,
+      "semantic_archetypes": 5,
+      "unique_texts": 10000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3145,
+      "cold_samples_ms": [
+        9521.13,
+        11786.77,
+        12246.54
+      ],
+      "parsed_samples_ms": [
+        7983.12,
+        13358.02,
+        7399.42
+      ],
+      "parse_score_rank_p50_ms": 11786.77,
+      "parsed_score_rank_p50_ms": 7983.12,
+      "existing_results_rerank_p50_ms": 3.9,
+      "process_rss_max_mib": 1571.36,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "clinical",
+      "candidates": 500,
+      "semantic_archetypes": 5,
+      "unique_texts": 500,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3135,
+      "cold_samples_ms": [
+        865.17,
+        950.02,
+        848
+      ],
+      "parsed_samples_ms": [
+        778.45,
+        563.33,
+        581.53
+      ],
+      "parse_score_rank_p50_ms": 865.17,
+      "parsed_score_rank_p50_ms": 581.53,
+      "existing_results_rerank_p50_ms": 0.09,
+      "process_rss_max_mib": 1542.93,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "clinical",
+      "candidates": 1000,
+      "semantic_archetypes": 5,
+      "unique_texts": 1000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3135,
+      "cold_samples_ms": [
+        1395.52,
+        1459.1,
+        1574.91
+      ],
+      "parsed_samples_ms": [
+        1213.5,
+        1103.98,
+        999.24
+      ],
+      "parse_score_rank_p50_ms": 1459.1,
+      "parsed_score_rank_p50_ms": 1103.98,
+      "existing_results_rerank_p50_ms": 0.18,
+      "process_rss_max_mib": 1541.92,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "clinical",
+      "candidates": 5000,
+      "semantic_archetypes": 5,
+      "unique_texts": 5000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3135,
+      "cold_samples_ms": [
+        8779.89,
+        10284.13,
+        7539.02
+      ],
+      "parsed_samples_ms": [
+        31004.96,
+        6233.52,
+        5338.8
+      ],
+      "parse_score_rank_p50_ms": 8779.89,
+      "parsed_score_rank_p50_ms": 6233.52,
+      "existing_results_rerank_p50_ms": 1.95,
+      "process_rss_max_mib": 1542.29,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "clinical",
+      "candidates": 10000,
+      "semantic_archetypes": 5,
+      "unique_texts": 10000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3135,
+      "cold_samples_ms": [
+        22500.31,
+        14243.52,
+        19091.33
+      ],
+      "parsed_samples_ms": [
+        13032.25,
+        12322.86,
+        18755.37
+      ],
+      "parse_score_rank_p50_ms": 19091.33,
+      "parsed_score_rank_p50_ms": 13032.25,
+      "existing_results_rerank_p50_ms": 5.15,
+      "process_rss_max_mib": 1580.02,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "warehouse",
+      "candidates": 500,
+      "semantic_archetypes": 5,
+      "unique_texts": 500,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3083,
+      "cold_samples_ms": [
+        755.99,
+        643.76,
+        715.55
+      ],
+      "parsed_samples_ms": [
+        493.1,
+        441.37,
+        431.74
+      ],
+      "parse_score_rank_p50_ms": 715.55,
+      "parsed_score_rank_p50_ms": 441.37,
+      "existing_results_rerank_p50_ms": 0.14,
+      "process_rss_max_mib": 1543.99,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "warehouse",
+      "candidates": 1000,
+      "semantic_archetypes": 5,
+      "unique_texts": 1000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3083,
+      "cold_samples_ms": [
+        1287.8,
+        1385.7,
+        1168.29
+      ],
+      "parsed_samples_ms": [
+        1031.64,
+        859.95,
+        855.37
+      ],
+      "parse_score_rank_p50_ms": 1287.8,
+      "parsed_score_rank_p50_ms": 859.95,
+      "existing_results_rerank_p50_ms": 0.17,
+      "process_rss_max_mib": 1542.92,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "warehouse",
+      "candidates": 5000,
+      "semantic_archetypes": 5,
+      "unique_texts": 5000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3120,
+      "cold_samples_ms": [
+        5294.03,
+        7695.3,
+        4907.88
+      ],
+      "parsed_samples_ms": [
+        4203.12,
+        3266.6,
+        3168.64
+      ],
+      "parse_score_rank_p50_ms": 5294.03,
+      "parsed_score_rank_p50_ms": 3266.6,
+      "existing_results_rerank_p50_ms": 1.7,
+      "process_rss_max_mib": 1543.04,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "warehouse",
+      "candidates": 10000,
+      "semantic_archetypes": 5,
+      "unique_texts": 10000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3120,
+      "cold_samples_ms": [
+        9671.91,
+        10195.85,
+        10341.54
+      ],
+      "parsed_samples_ms": [
+        8284.6,
+        6773.55,
+        6458.5
+      ],
+      "parse_score_rank_p50_ms": 10195.85,
+      "parsed_score_rank_p50_ms": 6773.55,
+      "existing_results_rerank_p50_ms": 5.71,
+      "process_rss_max_mib": 1554.45,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "education",
+      "candidates": 500,
+      "semantic_archetypes": 5,
+      "unique_texts": 500,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3094,
+      "cold_samples_ms": [
+        435,
+        375.7,
+        430.05
+      ],
+      "parsed_samples_ms": [
+        270.79,
+        224.32,
+        221.4
+      ],
+      "parse_score_rank_p50_ms": 430.05,
+      "parsed_score_rank_p50_ms": 224.32,
+      "existing_results_rerank_p50_ms": 0.1,
+      "process_rss_max_mib": 1557.11,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "education",
+      "candidates": 1000,
+      "semantic_archetypes": 5,
+      "unique_texts": 1000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3094,
+      "cold_samples_ms": [
+        758.65,
+        721.13,
+        795.16
+      ],
+      "parsed_samples_ms": [
+        511.21,
+        444.42,
+        427.27
+      ],
+      "parse_score_rank_p50_ms": 758.65,
+      "parsed_score_rank_p50_ms": 444.42,
+      "existing_results_rerank_p50_ms": 0.17,
+      "process_rss_max_mib": 1556.07,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "education",
+      "candidates": 5000,
+      "semantic_archetypes": 5,
+      "unique_texts": 5000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3131,
+      "cold_samples_ms": [
+        3564.13,
+        3562.84,
+        3831.56
+      ],
+      "parsed_samples_ms": [
+        2715.13,
+        2257.44,
+        2452.91
+      ],
+      "parse_score_rank_p50_ms": 3564.13,
+      "parsed_score_rank_p50_ms": 2452.91,
+      "existing_results_rerank_p50_ms": 1.53,
+      "process_rss_max_mib": 1556.05,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "education",
+      "candidates": 10000,
+      "semantic_archetypes": 5,
+      "unique_texts": 10000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3131,
+      "cold_samples_ms": [
+        7148.63,
+        7597.15,
+        8949.51
+      ],
+      "parsed_samples_ms": [
+        5221.96,
+        4976.22,
+        5016.1
+      ],
+      "parse_score_rank_p50_ms": 7597.15,
+      "parsed_score_rank_p50_ms": 5016.1,
+      "existing_results_rerank_p50_ms": 6.05,
+      "process_rss_max_mib": 1557.54,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "maintenance",
+      "candidates": 500,
+      "semantic_archetypes": 5,
+      "unique_texts": 500,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3127,
+      "cold_samples_ms": [
+        621.29,
+        517.97,
+        504.06
+      ],
+      "parsed_samples_ms": [
+        374.38,
+        307.48,
+        306.32
+      ],
+      "parse_score_rank_p50_ms": 517.97,
+      "parsed_score_rank_p50_ms": 307.48,
+      "existing_results_rerank_p50_ms": 0.13,
+      "process_rss_max_mib": 1561.32,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "maintenance",
+      "candidates": 1000,
+      "semantic_archetypes": 5,
+      "unique_texts": 1000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3127,
+      "cold_samples_ms": [
+        984.17,
+        953.69,
+        961.23
+      ],
+      "parsed_samples_ms": [
+        724.35,
+        632,
+        603.16
+      ],
+      "parse_score_rank_p50_ms": 961.23,
+      "parsed_score_rank_p50_ms": 632,
+      "existing_results_rerank_p50_ms": 0.22,
+      "process_rss_max_mib": 1560.66,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "maintenance",
+      "candidates": 5000,
+      "semantic_archetypes": 5,
+      "unique_texts": 5000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3164,
+      "cold_samples_ms": [
+        4866.88,
+        4903.62,
+        6906.38
+      ],
+      "parsed_samples_ms": [
+        3660.89,
+        4212.93,
+        4018.72
+      ],
+      "parse_score_rank_p50_ms": 4903.62,
+      "parsed_score_rank_p50_ms": 4018.72,
+      "existing_results_rerank_p50_ms": 1.72,
+      "process_rss_max_mib": 1560.78,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "maintenance",
+      "candidates": 10000,
+      "semantic_archetypes": 5,
+      "unique_texts": 10000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3164,
+      "cold_samples_ms": [
+        12576.12,
+        14155.63,
+        15925.24
+      ],
+      "parsed_samples_ms": [
+        10218.92,
+        15750.15,
+        8029.3
+      ],
+      "parse_score_rank_p50_ms": 14155.63,
+      "parsed_score_rank_p50_ms": 10218.92,
+      "existing_results_rerank_p50_ms": 3.29,
+      "process_rss_max_mib": 1561.37,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "qa",
+      "candidates": 500,
+      "semantic_archetypes": 5,
+      "unique_texts": 500,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3097,
+      "cold_samples_ms": [
+        752.13,
+        870.01,
+        685.96
+      ],
+      "parsed_samples_ms": [
+        599.52,
+        636.07,
+        546.15
+      ],
+      "parse_score_rank_p50_ms": 752.13,
+      "parsed_score_rank_p50_ms": 599.52,
+      "existing_results_rerank_p50_ms": 0.09,
+      "process_rss_max_mib": 1561.79,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "qa",
+      "candidates": 1000,
+      "semantic_archetypes": 5,
+      "unique_texts": 1000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3097,
+      "cold_samples_ms": [
+        1396.44,
+        1438.35,
+        1345.14
+      ],
+      "parsed_samples_ms": [
+        1000.34,
+        879.21,
+        933.98
+      ],
+      "parse_score_rank_p50_ms": 1396.44,
+      "parsed_score_rank_p50_ms": 933.98,
+      "existing_results_rerank_p50_ms": 0.23,
+      "process_rss_max_mib": 1560.72,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "qa",
+      "candidates": 5000,
+      "semantic_archetypes": 5,
+      "unique_texts": 5000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3134,
+      "cold_samples_ms": [
+        7209.52,
+        8041.88,
+        8501.37
+      ],
+      "parsed_samples_ms": [
+        8365.58,
+        5380.28,
+        5560.89
+      ],
+      "parse_score_rank_p50_ms": 8041.88,
+      "parsed_score_rank_p50_ms": 5560.89,
+      "existing_results_rerank_p50_ms": 1.92,
+      "process_rss_max_mib": 1560.85,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    },
+    {
+      "occupation": "qa",
+      "candidates": 10000,
+      "semantic_archetypes": 5,
+      "unique_texts": 10000,
+      "resume_bytes_min": 733,
+      "resume_bytes_max": 3134,
+      "cold_samples_ms": [
+        13967.36,
+        20149.94,
+        16156.36
+      ],
+      "parsed_samples_ms": [
+        12662.19,
+        11540.28,
+        11181.84
+      ],
+      "parse_score_rank_p50_ms": 16156.36,
+      "parsed_score_rank_p50_ms": 11540.28,
+      "existing_results_rerank_p50_ms": 13.74,
+      "process_rss_max_mib": 1561.01,
+      "top20_expected_recovered": 20,
+      "near20_expected_recovered": 20,
+      "quote_failures": 0,
+      "all_candidates_retained": true,
+      "ai_calls": 0,
+      "provider_cost_usd": 0
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+// Shared, provider-free screening kernel. Callers must authorize workspace/job access.
+import {evidenceTextRanges,isSourceInstruction} from './source-instructions.mjs';
+import {unsafeScreeningText} from './screening-rule-spec.mjs';
+import {validateQualification,qualificationProfile,evaluateQualification,matchQualificationEvidence} from './screening-qualifications.mjs';
+import {evidencePassages,workEvidenceText} from './screening-evidence.mjs';
+export const screeningVersion='screening-v5';
+const norm=s=>String(s).normalize('NFKC').toLowerCase().replace(/[‐‑–—]/g,'-').replace(/\s+/g,' ').trim();
+const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const termRE=t=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escape(norm(t))}(?=$|[^\\p{L}\\p{N}_])`,'u');
+const personal={test:unsafeScreeningText};
+const stable=x=>JSON.stringify(x,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+export async function fingerprint(value){
+ const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stable(value)));
+ return Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
+}
+function terms(values){
+ if(!Array.isArray(values)||values.length>30||values.some(t=>typeof t!=='string'||!t.trim()||t.length>120||personal.test(t)||isSourceInstruction(t)))throw Error('invalid_screening_terms');
+ return [...new Set(values.map(norm))];
+}
+function condition(input,depth=0,budget={nodes:0}){
+ if(!input||depth>4||++budget.nodes>200)throw Error('invalid_screening_condition');
+ const keys=['all','any','terms','experience','credential','depth','workflow','recency','quantity','unresolved'].filter(k=>Object.hasOwn(input,k));
+ if(keys.length!==1)throw Error('invalid_screening_condition');
+ const key=keys[0];
+ if(!['all','any','terms'].includes(key)){
+  const checked=validateQualification(input),q=checked[key];
+  for(const names of [q.terms,q.titles,q.jurisdiction,q.fieldTerms])if(names)terms(names);
+  return checked;
+ }
+ if(key==='terms'){
+  const direct=terms(input.terms),related=terms(input.related||[]);
+  if(!direct.length)throw Error('empty_screening_terms');
+  if(input.minimumDepth!==undefined&&!['contribution','practice'].includes(input.minimumDepth))throw Error('invalid_screening_depth');
+  return {terms:direct,related,...(input.minimumDepth?{minimumDepth:input.minimumDepth}:{})};
+ }
+ if(!Array.isArray(input[key])||!input[key].length||input[key].length>20)throw Error('invalid_screening_group');
+ return {[key]:input[key].map(c=>condition(c,depth+1,budget))};
+}
+// Use the existing canonical priority items. No new model call, guessed weights,
+// requirements or implicit synonyms. Conditions are explicit versioned configuration.
+export async function buildScreeningRubric({workspaceId,jobId,jobVersion,feedbackVersion='',priorities,rules,titleTerms=[],additionalRequirements=[],asOf=''}){
+ if(!workspaceId||!jobId||!jobVersion||!Array.isArray(priorities)||!priorities.length||priorities.length>5||!Array.isArray(rules)||rules.length!==priorities.length)throw Error('invalid_screening_rubric');
+ const ids=new Set(priorities.map(p=>p.id));
+ if(ids.size!==priorities.length||priorities.some(p=>!p.id||!p.title||!p.source_quote||!['required','preferred','inferred'].includes(p.requirement_type)||personal.test(p.title)||isSourceInstruction(p.title)))throw Error('invalid_screening_priorities');
+ const seen=new Set();
+ const compiled=rules.map(r=>{
+  if(!ids.has(r.priorityId)||seen.has(r.priorityId)||!Number.isFinite(r.weight)||r.weight<=0||r.weight>100)throw Error('invalid_screening_rule');
+  seen.add(r.priorityId);
+  const p=priorities.find(p=>p.id===r.priorityId);
+  return {priorityId:p.id,title:p.title,requirementType:p.requirement_type,sourceQuote:p.source_quote,weight:r.weight,condition:condition(r.condition)};
+ });
+ if(!Array.isArray(additionalRequirements)||additionalRequirements.length+compiled.length>64)throw Error('invalid_additional_requirements');
+ for(const r of additionalRequirements){
+  if(!r.id||seen.has(r.id)||!r.title||!r.sourceQuote||!['required','preferred','inferred'].includes(r.requirementType)||!Number.isFinite(r.weight)||r.weight<=0||r.weight>100||personal.test(r.title)||isSourceInstruction(r.title))throw Error('invalid_additional_requirement');
+  seen.add(r.id);compiled.push({priorityId:r.id,title:r.title,requirementType:r.requirementType,sourceQuote:r.sourceQuote,weight:r.weight,origin:r.origin,condition:condition(r.condition)});
+ }
+ const body={version:screeningVersion,workspaceId,jobId,jobVersion,feedbackVersion,asOf,rules:compiled,titleTerms:terms(titleTerms)};
+ return {...body,key:await fingerprint(body)};
+}
+export function parseScreeningEvidence(text,{asOf}={}){
+ if(typeof text!=='string'||text.length>1000000)throw Error('invalid_resume_text');
+ const passages=[];
+ for(const range of evidenceTextRanges(text))for(const quote of evidencePassages(range)){
+  const normalized=workEvidenceText(quote);
+  if(!quote||personal.test(normalized)||isSourceInstruction(quote))continue;
+  passages.push({sourceId:`screening-${passages.length+1}`,quote,normalized});
+ }
+ const profile=qualificationProfile(passages,asOf);
+ return {passages,profile,reviewRequired:!passages.length,parserVersion:screeningVersion};
+}
+function matchEvidence(pattern,passage){
+ return matchQualificationEvidence(pattern,passage);
+}
+function compile(c){
+ if(c.all)return {all:c.all.map(compile)};
+ if(c.any)return {any:c.any.map(compile)};
+ return c.terms?{direct:c.terms.map(termRE),related:c.related.map(termRE),minimumDepth:c.minimumDepth}:c;
+}
+function evaluate(c,profile){
+ const passages=profile.passages;
+ if(c.all||c.any){
+  const all=Boolean(c.all),rows=(c.all||c.any).map(x=>evaluate(x,profile));
+  const value=all?Math.min(...rows.map(r=>r.value)):Math.max(...rows.map(r=>r.value));
+  const contradicted=all?rows.some(r=>r.status==='contradicted'):rows.every(r=>r.status==='contradicted');
+  return {value,evidence:rows.flatMap(r=>r.evidence),status:contradicted?'contradicted':value===1?'supported':rows.some(r=>r.value>0||r.status==='partial')?'partial':'unknown',components:rows,verificationRequired:rows.some(r=>r.verificationRequired)};
+ }
+ if(!c.direct)return evaluateQualification(c,profile);
+ const evidence=[];let value=0,contradicted=false;
+ for(const p of passages){
+  const directMatches=c.direct.map(rx=>matchEvidence(rx,p)).filter(Boolean),relatedMatches=c.related.map(rx=>matchEvidence(rx,p)).filter(Boolean);
+  const direct=directMatches.length>0,related=relatedMatches.length>0;
+  if(!direct&&!related)continue;
+  const matches=direct?directMatches:relatedMatches;
+  const negative=matches.every(m=>m.negative),substantive=matches.some(m=>!m.negative&&m.actor==='applicant'&&m.modality==='asserted'&&(m.substantive||c.minimumDepth==='contribution'&&m.depth==='contribution'));
+  const v=negative?0:direct?(substantive?1:0.35):(substantive?0.5:0.15);
+  contradicted ||= negative&&direct;
+  value=Math.max(value,v);
+  const basis=matches.find(m=>m.substantive)||matches[0];
+  evidence.push({sourceId:p.sourceId,quote:p.quote,type:negative?'contradicted':direct?'direct':'inferred',depth:substantive?'practice':'mention',value:v,
+   interpretation:{actor:basis.actor,action:basis.action,depth:basis.depth,modality:basis.modality,negated:basis.negative}});
+ }
+ if(contradicted)value=Math.min(value,0.35);
+ // Keep evidence responsible for the score even after many earlier mentions.
+ return {value,status:contradicted?'contradicted':value===1?'supported':value>0?'partial':'unknown',evidence:evidence.sort((a,b)=>(b.type==='contradicted')-(a.type==='contradicted')||b.value-a.value).slice(0,12)};
+}
+export function compileScreeningRubric(rubric){
+ return {...rubric,compiled:rubric.rules.map(r=>({...r,compiledCondition:compile(r.condition)})),compiledTitles:rubric.titleTerms.map(termRE)};
+}
+export function scoreScreeningCandidate(compiled,evidence,candidateId){
+ if(!candidateId)throw Error('missing_candidate_id');
+ const profile=evidence.profile||qualificationProfile(evidence.passages,compiled.asOf);
+ const findings=compiled.compiled.map(r=>({priorityId:r.priorityId,title:r.title,weight:r.weight,requirementType:r.requirementType,sourceQuote:r.sourceQuote,origin:r.origin||'priority',...evaluate(r.compiledCondition,profile)}));
+ const total=findings.reduce((n,r)=>n+r.weight,0);
+ const reviewRequired=evidence.reviewRequired||findings.some(r=>r.status!=='supported'||r.verificationRequired);
+ const required=findings.filter(r=>r.requirementType==='required'),requiredStatus=!required.length?'not_applicable':required.some(r=>r.status==='contradicted')?'conflicting':required.some(r=>r.status!=='supported')?'unverified':'evidenced';
+ const questions=findings.filter(r=>r.status!=='supported').sort((a,b)=>(b.requirementType==='required')-(a.requirementType==='required')||b.weight-a.weight).slice(0,5).map(r=>({priorityId:r.priorityId,question:`What specific work or current documentation demonstrates ${r.title}?`,reason:r.status==='contradicted'?'Resolve conflicting evidence.':r.requirementType==='required'?'Verify an explicit required qualification.':'Clarify missing or partial evidence.'}));
+ return {candidateId,rubricKey:compiled.key,score:Math.round(10000*findings.reduce((n,r)=>n+r.weight*r.value,0)/total)/100,
+  findings,titleSignal:evidence.passages.some(p=>compiled.compiledTitles.some(rx=>rx.test(p.normalized))),reviewRequired,
+  requiredStatus,requiredFindings:{total:required.length,supported:required.filter(r=>r.status==='supported').length,unknown:required.filter(r=>r.status==='unknown'||r.status==='partial').length,contradicted:required.filter(r=>r.status==='contradicted').length},verificationQuestions:questions,
+  // Screening never rejects; even explicit negatives remain reviewable.
+  decision:'recruiter_review',aiCalls:0};
+}
+export function rankScreeningCandidates(results,{complete=false,top=20,nearMiss=20}={}){
+ if(!Number.isInteger(top)||top<1||!Number.isInteger(nearMiss)||nearMiss<0)throw Error('invalid_shortlist_size');
+ if(new Set(results.map(r=>r.candidateId)).size!==results.length)throw Error('duplicate_candidate_id');
+ if(new Set(results.map(r=>r.rubricKey)).size>1)throw Error('mixed_screening_rubrics');
+ const band=r=>({not_applicable:0,evidenced:0,unverified:1,conflicting:2}[r.requiredStatus]??1);
+ const ranked=[...results].sort((a,b)=>band(a)-band(b)||b.score-a.score||String(a.candidateId).localeCompare(String(b.candidateId),'en'));
+ return {status:complete?'final':'provisional',evaluated:results.length,top:ranked.slice(0,top),nearMiss:ranked.slice(top,top+nearMiss),remaining:ranked.slice(top+nearMiss),aiCalls:0};
+}
+// Bounded per-instance cache, scoped by workspace/job/rubric and exact resume bytes.
+// Durable cache and cross-worker AI idempotency belong in the authorized backend.
+export function createScreeningSession(rubric,{maxEntries=2000}={}){
+ if(!Number.isInteger(maxEntries)||maxEntries<1||maxEntries>10000)throw Error('invalid_cache_limit');
+ const compiled=compileScreeningRubric(rubric),cache=new Map();
+ return {async score(candidateId,text){
+  const key=await fingerprint({rubric:rubric.key,text});let result=cache.get(key),cacheHit=Boolean(result);
+  if(!result){result=scoreScreeningCandidate(compiled,parseScreeningEvidence(text,{asOf:rubric.asOf}),candidateId);cache.set(key,result);if(cache.size>maxEntries)cache.delete(cache.keys().next().value);}
+  return {...structuredClone(result),candidateId,cacheHit};
+ },get cacheSize(){return cache.size;}};
+}

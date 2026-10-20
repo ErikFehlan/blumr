@@ -1,0 +1,111 @@
+{
+  "commit": "2461d56c2ffc9e3cc99417b7f04c559481e42c33",
+  "workflow_run": "https://github.com/ErikFehlan/blumr/actions/runs/39250855752",
+  "request_concurrency": 1,
+  "scope": "Authenticated staging, private synthetic resume-shaped TXT files, six evidence archetypes. Ranking timings exclude fixture upload, PDF/DOCX extraction, UI timing and real model quality.",
+  "fixture_bytes": {
+    "min": 2173,
+    "max": 2224
+  },
+  "runs": [
+    {
+      "candidates": 20,
+      "path": "cold",
+      "duration_ms": 2440.86,
+      "time_to_first_page_ms": 2304.12,
+      "cache_hits": 0,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 20,
+      "path": "warm",
+      "duration_ms": 854.63,
+      "time_to_first_page_ms": 854.56,
+      "cache_hits": 20,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 20,
+      "path": "warm",
+      "duration_ms": 915.69,
+      "time_to_first_page_ms": 915.63,
+      "cache_hits": 20,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 100,
+      "path": "cold",
+      "duration_ms": 1485.65,
+      "time_to_first_page_ms": 1485.54,
+      "cache_hits": 0,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 100,
+      "path": "warm",
+      "duration_ms": 1258.77,
+      "time_to_first_page_ms": 1258.67,
+      "cache_hits": 100,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 100,
+      "path": "warm",
+      "duration_ms": 795.14,
+      "time_to_first_page_ms": 795.02,
+      "cache_hits": 100,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 500,
+      "path": "cold",
+      "duration_ms": 7092.05,
+      "time_to_first_page_ms": 1022.73,
+      "cache_hits": 0,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 500,
+      "path": "warm",
+      "duration_ms": 4893.02,
+      "time_to_first_page_ms": 814.79,
+      "cache_hits": 500,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 500,
+      "path": "warm",
+      "duration_ms": 4225.79,
+      "time_to_first_page_ms": 645.84,
+      "cache_hits": 500,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 1000,
+      "path": "cold",
+      "duration_ms": 12805.98,
+      "time_to_first_page_ms": 1138.23,
+      "cache_hits": 0,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 1000,
+      "path": "warm",
+      "duration_ms": 8622.41,
+      "time_to_first_page_ms": 1033.58,
+      "cache_hits": 1000,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 1000,
+      "path": "warm",
+      "duration_ms": 8275.17,
+      "time_to_first_page_ms": 680.94,
+      "cache_hits": 1000,
+      "ai_calls": 0
+    }
+  ],
+  "ai_calls": 0,
+  "passed": true,
+  "cleanup": "passed"
+}

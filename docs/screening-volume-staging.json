@@ -1,0 +1,205 @@
+{
+  "scope": "Authenticated staging, private synthetic resume-shaped TXT files, six evidence archetypes. Ranking timings exclude fixture upload, PDF/DOCX extraction, UI timing and real model quality.",
+  "fixture_bytes": {
+    "min": 2173,
+    "max": 2224
+  },
+  "runs": [
+    {
+      "candidates": 20,
+      "path": "cold",
+      "concurrency": 2,
+      "duration_ms": 1404.09,
+      "time_to_first_page_ms": 1404.02,
+      "cache_hits": 0,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 20,
+      "path": "warm",
+      "concurrency": 2,
+      "duration_ms": 665.39,
+      "time_to_first_page_ms": 665.34,
+      "cache_hits": 20,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 20,
+      "path": "warm",
+      "concurrency": 2,
+      "duration_ms": 863.17,
+      "time_to_first_page_ms": 863.09,
+      "cache_hits": 20,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 100,
+      "path": "cold",
+      "concurrency": 2,
+      "duration_ms": 2200.75,
+      "time_to_first_page_ms": 2200.67,
+      "cache_hits": 0,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 100,
+      "path": "warm",
+      "concurrency": 2,
+      "duration_ms": 1004.77,
+      "time_to_first_page_ms": 1004.7,
+      "cache_hits": 100,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 100,
+      "path": "warm",
+      "concurrency": 2,
+      "duration_ms": 861.93,
+      "time_to_first_page_ms": 861.88,
+      "cache_hits": 100,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 500,
+      "path": "cold",
+      "concurrency": 2,
+      "duration_ms": 5466.83,
+      "time_to_first_page_ms": 1797.23,
+      "cache_hits": 0,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 500,
+      "path": "warm",
+      "concurrency": 2,
+      "duration_ms": 2451.2,
+      "time_to_first_page_ms": 887.68,
+      "cache_hits": 500,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 500,
+      "path": "warm",
+      "concurrency": 2,
+      "duration_ms": 2942.59,
+      "time_to_first_page_ms": 889.94,
+      "cache_hits": 500,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 1000,
+      "path": "cold",
+      "concurrency": 2,
+      "duration_ms": 10245.61,
+      "time_to_first_page_ms": 1503.92,
+      "cache_hits": 0,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 1000,
+      "path": "warm",
+      "concurrency": 2,
+      "duration_ms": 5180.28,
+      "time_to_first_page_ms": 1066.06,
+      "cache_hits": 1000,
+      "ai_calls": 0
+    },
+    {
+      "candidates": 1000,
+      "path": "warm",
+      "concurrency": 2,
+      "duration_ms": 5330.86,
+      "time_to_first_page_ms": 940.1,
+      "cache_hits": 1000,
+      "ai_calls": 0
+    }
+  ],
+  "ai_calls": 0,
+  "passed": true,
+  "fixture_upload": {
+    "concurrency": 1,
+    "minimum_gap_ms": 500,
+    "uploaded": 1000,
+    "duration_ms": 694275
+  },
+  "qualification_pools": [
+    {
+      "occupation": "cloud",
+      "candidates": 5,
+      "priorities": 5,
+      "expected_pair_orderings": 4,
+      "source_quotes_verified": true,
+      "near_miss_retained": true,
+      "warm_cache_hits": 5,
+      "ai_calls": 0
+    },
+    {
+      "occupation": "accounting",
+      "candidates": 5,
+      "priorities": 5,
+      "expected_pair_orderings": 4,
+      "source_quotes_verified": true,
+      "near_miss_retained": true,
+      "warm_cache_hits": 5,
+      "ai_calls": 0
+    },
+    {
+      "occupation": "clinical",
+      "candidates": 5,
+      "priorities": 5,
+      "expected_pair_orderings": 4,
+      "source_quotes_verified": true,
+      "near_miss_retained": true,
+      "warm_cache_hits": 5,
+      "ai_calls": 0
+    },
+    {
+      "occupation": "warehouse",
+      "candidates": 5,
+      "priorities": 5,
+      "expected_pair_orderings": 4,
+      "source_quotes_verified": true,
+      "near_miss_retained": true,
+      "warm_cache_hits": 5,
+      "ai_calls": 0
+    },
+    {
+      "occupation": "education",
+      "candidates": 5,
+      "priorities": 5,
+      "expected_pair_orderings": 4,
+      "source_quotes_verified": true,
+      "near_miss_retained": true,
+      "warm_cache_hits": 5,
+      "ai_calls": 0
+    },
+    {
+      "occupation": "maintenance",
+      "candidates": 5,
+      "priorities": 5,
+      "expected_pair_orderings": 4,
+      "source_quotes_verified": true,
+      "near_miss_retained": true,
+      "warm_cache_hits": 5,
+      "ai_calls": 0
+    },
+    {
+      "occupation": "qa",
+      "candidates": 5,
+      "priorities": 5,
+      "expected_pair_orderings": 4,
+      "source_quotes_verified": true,
+      "near_miss_retained": true,
+      "warm_cache_hits": 5,
+      "ai_calls": 0
+    }
+  ],
+  "cleanup": "passed",
+  "validation": {
+    "commit": "62bcddbac4a456765ed079d86bc6aef25bd37b9b",
+    "workflow_run": 39309016535,
+    "job": 118253925485,
+    "project": "momfzjmycveqginxmqib",
+    "production_unchanged": true
+  }
+}

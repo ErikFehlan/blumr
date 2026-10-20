@@ -3,7 +3,7 @@
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function create(api){
     const jobs=new Map(),requests=new Map(),busy=new Set(),errors=new Map(),markup=new WeakMap();let timer=null,loading=false,disposed=false;
-    const rows=()=>(jobs.get(api.job()?.id)||[]).filter(t=>!global.AncalagonIntake?.pending(api.candidates().find(c=>c.id===t.candidate_id))&&t.job_id===api.job()?.id&&api.candidates().some(c=>c.id===t.candidate_id&&c.jobId===t.job_id)).concat(api.candidates().filter(c=>c.jobId===api.job()?.id&&global.AncalagonIntake?.pending(c)).map(c=>({candidate_id:c.id,job_id:c.jobId,intake:true,status:c.resumeIntake.phase==='ready'?'ready':c.resumeIntake.phase==='error'?'failed':'processing'})));
+    const rows=()=>(jobs.get(api.job()?.id)||[]).filter(t=>!global.AncalagonIntake?.pending(api.candidates().find(c=>c.id===t.candidate_id))&&t.job_id===api.job()?.id&&api.candidates().some(c=>c.id===t.candidate_id&&c.jobId===t.job_id)).concat(api.candidates().filter(c=>c.jobId===api.job()?.id&&c.resumeIntake&&!c.screeningManaged&&global.AncalagonIntake?.pending(c)).map(c=>({candidate_id:c.id,job_id:c.jobId,intake:true,status:c.resumeIntake.phase==='ready'?'ready':c.resumeIntake.phase==='error'?'failed':'processing'})));
     function plan(ms=4000){if(disposed)return;clearTimeout(timer);timer=setTimeout(refresh,ms);}
     async function refresh(){
       if(disposed)return;render();if(!api.ready()){plan(500);return;}

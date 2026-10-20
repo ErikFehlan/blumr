@@ -1,0 +1,101 @@
+name: Validate rules screening foundation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/migrations/*screening*'
+      - 'tests/*screening*'
+      - 'assets/bulk-*'
+      - 'tests/bulk-*'
+      - 'scripts/bulk-*'
+      - 'tests/job-intelligence.test.js'
+      - 'tests/fixtures/screening-*.mjs'
+      - 'tests/fixtures/mixed-screening-*.cjs'
+      - 'scripts/*screening*'
+      - 'scripts/readiness-fixtures.mjs'
+      - 'scripts/fixture-storage.mjs'
+      - '.github/workflows/rules-screening.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: node --test tests/*.test.js
+      - run: deno test --allow-env tests/rules-screening-routing.test.ts tests/bulk-screening-backend.test.ts tests/job-reassessment-worker.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
+      - run: psql -h localhost -U postgres -d postgres -f tests/screening-cache.sql
+        env:
+          PGPASSWORD: postgres
+      - run: createdb -h localhost -U postgres bulk_screening && psql -h localhost -U postgres -d bulk_screening -f tests/bulk-screening.sql
+        env:
+          PGPASSWORD: postgres
+      - run: node scripts/benchmark-screening.mjs
+  staging:
+    needs: validate
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/rules-first-screening'
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    concurrency:
+      group: staging-backend
+      cancel-in-progress: false
+    timeout-minutes: 35
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
+      BULK_MIXED_IMPORT: '1'
+      READINESS_STATE_FILE: /tmp/blumr-screening-${{ github.run_id }}-${{ github.run_attempt }}.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.95.3
+      - run: node scripts/screening-backend.mjs
+      - name: Recover known failed synthetic fixture
+        run: node scripts/recover-screening-fixture.mjs
+      - name: Deploy experimental route to staging only
+        run: |
+          supabase functions deploy analyze-patterns-beta --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy reassess-job --project-ref "$SUPABASE_PROJECT_REF"
+          supabase secrets set RULES_FIRST_SCREENING=true --project-ref "$SUPABASE_PROJECT_REF"
+      - name: Install exact browser import dependencies
+        run: |
+          npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.8.0 pdfjs-dist@4.10.38 tesseract.js@5.1.1 @tesseract.js-data/eng@1.0.0 @supabase/supabase-js@2.116.0
+          npx playwright install --with-deps chromium
+      - name: Verify actual mixed document extraction and OCR
+        run: node scripts/bulk-screening-mixed-browser.cjs
+      - run: node scripts/bulk-screening-staging-smoke.mjs
+      - name: Clean disposable fixtures
+        if: always()
+        run: node scripts/bulk-screening-staging-smoke.mjs cleanup
+      - name: Disable experimental route
+        if: always()
+        run: supabase secrets set RULES_FIRST_SCREENING=false --project-ref "$SUPABASE_PROJECT_REF"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rules-screening-staging
+          path: test-results/bulk-screening/
+          if-no-files-found: ignore
+  release-staging:
+    needs: staging
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/rules-first-screening'
+    uses: ./.github/workflows/staging-backend.yml
+    secrets: inherit

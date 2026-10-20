@@ -13,7 +13,7 @@
   function create(api){
     let timer=null,polling=false,disposed=false,activeSince=null;
     const requests=new Map(),errors=new Set();
-    const valid=c=>api.valid(c)&&global.AncalagonIntake.pending(c);
+    const valid=c=>!!c?.resumeIntake&&!c.screeningManaged&&api.valid(c)&&global.AncalagonIntake.pending(c);
     function plan(ms=2500){if(disposed)return;clearTimeout(timer);timer=setTimeout(()=>void poll(),ms);timer?.unref?.();}
     async function request(c,retry=false){
       if(!valid(c))return;

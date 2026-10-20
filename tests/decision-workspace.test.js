@@ -49,3 +49,10 @@ test('comparison overview preserves candidate identity, saved score separation a
  const other={...candidate(),id:'two',managerScore:5.4};const before=JSON.stringify([c,other]);
  const html=d.comparisonHTML(job,[c,other]);assert.match(html,/data-profile-candidate="one"/);assert.match(html,/data-profile-candidate="two"/);assert.doesNotMatch(html,/Unsupported claim/);assert.match(html,/JD Fit/);assert.match(html,/Manager Fit/);assert.match(html,/5\.4/);assert.equal(JSON.stringify([c,other]),before);
 });
+
+test('unselected bulk candidates have no saved fit scores or automatic processing state',()=>{
+ const c={...candidate(),aiReview:null,resumeIntake:null,screeningManaged:true};
+ assert.equal(d.reviewState(c).label,'Bulk screening');
+ const summary=d.summary(job,[c]);assert.equal(summary.working.length,0);assert.equal(summary.needsReview.length,0);
+ assert.doesNotMatch(d.shortlistHTML([c]),/8\.0/);assert.match(d.shortlistHTML([c]),/bulk screening/i);
+});

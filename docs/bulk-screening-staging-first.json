@@ -1,0 +1,76 @@
+{
+  "scope": "Authenticated staging, 500 synthetic TXT imports through bulk RPCs, real Storage and rules engine. One selected Top 20 uses the existing real provider with a $10 reservation cap. Synthetic evidence checks do not establish recruiter-labeled accuracy.",
+  "started_at": "2026-10-20T12:36:59.824Z",
+  "runs": [
+    {
+      "stage": "incremental",
+      "saved": 20,
+      "ranked": 20,
+      "duration_ms": 2869
+    },
+    {
+      "stage": "incremental",
+      "saved": 100,
+      "ranked": 100,
+      "duration_ms": 2711
+    },
+    {
+      "stage": "incremental",
+      "saved": 500,
+      "ranked": 458,
+      "duration_ms": 4972
+    },
+    {
+      "stage": "finish",
+      "ranked": 500,
+      "duration_ms": 3033
+    },
+    {
+      "stage": "warm",
+      "ranked": 500,
+      "duration_ms": 2365
+    },
+    {
+      "stage": "warm",
+      "ranked": 500,
+      "duration_ms": 3354
+    },
+    {
+      "stage": "warm",
+      "ranked": 500,
+      "duration_ms": 2619
+    }
+  ],
+  "passed": true,
+  "batch_ack_ms": 198,
+  "upload_ms": 375989,
+  "provider_calls": 0,
+  "deep": {
+    "duration_ms": 406811,
+    "assessed": 20,
+    "recommended": 10,
+    "provider_calls": 20,
+    "input_tokens": 86461,
+    "output_tokens": 25066,
+    "actual_usd": 0.6527488,
+    "budget_usd": 10,
+    "reserved_usd": 4.89873,
+    "unsettled_calls": 0,
+    "provider_calls_reserved": 20,
+    "approval_and_replay_passed": true
+  },
+  "checks": [
+    "500 candidates, 501 manifest entries, one duplicate",
+    "zero provider calls or paid intake tasks",
+    "incremental provisional results",
+    "warm stable Top 20 and near misses",
+    "workspace isolation",
+    "job-source invalidation",
+    "real Top 20 to Top 10 with exact source quotations",
+    "batch token/cost attribution and explicit approval",
+    "no duplicate AI on shortlist replay"
+  ],
+  "cleanup_passed": true,
+  "commit": "aa7ffc829bf2cd117d68b58dbb55eba069f98324",
+  "workflow": "https://github.com/ErikFehlan/blumr/actions/runs/39423460136"
+}

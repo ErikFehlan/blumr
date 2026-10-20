@@ -2,7 +2,7 @@
   'use strict';
   const normalize=s=>String(s||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
   const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const pending=c=>!!c?.resumeIntake&&!c.resumeIntake.reviewedAt&&!c.aiReview;
+  const pending=c=>Boolean((c?.screeningManaged||c?.role==='Resume awaiting analysis')&&!c.aiReview)||!!c?.resumeIntake&&!c.resumeIntake.reviewedAt&&!c.aiReview;
   function fileReadError(error,type){
     if(type==='pdf'&&(error?.name==='PasswordException'||/password required|no password given/i.test(error?.message||'')))
       return new Error('This PDF is password protected. Upload an unlocked copy.');
@@ -141,7 +141,7 @@
   }
   function create(api){
     const files=new Map(),queue=new Set(),reviewing=new Set(),reveal=global.BlumrExperience?.createReveal();let running=false,extracting=false;
-    const valid=c=>api.candidates().includes(c)&&!!api.job(c.jobId)&&api.job(c.jobId).status!=='closed';
+    const valid=c=>!!c?.resumeIntake&&!c.screeningManaged&&api.candidates().includes(c)&&!!api.job(c.jobId)&&api.job(c.jobId).status!=='closed';
     const context=c=>api.context(c);
     const remote=api.requestRemote?global.AncalagonRemoteIntake.create({...api,valid,changed:c=>changed(c)}):null;
     const useRemote=()=>!!remote&&(!api.remoteAvailable||api.remoteAvailable());
@@ -394,7 +394,7 @@
     function render(){
       if(api.renderQueue){api.renderQueue();return;}
       const wrap=api.root?.querySelector('#resumeIntakeStatus');if(!wrap)return;
-      const list=api.candidates().filter(c=>c.jobId===api.job()?.id&&pending(c));
+      const list=api.candidates().filter(c=>c.jobId===api.job()?.id&&c.resumeIntake&&!c.screeningManaged&&pending(c));
       wrap.hidden=!list.length;
       wrap.innerHTML=list.map(c=>{const quick=c.resumeIntake.preliminary?.job_signature===preliminaryJobSignature(api.job(c.jobId))?c.resumeIntake.preliminary:null;const label=Number.isFinite(quick?.score)&&!['ready','error'].includes(c.resumeIntake.phase)?'Preliminary JD Fit '+quick.score.toFixed(1)+' · full assessment running':({uploading:'Saving resume…',queued:'Queued for assessment',processing:'Preparing screening brief…',ready:'Ready for your review',error:'Needs attention'}[c.resumeIntake.phase]||'Preparing…');return '<button type="button" class="rf-intake-status" data-intake-open="'+escape(c.id)+'"><strong>'+escape(c.short)+'</strong><span>'+escape(label)+'</span></button>';}).join('');
       wrap.querySelectorAll('[data-intake-open]').forEach(b=>b.addEventListener('click',()=>api.open(api.candidates().find(c=>c.id===b.dataset.intakeOpen),true)));
