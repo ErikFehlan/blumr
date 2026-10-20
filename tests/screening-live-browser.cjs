@@ -6,6 +6,15 @@ const {chromium}=require('playwright');
  const rollout=JSON.parse(await fs.readFile(process.env.LIVE_FIXTURE_FILE+'.screening','utf8'));
  assert.equal(fixture.app,'https://blumr.io/');assert.equal(fixture.project,'zqiqjzxcpznhzjengfff');assert.equal(rollout.project,fixture.project);
  const [owner,other]=fixture.users;
+ // The preceding recruiter journey tests global sign-out and password recovery.
+ // Its saved access tokens are revoked; authenticate both disposable accounts
+ // again so the route and cross-workspace checks use valid current sessions.
+ for(const user of [owner,other]){
+  const response=await fetch(fixture.base+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:fixture.anon,'Content-Type':'application/json'},body:JSON.stringify({email:user.email,password:user.password}),signal:AbortSignal.timeout(30000)});
+  assert.ok(response.ok,'Synthetic screening account could not sign in');
+  const session=await response.json();assert.equal(session.user?.id,user.id);assert.ok(session.access_token);
+  user.access=session.access_token;if(process.env.GITHUB_ACTIONS)console.log('::add-mask::'+user.access);
+ }
  const request=async(user,path,body)=>{
   const r=await fetch(fixture.base+path,{method:body?'POST':'GET',headers:{apikey:fixture.anon,Authorization:'Bearer '+user.access,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(30000)});
   return {status:r.status,ok:r.ok,data:await r.json().catch(()=>null)};

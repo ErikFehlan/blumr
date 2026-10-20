@@ -153,6 +153,10 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
  assert.equal(oldLogin.status,400,'Previous password was not rejected');assert.equal((await oldLogin.json()).error_code,'invalid_credentials');
  await login({...other,password:newPassword});await page.locator('#authSignOut').click();await page.locator('#authSubmit').waitFor({state:'visible'});
  pass('Recovery link returns to blumr; disposable password changes, old password fails and new password signs in (email delivery not tested)');
+  // Later live checks must sign in again: this journey intentionally signs out
+  // every session and changes the second disposable account's password.
+  other.password=newPassword;
+  await fs.writeFile(process.env.LIVE_FIXTURE_FILE,JSON.stringify(fixture),{mode:0o600});
  assert.deepEqual(errors,[],'Unhandled application errors during the live journey');
  await fs.writeFile(output+'/results.json',JSON.stringify({url:fixture.app,status:'passed',checks:results},null,2));
 })().catch(async error=>{
