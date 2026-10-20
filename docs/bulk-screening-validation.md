@@ -19,7 +19,9 @@ The existing Candidates page now offers bulk rules screening when the rollout fl
 
 Local verification on the final development work includes 495 passing Node tests, focused Deno backend tests, the bulk SQL suite on PostgreSQL 17 through PGlite, the existing individual-intake browser journey and the new bulk browser journey. GitHub Actions separately runs real PostgreSQL 17, backend type checks and the broader recruiter browser suite; exact final workflow results are recorded below when finished.
 
-The new browser journey runs the actual application, PDF/DOCX parsing, ZIP handling and shared deterministic engine. Database/provider transport is simulated. Its 25-file batch includes one duplicate, a damaged PDF and a recoverable interrupted upload. It verifies 23 unique saved candidates, no initial AI, 20 simulated finalist calls, replay without extra calls, reload with actual rules-only candidate records, explicit approval, zero legacy intake requests, original-resume viewing, mobile width, and preservation of open evidence and the next-batch budget across refresh. These browser observations do not establish hosted provider latency or cost.
+The new browser journey runs the actual application, PDF/DOCX parsing, ZIP handling and shared deterministic engine. Database/provider transport is simulated. Its 25-file batch includes one duplicate, a damaged PDF and a recoverable interrupted upload. It verifies 23 unique saved candidates, no initial AI, 20 simulated finalist calls, replay without extra calls, reload with actual rules-only candidate records, explicit approval, zero legacy intake requests, original-resume viewing, mobile width, and preservation of open evidence and the next-batch budget across refresh, job switches during a delayed manifest request, and exclusion of concurrent import starts. These browser observations do not establish hosted provider latency or cost.
+
+A browser resource regression failed before the PDF-reader fix: a parsing worker remained live after extraction. The reader now destroys its loading task in a `finally` block, including parse failures and page-limit errors. A subsequent **1,000-document parser run (500 PDF, 500 DOCX) completed in 40.13 seconds**, preserved the expected source passages, peaked at **one PDF worker**, and ended with **zero workers**. These are repeated synthetic fixtures using the actual application parser, not 1,000 independently varied resumes; upload, HTTP, scoring and AI are excluded. Raw observations: `bulk-screening-parser-volume.json`. Run it with `BULK_PARSE_COUNT=1000 node tests/bulk-screening-browser.cjs` in the browser-test environment.
 
 The SQL suite covers authenticated inserts, isolation, private write permissions, incomplete sealing, changed-source writes, document/hash binding, consent invalidation, worker claim recovery, duplicate selection, provider reservation fencing, missing rates, budget limits and usage accounting. The live staging metadata for all 22 bulk-related routines matched the committed source expectations and caller permissions before release packaging.
 
@@ -34,7 +36,28 @@ The existing evidence suite still reports 1,008 synthetic checks and seven occup
 
 The staging harness imports 500 unique synthetic TXT resumes plus one duplicate through authenticated batch RPCs, actual Storage and document inserts. It checks incremental provisional results, final and cached ranking, workspace isolation, zero paid tasks before consent, real selective AI, exact source quotations, batch usage, replay and explicit approval. A $10 conservative reservation cap bounds its selected Top 20. Disposable fixture accounts/files are removed and both rollout flags are disabled afterward. PDF/DOCX/ZIP parsing is covered by the browser test, not by these hosted TXT timings.
 
-Final measured results are pending the active staging run. Do not interpret implemented code or passing simulated transports as a completed live batch.
+The first complete run passed on `aa7ffc829bf2cd117d68b58dbb55eba069f98324`: [workflow 39423460136](https://github.com/ErikFehlan/blumr/actions/runs/39423460136), raw results in `bulk-screening-staging-first.json`.
+
+| Measurement | Observed |
+| --- | ---: |
+| Authenticated batch creation | 198 ms |
+| 500 unique TXT uploads, sequential and paced | 375.99 s (6.27 min) |
+| Incremental 20 / 100 / 500-file ranking calls | 2.87 / 2.71 / 4.97 s |
+| Remaining ranking after sealing | 3.03 s |
+| Cached 500-candidate ranking, three observations | 2.37 / 3.35 / 2.62 s |
+| Initial screening provider calls | 0 |
+| Deep analysis of 20 selected candidates | 406.81 s (6.78 min) |
+| Real provider requests / extra replay requests | 20 / 0 |
+| Provider input / output tokens | 86,461 / 25,066 |
+| Recorded token-based cost estimate | $0.6527488 |
+| Conservative reserved amount / test cap | $4.89873 / $10 |
+| Unsettled usage records | 0 |
+
+The 500-file incremental response had 458 candidates ranked and correctly remained provisional; after sealing, all 500 were ranked. Every Top 20 candidate came from the supported synthetic archetype. The initial rules Top 20 stayed available beside the final Top 10. All selected AI quotations were literal source passages; explicit score approval, selection replay, source invalidation and foreign-workspace denial passed. All disposable fixtures were removed and the experimental route was disabled.
+
+This meets sub-second batch acknowledgment and low-single-digit cached ranking in these observations, not a production percentile promise. New imports and deep AI remain minutes-long operations with progressive results. Serial upload pacing respects the observed Storage limits; the real provider runs under the existing shared worker capacity. No full-pipeline instantaneous-speed claim is supported.
+
+The old one-assessment-per-applicant path would request 500 initial assessments for this batch; this run requested 20, a **96% reduction in initial call count**. The 500-call baseline is arithmetic, not a separately purchased benchmark. There is no measured production invoice saving. Final CI and the complete isolated staging release suite are running against the final packaged commit.
 
 ## Release gates
 

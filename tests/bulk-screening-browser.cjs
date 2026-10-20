@@ -37,13 +37,14 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
  }).listen(0,'127.0.0.1');
  let browser;
  try{
-  browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME});const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME});let peakPdfWorkers=0;const page=await browser.newPage(),errors=[],pdfWorkers=new Set();page.on('worker',worker=>{pdfWorkers.add(worker);peakPdfWorkers=Math.max(peakPdfWorkers,pdfWorkers.size);worker.on('close',()=>pdfWorkers.delete(worker));});page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://**',r=>r.abort());
   const pdfDir=path.dirname(require.resolve('pdfjs-dist/package.json'));
   await page.route('**/pdfjs-dist@4.10.38/**',r=>r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(pdfDir,'build',r.request().url().includes('worker')?'pdf.worker.min.mjs':'pdf.mjs'),'utf8')}));
   await page.route('**/mammoth@1.8.0/mammoth.browser.min.js',r=>r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(path.dirname(require.resolve('mammoth/package.json')),'mammoth.browser.min.js'),'utf8')}));
   await page.route('**/assets/auth.js*',r=>r.fulfill({contentType:'application/javascript',body:"document.body.classList.remove('rf-auth-pending');document.getElementById('authGate').style.display='none';"}));
   await page.route('**/assets/data.js*',r=>r.fulfill({contentType:'application/javascript',body:''}));
+  await page.route('**/assets/resume-intake.js*',r=>r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(dir,'assets/resume-intake.js'),'utf8')+";{const original=window.AncalagonIntake.create;window.AncalagonIntake.create=api=>{window.testExtractLocalResume=api.extract;return original(api);};}"}));
   await page.addInitScript(()=>{
    const rpc=async(op,...args)=>{const r=await fetch('/__bulk',{method:'POST',body:JSON.stringify({op,args})});const value=await r.json();if(!r.ok)throw Error(value.error);return value;};
    window.AncalagonData={create:()=>({load:()=>rpc('load'),requestResumeIntake:()=>rpc('legacy'),loadResumeIntakes:async()=>[],reviewResumeIntake:(...a)=>rpc('approve',...a),schedule:(_,__,done)=>done('saved'),flush:async()=>{},trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin');},
@@ -53,11 +54,11 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#screeningMode').waitFor();
   assert.equal(await page.locator('#screeningMode').inputValue(),'bulk');await page.locator('[data-bulk-budget]').fill('1.25');
   const text=i=>`Synthetic applicant ${i}\nQA Engineer\nPerformed manual testing.\nReproduced defects.\nMaintained regression tests.\nDocumented test cases.\nValidated user acceptance testing.`;
-  const zip=new Zip();for(let i=0;i<20;i++)zip.file(i+'.txt',text(i));zip.file('duplicate.txt',text(0));zip.file('Word.docx',await require('./fixtures/docx-resume.cjs')());zip.file('Readable.pdf',require('./fixtures/pdf-resume.cjs')());zip.file('Broken.pdf','Not actually a PDF');zip.file('retry.txt',text(99));
+  const zip=new Zip();for(let i=0;i<20;i++)zip.file(i+'.txt',text(i));zip.file('duplicate.txt',text(0));zip.file('Word.docx',await require('./fixtures/docx-resume.cjs')());zip.file('Readable.pdf',require('./fixtures/pdf-resume.cjs')());zip.file('Broken.pdf','%PDF-1.7\nThis synthetic document deliberately has no cross-reference table.');zip.file('retry.txt',text(99));
   const started=performance.now();await page.locator('#resumeUpload').setInputFiles({name:'Applications.zip',mimeType:'application/zip',buffer:await zip.generateAsync({type:'nodebuffer',compression:'DEFLATE'})});
   await page.locator('[data-bulk-message]').filter({hasText:/Preparing|Import saved|Reading|Saving/}).waitFor();const ack=performance.now()-started;
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Some files need attention'),{},{timeout:45000});
-  assert.equal(batch.budget_usd,1.25,'Budget selection lost');assert.equal(docs.size,22,'Duplicate or readable document handling failed');assert.equal(deepCalls,0,'Upload invoked full AI');assert.equal(batch.sealed,false);assert.match(await page.locator('#bulkScreening').textContent(),/Provisional ranking/);
+  assert.equal(pdfWorkers.size,0,'PDF parsing workers leaked after successful or failed documents');assert.equal(batch.budget_usd,1.25,'Budget selection lost');assert.equal(docs.size,22,'Duplicate or readable document handling failed');assert.equal(deepCalls,0,'Upload invoked full AI');assert.equal(batch.sealed,false);assert.match(await page.locator('#bulkScreening').textContent(),/Provisional ranking/);
   assert.ok([...docs.values()].some(t=>t.includes('Documented regression coverage')),'DOCX text box lost');assert.ok([...docs.values()].some(t=>t.includes('Used SQL to validate billing data')),'PDF extraction lost');
   await page.locator('[data-bulk-resume-files]').setInputFiles({name:'retry.txt',mimeType:'text/plain',buffer:Buffer.from(text(99))});
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Files saved'),{},{timeout:15000});
@@ -86,6 +87,16 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.waitForFunction(()=>document.querySelector('#globalJobSelect')?.value==='job-b'&&document.querySelector('[data-bulk-batch]')?.value==='');
   const sealed=page.waitForResponse(r=>r.url().endsWith('/__bulk')&&r.request().postDataJSON()?.op==='seal');releaseCreate();await sealed;await page.waitForTimeout(100);
   assert.equal(batch.job_id,'job-a');assert.equal(await page.locator('[data-bulk-batch]').inputValue(),'','Old import replaced the new job’s batch');assert.equal(deepCalls,20);assert.equal(legacyCalls,0);
-  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,job_switch_during_manifest:true,legacy_calls:legacyCalls,pdf_docx_zip:true,passed:true}));
+  let parsing=null;const parseCount=Number(process.env.BULK_PARSE_COUNT||0);
+  if(parseCount){
+   assert.ok(Number.isInteger(parseCount)&&parseCount>=20&&parseCount<=1000);peakPdfWorkers=0;
+   const inputs={count:parseCount,pdf:Buffer.from(require('./fixtures/pdf-resume.cjs')()).toString('base64'),docx:Buffer.from(await require('./fixtures/docx-resume.cjs')()).toString('base64')};
+   parsing=await page.evaluate(async({count,pdf,docx})=>{const bytes=value=>Uint8Array.from(atob(value),c=>c.charCodeAt(0)),sources=[bytes(pdf),bytes(docx)],started=performance.now();let pdfs=0,words=0;
+    for(let i=0;i<count;i++){const word=i%2===1,file=new File([sources[i%2]],'Synthetic-'+i+(word?'.docx':'.pdf'),{type:word?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'application/pdf'}),result=await window.testExtractLocalResume(file),text=typeof result==='string'?result:result.text;
+     if(!text.includes(word?'Documented regression coverage':'Used SQL to validate billing data'))throw Error('Repeated parser lost evidence');word?words++:pdfs++;}
+    return {documents:count,pdfs,docx:words,duration_ms:Math.round(performance.now()-started),scope:'Repeated synthetic parser fixtures; excludes upload, HTTP, ranking and AI'};
+   },inputs);await page.waitForTimeout(100);assert.equal(pdfWorkers.size,0,'PDF workers leaked under volume');assert.ok(peakPdfWorkers<=2,'PDF workers grew with batch size');parsing.peak_pdf_workers=peakPdfWorkers;parsing.remaining_pdf_workers=pdfWorkers.size;
+  }
+  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,job_switch_during_manifest:true,pdf_workers_released:true,legacy_calls:legacyCalls,pdf_docx_zip:true,parsing,passed:true}));
  }finally{await browser?.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

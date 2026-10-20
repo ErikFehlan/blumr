@@ -1,0 +1,24 @@
+{
+  "browser": "bulk screening",
+  "files": 25,
+  "unique_saved": 23,
+  "ui_ack_ms": 35,
+  "rules_provider_calls": 0,
+  "simulated_deep_calls": 20,
+  "reload_and_replay": true,
+  "explicit_approval": true,
+  "job_switch_during_manifest": true,
+  "pdf_workers_released": true,
+  "legacy_calls": 0,
+  "pdf_docx_zip": true,
+  "parsing": {
+    "documents": 1000,
+    "pdfs": 500,
+    "docx": 500,
+    "duration_ms": 40127,
+    "scope": "Repeated synthetic parser fixtures; excludes upload, HTTP, ranking and AI",
+    "peak_pdf_workers": 1,
+    "remaining_pdf_workers": 0
+  },
+  "passed": true
+}

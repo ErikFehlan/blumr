@@ -43,7 +43,7 @@
     'assets/vendor/jszip-3.10.1.min.js',
     'assets/bulk-files.js?v=20261020-bulk',
     'assets/bulk-screening.js?v=20261020-job-scope',
-    'assets/app.js?v=20261020-bulk-reload'
+    'assets/app.js?v=20261020-pdf-cleanup'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
