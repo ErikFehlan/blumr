@@ -63,6 +63,10 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Files saved'),{},{timeout:15000});
   const broken=batch.items.find(i=>i.file_name==='Broken.pdf');await page.locator(`[data-bulk-exclude="${broken.ordinal}"]`).click();await page.getByText('Screening complete for this batch',{exact:true}).waitFor();
   assert.equal(docs.size,23);assert.equal(deepCalls,0);assert.equal(batch.sealed,true);
+  await page.locator('[data-bulk-disclosure="near"]').evaluate(d=>d.open=true);
+  await page.locator('[data-bulk-refresh]').click();await page.waitForTimeout(150);
+  assert.equal(await page.locator('[data-bulk-disclosure="near"]').evaluate(d=>d.open),true,'Refresh closed evidence review');
+  assert.equal(await page.locator('[data-bulk-budget]').inputValue(),'1.25','Progress reset the chosen next-batch budget');
   await page.locator('[data-bulk-start]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(deepCalls,20);
   await page.locator('[data-bulk-start]').click();await page.waitForTimeout(250);assert.equal(deepCalls,20,'Repeated shortlist created duplicate model calls');
   await page.locator('[data-bulk-resume]').first().click();await page.locator('dialog[open]').waitFor();assert.ok((await page.locator('[data-resume-text]').textContent()).length>40);await page.locator('dialog [data-close]').click();

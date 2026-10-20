@@ -42,7 +42,7 @@
     'assets/retention-analytics.js?v=20261014-retention',
     'assets/vendor/jszip-3.10.1.min.js',
     'assets/bulk-files.js?v=20261020-bulk',
-    'assets/bulk-screening.js?v=20261020-bulk',
+    'assets/bulk-screening.js?v=20261020-progress',
     'assets/app.js?v=20261020-bulk-reload'
   ];
   const parked = document.createDocumentFragment();

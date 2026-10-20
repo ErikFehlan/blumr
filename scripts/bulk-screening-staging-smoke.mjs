@@ -79,5 +79,5 @@ finally{
  try{await f.cleanup();await f.sql('update public.screening_feature_config set enabled=false');report.cleanup_passed=true;}catch(e){report.cleanup_passed=false;originalError??=e;}
  await mkdir('test-results/bulk-screening',{recursive:true});await writeFile('test-results/bulk-screening/staging.json',JSON.stringify(report,null,2));
 }
-if(originalError)throw originalError;
 console.log(JSON.stringify(report));
+if(originalError)throw originalError;

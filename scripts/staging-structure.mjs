@@ -23,6 +23,24 @@ export function capacityExpectations(sql) {
  return expected;
 }
 export const normalizeStructure=value=>value.replaceAll('\r\n','\n').replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
+// Check each bulk override against its exact source and intended caller class.
+// This is not an exemption for changed legacy intake or export functions.
+export function bulkScreeningExpectations(sql){
+ const members=new Set(['screening_capabilities','resume_content_hash','create_screening_batch','prepare_screening_upload','update_screening_item','seal_screening_batch','bulk_screening_source','bulk_screening_page','select_screening_finalists','screening_batch_snapshot','get_account_export']);
+ const workers=new Set(['save_bulk_screening_page','reserve_screening_ai','record_screening_ai_usage','next_screening_batches','begin_assessment_provider']);
+ const internal=new Set(['require_screening_batch','screening_finalist_input','resume_intake_input','enqueue_resume_intake','enqueue_job_reassessments','intake_source_changed']);
+ const expected=new Map(),pattern=/create or replace function public\.(\w+)\(([^)]*)\) returns (?:public\.)?(\w+)\s+language (sql|plpgsql)\s+(?:(immutable|stable|volatile)\s+)?(?:(?:parallel safe)\s+)?(?:security (definer|invoker)\s+)?set search_path='' as \$\$([\s\S]*?)\$\$;/g;
+ for(const [,name,args,result,language,volatility,security,body] of sql.matchAll(pattern)){
+  if(!members.has(name)&&!workers.has(name)&&!internal.has(name))throw Error('Unexpected bulk screening routine');
+  const parameters=args?args.split(',').map(arg=>{const p=arg.trim().match(/^(\w+) (uuid(?:\[\])?|text|jsonb|numeric|integer)(?: default (null|\d+|'Job priorities changed'))?$/);if(!p)throw Error('Unsupported bulk screening argument');return p;}):[];
+  const defaults=parameters.filter(p=>p[3]!==undefined).map(p=>p[3]==='null'?'NULL::'+p[2]:p[2]==='text'?p[3]+'::text':p[3]);
+  const key='function:'+name+'('+parameters.map(p=>p[2]).join(',')+')';if(expected.has(key))throw Error('Duplicate bulk screening routine');
+  expected.set(key,{body,language,result,setof:false,args:parameters.map(p=>p[1]+' '+p[2]).join(', '),defaults:defaults.join(', ')||null,
+   admin:members.has(name),securityDefiner:security==='definer',volatility:volatility==='immutable'?'i':volatility==='stable'?'s':'v'});
+ }
+ if(expected.size!==members.size+workers.size+internal.size||(sql.match(/create or replace function/gi)||[]).length!==expected.size)throw Error('Bulk screening declarations incomplete');
+ return expected;
+}
 export function retentionExpectations(sql){
  const expected=knowledgeExpectations(sql,['get_actionable_notifications','onboarding_reminder_target','onboarding_step']);
  for(const [key,value] of expected)value.admin=key==='function:get_actionable_notifications(uuid)';

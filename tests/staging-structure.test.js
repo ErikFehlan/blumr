@@ -112,3 +112,16 @@ test('priority draft and review routines must match source and restricted caller
  assert.deepEqual(structuralDifferences([],stage,expected),['function:attach_hiring_priority_draft()']);
  assert.throws(()=>priorityExpectations(sql.replace('attach_hiring_priority_draft() returns','unlisted_priority() returns')));
 });
+
+test('bulk deployment overrides must match exact source and keep internal helpers private',async()=>{
+ const {bulkScreeningExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261020115320_bulk_screening_workflow.sql','utf8'),expected=bulkScreeningExpectations(sql);
+ assert.equal(expected.size,22);
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:false,args:e.args,defaults:e.defaults,security_definer:e.securityDefiner,volatility:e.volatility,config:['search_path=""'],clients_denied:!e.admin,worker_allowed:!e.private,anon_denied:true,authenticated_allowed:e.admin}}));
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ stage.find(r=>r.name==='resume_intake_input(uuid)').routine.clients_denied=false;
+ assert.deepEqual(structuralDifferences([],stage,expected),['function:resume_intake_input(uuid)']);
+ stage.find(r=>r.name==='begin_assessment_provider(uuid,uuid)').routine.source='old provider without batch fence';
+ assert.ok(structuralDifferences([],stage,expected).includes('function:begin_assessment_provider(uuid,uuid)'));
+ assert.throws(()=>bulkScreeningExpectations(sql.replace('reserve_screening_ai(p_lease','unexpected_reservation(p_lease')));
+});

@@ -16,6 +16,8 @@ create table if not exists public.screening_batches(
  foreign key(job_id,workspace_id) references public.jobs(id,workspace_id) on delete cascade,
  unique(id,job_id,workspace_id)
 );
+drop trigger if exists preserve_record_creator on public.screening_batches;
+create trigger preserve_record_creator before update of created_by on public.screening_batches for each row execute function public.preserve_record_creator();
 alter table public.screening_batches add column if not exists worker_requested_at timestamptz;
 alter table public.screening_batches add column if not exists worker_claimed_at timestamptz;
 create index if not exists screening_batches_job on public.screening_batches(workspace_id,job_id,created_at desc);
@@ -487,4 +489,6 @@ begin
  if tg_op='DELETE' then return old;end if;return new;
 end $$;
 
+-- Preserve the existing trusted-worker access while denying all client callers.
+grant execute on function public.require_screening_batch(uuid),public.screening_finalist_input(uuid),public.resume_intake_input(uuid),public.enqueue_resume_intake(uuid),public.enqueue_job_reassessments(uuid,uuid,text),public.intake_source_changed() to service_role;
 commit;

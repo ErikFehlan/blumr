@@ -1,5 +1,6 @@
 \set ON_ERROR_STOP on
 \ir durable-worker-recovery.sql
+create function public.preserve_record_creator() returns trigger language plpgsql as $$begin return new;end$$;
 create function auth.role() returns text language sql stable as $$select coalesce(nullif(current_setting('test.role',true),''),'authenticated')$$;
 create table public.ai_model_rates(model text primary key,input_usd_per_million numeric,cached_input_usd_per_million numeric,output_usd_per_million numeric,updated_at timestamptz default now());
 grant select on public.ai_model_rates to service_role;
