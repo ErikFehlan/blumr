@@ -85,6 +85,8 @@ do $$declare b uuid:='b0000000-0000-0000-0000-000000000001';s jsonb;rows jsonb;i
  if (select actual_usd from screening_ai_charges where lease_id=lease)<>0.001225 then raise exception 'Cache-write cost was omitted';end if;
  perform end_assessment_provider(lease,call);
  if reserve_screening_ai(lease,'test-model',300000,16000)->>'code'<>'screening_budget_limit' then raise exception 'Batch budget exceeded';end if;
+ -- Exercise the terminal failure after the existing worker's bounded retries.
+ update resume_intake_tasks set attempts=3 where candidate_id=cid;
  perform finish_resume_intake(cid,rev,lease,null,'screening_budget_limit');
  if screening_batch_snapshot(b)#>>'{candidates,0,assessment,status}'<>'failed' then raise exception 'Budget failure lost';end if;
  perform select_screening_finalists(b,array[cid],s->>'sourceVersion',1);
