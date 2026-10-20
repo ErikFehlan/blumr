@@ -7,7 +7,7 @@ const {mixedFiles}=require('../tests/fixtures/mixed-screening-resumes.cjs');
 const root=path.resolve(__dirname,'..');
 const normalized=s=>s.toLowerCase().replace(/\s+/g,' ').trim();
 async function openBrowser({f,user,report={}}={}){
- const saved=new Map(),requests=[],errors=[],workers=new Set();let peakWorkers=0,batch,interrupted=false,interruptPath;
+ const saved=new Map(),requests=[],errors=[],workers=new Set();let peakWorkers=0,batch,interrupted=false,interruptPath,uploadRestored=false;
  const bridgeErrors=[];
  const server=http.createServer(async(req,res)=>{
   try{
@@ -18,6 +18,9 @@ async function openBrowser({f,user,report={}}={}){
     res.setHeader('Content-Type','application/json');
     if(url.pathname.startsWith('/storage/v1/object/resumes/')&&req.method==='POST'){
      const key=decodeURIComponent(url.pathname.slice('/storage/v1/object/resumes/'.length));
+     // Chromium may retry a closed socket without surfacing an error. Keep this
+     // one object's transport offline until the explicit reload/retry phase.
+     if(key===interruptPath&&!uploadRestored){req.socket.destroy();return;}
      // The first file commits to Storage but loses its HTTP response. Retrying
      // must reuse the object and finish the document, without duplicating it.
      const response=await f.upload(user,key,raw,req.headers['content-type'],false,true),status=response.status;
@@ -60,7 +63,7 @@ async function openBrowser({f,user,report={}}={}){
  if(!f)await page.route('**/assets/data.js*',r=>r.fulfill({contentType:'application/javascript',body:`window.AncalagonData={create:()=>({load:async()=>({jobs:[],candidates:[],feedback:[],interviewOutcomes:[]}),schedule:(_,__,done)=>done('saved'),flush:async()=>{},trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin')},screeningCapabilities:async()=>({enabled:false})})};`}));
  await page.route('**/assets/resume-intake.js*',r=>r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,'assets/resume-intake.js'),'utf8')+';{const original=window.AncalagonIntake.create;window.AncalagonIntake.create=api=>{window.testExtractLocalResume=api.extract;return original(api);};}'}));
  try{await page.goto(origin,{waitUntil:'domcontentloaded',timeout:120000});await page.waitForFunction(()=>typeof window.testExtractLocalResume==='function',{},{timeout:90000});}catch(e){console.error('Browser startup errors: '+JSON.stringify(errors));await browser.close();server.close();throw e;}
- return {page,saved,requests,errors,bridgeErrors,get batch(){return batch;},get interrupted(){return interrupted;},get interruptPath(){return interruptPath;},get workers(){return {peak:peakWorkers,remaining:workers.size};},async close(){await browser.close();await new Promise(resolve=>server.close(resolve));}};
+ return {page,saved,requests,errors,bridgeErrors,restoreUpload(){uploadRestored=true;},get batch(){return batch;},get interrupted(){return interrupted;},get interruptPath(){return interruptPath;},get workers(){return {peak:peakWorkers,remaining:workers.size};},async close(){await browser.close();await new Promise(resolve=>server.close(resolve));}};
 }
 async function parserPreflight(count=50){
  const b=await openBrowser();
@@ -100,6 +103,7 @@ async function importMixed({f,user,report,count=500}){
   assert.equal(unfinished.items.filter(i=>i.status==='failed').length,4);
   // Reload proves that recovery is driven by the durable server manifest.
   await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('[data-bulk-resume-files]').waitFor();
+  b.restoreUpload();
   await page.locator('[data-bulk-resume-files]').setInputFiles(upload);
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Some files need attention'),{},{timeout:180000});
   assert.equal(b.saved.size,count,'Retry lost or duplicated a document');
