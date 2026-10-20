@@ -604,6 +604,8 @@
         open:(c,force=false)=>{if(!c||c.jobId!==activeJobId)return;
           if(force||root.querySelector('#page-candidates').classList.contains('active')){openDetail(c.id);refreshIntakeCandidate(c);}}
       });
+      const bulk=window.BlumrBulkScreening.mount({root,data:()=>dataService,job:activeJob,extract:extractLocalResume,toast:showToast,review:async(id,revision)=>{const service=dataService,g=workspaceGeneration,job=activeJobId;await flushCriticalState();await service.reviewResumeIntake(id,revision,stateSnapshot());const remote=await service.load();if(g!==workspaceGeneration)return;hydrateState({...remote,activeJobId:job});renderInitialState();openDetail(id);}});
+      const addResumeFiles=files=>bulk.isBulk()?bulk.add(files):batch.add(files);
       const batch=window.AncalagonRecruiter.createBatch({job:activeJob,workspace:()=>window.ancalagonAuth?.workspace?.id,
         upload:(file,options)=>intake.upload(file,options),release:id=>intake.releaseFile(id),toast:showToast,changed:renderRecruiterQueue});
       function renderRecruiterQueue(){
@@ -622,12 +624,12 @@
         if(open){const candidate=candidateForRef(open.dataset.batchOpen);if(candidate)homeOpen(candidate.jobId,candidate.id,'detail');return;}
         if(retry)batch.retry(retry.dataset.batchRetry);if(dismiss)batch.dismiss(dismiss.dataset.batchDismiss);
       });
-      root.querySelector('#resumeUpload').addEventListener('change',event=>{const files=Array.from(event.target.files||[]);event.target.value='';if(files.length)batch.add(files);});
+      root.querySelector('#resumeUpload').addEventListener('change',event=>{const files=Array.from(event.target.files||[]);event.target.value='';if(files.length)addResumeFiles(files);});
       root.querySelector('#detailAddCandidates').addEventListener('click',openAddCandidate);
       const drop=root.querySelector('#resumeDropZone');
       drop.addEventListener('dragover',event=>{event.preventDefault();drop.classList.add('dragging');});
       drop.addEventListener('dragleave',()=>drop.classList.remove('dragging'));
-      drop.addEventListener('drop',event=>{event.preventDefault();drop.classList.remove('dragging');if(event.dataTransfer.files?.length)batch.add(event.dataTransfer.files);});
+      drop.addEventListener('drop',event=>{event.preventDefault();drop.classList.remove('dragging');if(event.dataTransfer.files?.length)addResumeFiles(event.dataTransfer.files);});
       const assessmentMemory=window.BlumrAssessmentMemory.create({
         root,jobs:()=>jobs,job:activeJob,workspace:()=>dataReady?window.ancalagonAuth?.workspace?.id:null,
         ready:()=>!!dataService?.loadAssessmentLessons,load:()=>dataService.loadAssessmentLessons(),
@@ -851,6 +853,7 @@ function renderJobs(){
         }
         const navigation=navigationToken??focusUI.begin();if(name!=='detail')window.AncalagonWorkspace?.leave();intake.render();
         if(jobs.length&&!['home','jobs','job-picker','learn','backend','admin-tools','admin-usage','detail'].includes(name))recalibrateAll();if(name==='jobs')renderJobs();
+        if(name==='candidates')void bulk.open();
         if(name==='feedback')renderFeedback();
         if(name==='admin-tools')void adminTools.open();if(name==='backend'&&dataService)void refreshPersonalUsage();
         if(name==='learn')tutorial?.open();if(name==='home'){renderHome();void home?.refresh();}if(name==='job-picker')renderJobPicker();if(name==='dashboard')void jobReview.refresh();
@@ -938,7 +941,7 @@ function renderJobs(){
         });
         trackProductEvent('signed_in',null);
         loadAdminUsage();
-        window.ancalagonFlush=async()=>{try{if(jobWizard.hasFiles()||batch.hasUnsaved()||intake.hasUnsavedFile())throw Error('Wait for the resume uploads to finish or remove failed files from the upload queue.');await window.AncalagonWorkspace?.flushNotes();await dataService.flush(stateSnapshot());await home?.flush();await tutorial?.flush();await settings?.flush();}catch(error){setSyncStatus('error');showToast('Your latest changes have not saved. Retry before signing out.','error');throw error;}};
+        window.ancalagonFlush=async()=>{try{if(jobWizard.hasFiles()||batch.hasUnsaved()||bulk.hasUnsaved()||intake.hasUnsavedFile())throw Error('Wait for the resume uploads to finish or remove failed files from the upload queue.');await window.AncalagonWorkspace?.flushNotes();await dataService.flush(stateSnapshot());await home?.flush();await tutorial?.flush();await settings?.flush();}catch(error){setSyncStatus('error');showToast('Your latest changes have not saved. Retry before signing out.','error');throw error;}};
         jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;
         const workspaceLoadStarted=performance.now();
         try{
@@ -949,7 +952,7 @@ function renderJobs(){
             hybridState.analyses=Object.fromEntries(remote.jobs.filter(job=>job.patternAnalysis).map(job=>[job.id,job.patternAnalysis]));
           }
           dataReady=true;
-          renderInitialState();openReminderLink();void home.load();void tutorial.load();void guidance.load();setSyncStatus('saved');candidateAutomation.resume(candidates);intake.resume();
+          renderInitialState();openReminderLink();void home.load();void tutorial.load();void guidance.load();setSyncStatus('saved');candidateAutomation.resume(candidates);intake.resume();void bulk.init();
         }catch(error){
           recordReliability('database','supabase','workspace_load','error',error?.code||error?.name||'load_failed',performance.now()-workspaceLoadStarted);
           console.error('Workspace initialization failed',error);
@@ -977,7 +980,7 @@ function renderJobs(){
       root.querySelector('#retrySync').addEventListener('click',retrySync);
       window.addEventListener('offline',()=>setSyncStatus('offline'));
       window.addEventListener('online',retrySync);
-      window.addEventListener('beforeunload',event=>{if(settings?.view().dirty||tutorial?.hasPending()||dataService?.hasPendingChanges?.()||window.AncalagonWorkspace?.hasDrafts()||intake.hasUnsavedFile()||batch.hasUnsaved()){event.preventDefault();event.returnValue=''}});
+      window.addEventListener('beforeunload',event=>{if(settings?.view().dirty||tutorial?.hasPending()||dataService?.hasPendingChanges?.()||window.AncalagonWorkspace?.hasDrafts()||intake.hasUnsavedFile()||batch.hasUnsaved()||bulk.hasUnsaved()){event.preventDefault();event.returnValue=''}});
       root.addEventListener('click',event=>{const action=event.target.closest('[data-empty-action]')?.dataset.emptyAction;if(action==='new'){showPage('jobs');openJobForm();}if(action==='upload'){showPage('candidates');root.querySelector('#resumeUpload').focus();}});
       root.querySelectorAll('[data-new-job]').forEach(b=>b.addEventListener('click',()=>{showPage('jobs');openJobForm();}));
       root.querySelector('#recordCandidateOutcome').addEventListener('click',()=>{const id=root.querySelector('#reviewCandidateId').value;showPage('outcomes');root.querySelector('#outcomeCandidate').value=id;root.querySelector('#outcomeStage').focus();});
@@ -1157,7 +1160,7 @@ function renderJobs(){
           if(creating)trackProductEvent('job_created');
           delete form.dataset.pendingCreate;resetJobForm();
           showPage(creating?'candidates':'dashboard');
-          if(creating){trackProductEvent('job_opened',activeJobId,{entry:entryMode,resumes_selected:quickFiles.length});if(quickFiles.length)batch.add(quickFiles);else root.querySelector('#resumeUpload').focus();}
+          if(creating){trackProductEvent('job_opened',activeJobId,{entry:entryMode,resumes_selected:quickFiles.length});if(quickFiles.length)addResumeFiles(quickFiles);else root.querySelector('#resumeUpload').focus();}
         }catch(error){
           jobWizard.status('Your job has not saved yet. Your inputs are still here. Select Create job or Save job changes to retry.',true);console.error('Job save failed',error);
           setSyncStatus('error',error.message||'Job save failed');
@@ -1167,7 +1170,7 @@ function renderJobs(){
         }
       });
       window.addEventListener('ancalagon:auth-ready',event=>initializeWorkspace(event.detail),{once:true});
-      window.addEventListener('ancalagon:auth-cleared',()=>{activationRecorded.clear();delete root.querySelector('#jobForm').dataset.saving;jobWizard.scope(null);root.querySelector('#jobForm').reset();root.querySelector('#resumeUploadRecovery')?.remove();window.BlumrHiringPriorities?.clear(root);assessmentMemory.clear();workspaceGeneration++;dataReady=false;feedbackImpact.render();workspaceLoading=false;adminRequest++;setAdminAccess(false);settings?.clear();jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;home?.dispose();tutorial?.dispose();guidance?.dispose();root.querySelectorAll('.rf-guidance-slot,#guidanceSettings').forEach(el=>{el.replaceChildren();delete el.dataset.guidanceMarkup;delete el.dataset.markup;});root.querySelector('#personalUsage').textContent='';});
+      window.addEventListener('ancalagon:auth-cleared',()=>{bulk.clear();activationRecorded.clear();delete root.querySelector('#jobForm').dataset.saving;jobWizard.scope(null);root.querySelector('#jobForm').reset();root.querySelector('#resumeUploadRecovery')?.remove();window.BlumrHiringPriorities?.clear(root);assessmentMemory.clear();workspaceGeneration++;dataReady=false;feedbackImpact.render();workspaceLoading=false;adminRequest++;setAdminAccess(false);settings?.clear();jobs.splice(0);candidates.splice(0);feedback.splice(0);interviewOutcomes.splice(0);activeJobId=null;home?.dispose();tutorial?.dispose();guidance?.dispose();root.querySelectorAll('.rf-guidance-slot,#guidanceSettings').forEach(el=>{el.replaceChildren();delete el.dataset.guidanceMarkup;delete el.dataset.markup;});root.querySelector('#personalUsage').textContent='';});
       document.documentElement.dataset.blumrReady='true';
       window.dispatchEvent(new CustomEvent('blumr:ui-ready'));
       if(window.ancalagonAuth?.session)initializeWorkspace(window.ancalagonAuth);

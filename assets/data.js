@@ -48,7 +48,7 @@
     }
 
     async function load() {
-      const [jobRows, candidateRows, feedbackRows, outcomeRows, benchmarkRows, screeningRows, reviewRows, priorityRows] = await Promise.all([
+      const [jobRows, candidateRows, feedbackRows, outcomeRows, benchmarkRows, screeningRows, reviewRows, priorityRows, managedRows] = await Promise.all([
         query('jobs', 'id,title,client,description,manager_feedback,priority_draft_id,priority_draft_edits,criteria,knockouts,weights,pattern_analysis,status,close_reason,closed_at,hired_candidate_id,created_at,updated_at'),
         query('candidates', 'id,job_id,name,role,stage,resume_jd_score,jd_score,original_manager_score,manager_score,confidence,recommendation,primary_signal,strengths,concerns,tags,screening_questions,created_at,updated_at'),
         query('manager_feedback', 'id,job_id,candidate_id,feedback_type,outcome,feedback_text,created_at,updated_at'),
@@ -56,7 +56,8 @@
         query('candidate_benchmarks', 'job_id,candidate_id'),
         query('screening_insights', 'id,job_id,candidate_id,can_do_job,culture_working_style_fit,notes,resulting_jd_score,resulting_manager_score,assessment_summary,assessment_source,source_updated_at,created_at,previous_jd_score,previous_manager_score'),
         query('candidate_assessments', 'id,job_id,candidate_id,assessment_type,evidence,created_at,updated_at'),
-        query('job_criteria_tasks','job_id,priority_suggestions,priority_review,priority_version')
+        query('job_criteria_tasks','job_id,priority_suggestions,priority_review,priority_version'),
+        screeningCapabilities().then(c=>c?.enabled?query('screening_managed_candidates','candidate_id'):[]).catch(()=>[])
       ]);
       const benchmarkIds = new Set(benchmarkRows.map(row => row.candidate_id));
       const screeningByCandidate = new Map(screeningRows.sort((a, b) => epoch(a.created_at) - epoch(b.created_at)).map(row => [row.candidate_id, row]));
@@ -77,7 +78,7 @@
           const screening = screeningByCandidate.get(row.id);
           const review = reviewByCandidate.get(row.id);
           return {
-            id: row.id, jobId: row.job_id, name: row.name, short: row.name, role: row.role || '',
+            id: row.id, jobId: row.job_id, name: row.name, short: row.name, role: row.role || '', screeningManaged:managedRows.some(m=>m.candidate_id===row.id),
             initials: row.name.split(/\s+/).map(x => x[0]).join('').slice(0, 2).toUpperCase(), stage: row.stage,
             score: Number(row.jd_score ?? row.resume_jd_score ?? 0), resumeJDScore: Number(row.resume_jd_score ?? row.jd_score ?? 0),
             jdScore: Number(row.jd_score ?? 0), originalManagerScore: Number(row.original_manager_score ?? row.manager_score ?? 0),
@@ -509,6 +510,16 @@
       return data;
     }
 
+    const bulkRPC=async(name,args={})=>{const {data,error}=await client.rpc(name,args);if(error)throw error;return data;};
+    const screeningCapabilities=()=>bulkRPC('screening_capabilities');
+    async function listScreeningBatches(jobId){const {data,error}=await client.from('screening_batches').select('id,created_at,sealed,selected_ids').eq('workspace_id',workspaceId).eq('job_id',jobId).order('created_at',{ascending:false}).limit(50);if(error)throw error;return data||[];}
+    const createScreeningBatch=(id,job,manifest,budget)=>bulkRPC('create_screening_batch',{p_id:id,p_job:job,p_manifest:manifest,p_budget:budget});
+    const prepareScreeningUpload=(batch,ordinal,text)=>bulkRPC('prepare_screening_upload',{p_batch:batch,p_ordinal:ordinal,p_text:text});
+    const updateScreeningItem=(batch,ordinal,status)=>bulkRPC('update_screening_item',{p_batch:batch,p_ordinal:ordinal,p_status:status});
+    const sealScreeningBatch=batch=>bulkRPC('seal_screening_batch',{p_batch:batch});
+    const selectScreeningFinalists=(batch,ids,source,version)=>bulkRPC('select_screening_finalists',{p_batch:batch,p_ids:ids,p_source:source,p_version:version});
+    async function refreshScreeningBatch(batch,refresh=true){const {data,error}=await client.functions.invoke('analyze-patterns-beta',{body:{analysis_type:'bulk_screening',workspace_id:workspaceId,batch_id:batch,action:refresh?'refresh':'status'}});if(error)throw Error('Screening is temporarily unavailable. Saved progress is retained.');return data;}
+
     async function requestResumeIntake(candidateId,retry=false) {
       return monitored('database','resume','request_resume_intake',async()=>{
         const {error}=await client.rpc('request_resume_intake',{p_candidate:candidateId,p_retry:retry});
@@ -599,7 +610,7 @@
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { loadRetentionSummary, saveRetentionCohort, recordComparison, loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, loadResumeDocument, workspaceId };
+    return { screeningCapabilities, listScreeningBatches, createScreeningBatch, prepareScreeningUpload, updateScreeningItem, sealScreeningBatch, selectScreeningFinalists, refreshScreeningBatch, loadRetentionSummary, saveRetentionCohort, recordComparison, loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, loadResumeDocument, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };

@@ -2,7 +2,7 @@
   'use strict';
   const normalize=s=>String(s||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
   const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const pending=c=>!!c?.resumeIntake&&!c.resumeIntake.reviewedAt&&!c.aiReview;
+  const pending=c=>Boolean(c?.screeningManaged&&!c.aiReview)||!!c?.resumeIntake&&!c.resumeIntake.reviewedAt&&!c.aiReview;
   function fileReadError(error,type){
     if(type==='pdf'&&(error?.name==='PasswordException'||/password required|no password given/i.test(error?.message||'')))
       return new Error('This PDF is password protected. Upload an unlocked copy.');

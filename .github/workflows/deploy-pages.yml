@@ -37,6 +37,8 @@ jobs:
           node --check assets/job-wizard.js
           node --check assets/job-intake-code.js
           node --check assets/app.js
+          node --check assets/bulk-files.js
+          node --check assets/bulk-screening.js
           node --check assets/search-flow.js
           node --check assets/guidance.js
           node --check assets/settings.js
@@ -98,6 +100,7 @@ jobs:
           node tests/job-review-browser.cjs
           node tests/hiring-priorities-browser.cjs
           node tests/resume-intake-browser.cjs
+          node tests/bulk-screening-browser.cjs
           CAPTURE_UI=1 node tests/retention-browser.cjs
           node tests/streamline-browser.cjs
           node tests/guided-experience-browser.cjs
@@ -122,6 +125,7 @@ jobs:
             test-results/retention-*.png
             test-results/assessment-memory/*.png
             test-results/hiring-priorities/*.png
+            test-results/bulk-screening/*.png
           if-no-files-found: ignore
 
   prepare-home:

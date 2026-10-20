@@ -5,7 +5,7 @@
     'assets/job-intake-code.js?v=20261002-guided-experience',
     'assets/job-wizard.js?v=20261016-priorities',
     'assets/hiring-priorities.js?v=20261016-priorities',
-    'assets/data.js?v=20261016-priorities',
+    'assets/data.js?v=20261020-bulk',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20261014-decisions',
     'assets/evidence.js?v=20260911-quick-feedback',
@@ -40,7 +40,10 @@
     'assets/guidance.js?v=20260916-polish',
     'assets/search-flow.js?v=20260918-home-panels',
     'assets/retention-analytics.js?v=20261014-retention',
-    'assets/app.js?v=20261016-priorities'
+    'assets/vendor/jszip-3.10.1.min.js',
+    'assets/bulk-files.js?v=20261020-bulk',
+    'assets/bulk-screening.js?v=20261020-bulk',
+    'assets/app.js?v=20261020-bulk'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
