@@ -28,6 +28,7 @@
    const job=api.job(),service=api.data(),g=generation,budget=Number(host.querySelector('[data-bulk-budget]')?.value||5);
    if(!job||job.status==='closed'){api.toast('Choose an open job.','error');return;}
    if(uploads?.running){api.toast('Wait for this batch to finish uploading.','error');return;}
+   const run={id:null,job:job.id,service,g,work:[],running:true};uploads=run;
    status('Preparing your import…');
    try{
     const entries=await global.BlumrBulkFiles.expand(files);if(!current(g))return;
@@ -39,18 +40,18 @@
     }else{
      id=crypto.randomUUID();work=entries.map((entry,ordinal)=>({entry,ordinal,state:'pending'}));
      await service.createScreeningBatch(id,job.id,entries.map(({name,size})=>({name,size})),budget);
-     if(!current(g))return;list.unshift({id,created_at:new Date().toISOString()});batchId=id;snapshot=null;dirty=false;selected=[];
+     if(!current(g))return;if(jobId===job.id){list.unshift({id,created_at:new Date().toISOString()});batchId=id;snapshot=null;dirty=false;selected=[];}
     }
-    const run={id,job:job.id,service,g,work,running:true};uploads=run;status('Import saved. Reading resumes…');
+    Object.assign(run,{id,work});if(jobId===job.id&&batchId===id)status('Import saved. Reading resumes…');
     let lastRefresh=0;
     for(const item of work){
      if(!current(g))break;
      try{
-      item.state='reading';status('Reading '+item.entry.name);
+      item.state='reading';if(jobId===job.id&&batchId===id)status('Reading '+item.entry.name);
       const file=await item.entry.load(),extracted=await api.extract(file,text=>{if(current(g)&&batchId===id)status(text);});
       const text=typeof extracted==='string'?extracted:extracted?.text;
       if(!current(g))break;
-      item.state='saving';status('Saving '+item.entry.name);
+      item.state='saving';if(jobId===job.id&&batchId===id)status('Saving '+item.entry.name);
       const prepared=await service.prepareScreeningUpload(id,item.ordinal,text);
       if(!current(g))break;
       if(!prepared.stored)await service.uploadResume({id:prepared.candidate_id,jobId:job.id,resumeIntake:{hash:prepared.hash}},file,text);
@@ -68,7 +69,7 @@
      try{await service.sealScreeningBatch(id);}catch{/* Failed/unselected files remain explicitly unfinished. */}
      if(batchId===id){await refresh();status(work.some(i=>i.state==='failed')?'Some files need attention. Retry their originals or explicitly exclude them.':'Files saved. Screening continues in the background.');}
     }
-   }catch(e){if(current(g))status(e.message||'Import could not start.');}
+   }catch(e){if(current(g)&&jobId===job.id)status(e.message||'Import could not start.');}finally{run.running=false;}
   }
   function evidence(result){return (result?.findings||[]).map(f=>'<li><strong>'+esc(f.title)+'</strong> · '+esc(f.status)+' · weight '+esc(f.weight)+(f.evidence||[]).slice(0,2).map(e=>'<blockquote>'+esc(e.quote)+'</blockquote>').join('')+'</li>').join('');}
   function row(c,index,deep=false){const id=c.candidateId,r=c.assessment?.result;return '<li class="rf-bulk-candidate"><div class="rf-bulk-row"><strong>'+esc(index+1)+'. '+esc(r?.name&&r.name!=='Candidate'?r.name:c.name)+'</strong><span>'+ (deep?'JD '+Number(r.score).toFixed(1)+' · Manager '+Number(r.manager_score).toFixed(1):'Evidence '+Number(c.score).toFixed(1)+'/100 · '+esc(c.requiredStatus))+'</span></div>'+
