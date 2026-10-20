@@ -13,6 +13,12 @@ test('ZIP guard rejects traversal, unsupported exports, forged expansion, encryp
  for(const mutate of [b=>{b[b.length-22]=0;},b=>{const p=b.findIndex((_,i)=>b[i]===0x50&&b[i+1]===0x4b&&b[i+2]===1&&b[i+3]===2);new DataView(b.buffer).setUint32(p+24,11*1024*1024,true);},b=>{b[6]|=1;}]){const bad=bytes.slice();mutate(bad);assert.throws(()=>inspectZip(bad));}
  const unsupported=await archive([['bad.exe','not a resume']]);assert.throws(()=>inspectZip(unsupported));
 });
+test('ZIP files retain an allowed multipart MIME type and unchanged original bytes',async()=>{
+ const types={pdf:'application/pdf',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',txt:'text/plain'};
+ const original=Uint8Array.from([0,1,127,128,255]),zip=new Zip();for(const extension of Object.keys(types))zip.file('applications/Resume.'+extension.toUpperCase(),original);
+ const bytes=await zip.generateAsync({type:'uint8array'}),entries=await expand([new File([bytes],'Applications.zip')],{zip:Zip});
+ for(const entry of entries){const file=await entry.load(),form=new FormData();form.append('',file);assert.equal(form.get('').type,types[file.name.split('.').pop().toLowerCase()]);assert.deepEqual(new Uint8Array(await form.get('').arrayBuffer()),original);}
+});
 test('manifest limits cover 20, 100, 500 and 1000 files without inflating every file',async()=>{
  for(const count of [20,100,500,1000]){const bytes=await archive(Array.from({length:count},(_,i)=>[`${i}.txt`,'Owned manual testing for billing systems.']));const files=await expand([new File([bytes],'batch.zip')],{zip:Zip});assert.equal(files.length,count);}
  const files=Array.from({length:1001},(_,i)=>new File(['resume'],i+'.txt'));await assert.rejects(()=>expand(files,{zip:Zip}),/1,000/);

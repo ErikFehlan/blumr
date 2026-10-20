@@ -31,7 +31,9 @@
   stream.on('data',chunk=>{if(failed)return;size+=chunk.length;if(size>meta.size||size>MAX_FILE){failed=true;stream.pause();reject(Error('ZIP expanded beyond its declared size.'));return;}
    for(const byte of chunk)crc=crcTable[(crc^byte)&255]^(crc>>>8);chunks.push(chunk);
   }).on('error',reject).on('end',()=>{if(failed)return;if(size!==meta.size||((crc^0xffffffff)>>>0)!==meta.crc){reject(Error('ZIP resume failed its integrity check.'));return;}
-   resolve(new File(chunks,meta.name.split('/').pop(),{type:''}));}).resume();
+   const name=meta.name.split('/').pop(),extension=name.split('.').pop().toLowerCase();
+   const type={pdf:'application/pdf',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',txt:'text/plain'}[extension];
+   resolve(new File(chunks,name,{type}));}).resume();
  });}
  async function expand(files,{zip=global.JSZip}={}){
   const entries=[];let bytes=0;

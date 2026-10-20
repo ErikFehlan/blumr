@@ -106,6 +106,25 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
         run: node scripts/retention-live-check.mjs
+      - name: Enable approved rules screening after the verified live journey
+        id: screening_enable
+        if: steps.retention.outcome == 'success'
+        timeout-minutes: 3
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: node scripts/screening-rollout.mjs enable
+      - name: Verify production rules screening without paid analysis
+        id: screening
+        if: steps.screening_enable.outcome == 'success'
+        timeout-minutes: 4
+        run: node tests/screening-live-browser.cjs
+      - name: Restore the prior rollout state if activation or verification fails
+        if: always() && steps.screening_enable.outcome != 'skipped' && steps.screening_enable.outcome != '' && steps.screening.outcome != 'success'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: node scripts/screening-rollout.mjs rollback
       - name: Remove temporary accounts and documents
         id: cleanup
         if: always() && steps.fixtures.outcome != 'skipped' && steps.fixtures.outcome != ''
@@ -133,15 +152,17 @@ jobs:
           RECOVERY: ${{ steps.recovery.outcome }}
           CLEANUP: ${{ steps.cleanup.outcome }}
           RETENTION: ${{ steps.retention.outcome }}
+          SCREENING: ${{ steps.screening.outcome }}
         run: |
           node --input-type=module <<'JS'
           import {appendFile,readFile} from 'node:fs/promises';
-          const passed=process.env.READY==='true'&&process.env.JOURNEY==='success'&&process.env.DIRECT==='success'&&process.env.RECOVERY==='success'&&process.env.CLEANUP==='success'&&process.env.RETENTION==='success';
+          const passed=process.env.READY==='true'&&process.env.JOURNEY==='success'&&process.env.DIRECT==='success'&&process.env.RECOVERY==='success'&&process.env.CLEANUP==='success'&&process.env.RETENTION==='success'&&process.env.SCREENING==='success';
           let results;try{results=JSON.parse(await readFile('test-results/live/results.json','utf8'));}catch{}
           const text=['## Live blumr.io checks',passed?'**Passed, including cleanup.**':'**Not verified.** See the failed or skipped steps.',
             ...(results?.checks||[]).map(r=>'- '+r.check+': '+r.status),
             '','Scoped recovery drill: '+(process.env.RECOVERY||'not started')+'; full-project backup restore remains unverified.',
             '','Retention evidence: '+(process.env.RETENTION||'not started'),
+            '','Rules screening activation and live verification: '+(process.env.SCREENING||'not started'),
             '','Temporary account cleanup: '+(process.env.CLEANUP||'not started'),
             'Screenshots and results are in the live-blumr-results artifact.','',
             'Not covered: inbox delivery of confirmation/password-reset emails, handwriting, heavily degraded scans, or every browser/device.',

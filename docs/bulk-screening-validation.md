@@ -68,7 +68,7 @@ The final existing TXT staging run on `6321d2d` passed all three workflows, incl
 
 The remaining technical check connects the actual browser application, original PDF/DOCX/TXT files, ZIP extraction, OCR and authenticated staging persistence in a single mixed-document import. It includes two duplicates, damaged/blank files, an upload committed to Storage with a lost response, reload and retry, exact source-evidence retention, then the existing capped real Top 20 → Top 10 validation. Results will be recorded after the run completes.
 
-Production merge/deployment and enabling the feature remain pending deployment authorization. No deployment has been performed. Final rollout must use the current operational rates and workspace budgets; no bulk assessment starts merely because a resume is uploaded.
+The user explicitly approved deployment on October 20, 2026. Merge, production deployment and activation follow successful hosted validation. The live release enables both screening flags after the existing recruiter journey passes, then verifies a two-candidate rules-only import on the real custom domain, with rollback if activation or verification fails. Final rollout uses the current operational rates and workspace budgets; no bulk assessment starts merely because a resume is uploaded.
 
 ## Reproduction
 

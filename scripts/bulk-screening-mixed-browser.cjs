@@ -116,6 +116,6 @@ async function importMixed({f,user,report,count=500}){
   assert.equal(b.workers.remaining,0);assert.deepEqual(b.errors,[]);assert.deepEqual(b.bridgeErrors,[]);
   assert.equal(b.requests.filter(r=>r.path==='/rest/v1/rpc/request_resume_intake').length,0,'Bulk import entered legacy AI');
   return {batch:b.batch,rows,manifestCount:count+5};
- }finally{await b.close();}
+ }catch(error){report.mixed_failure={message:error.message,saved:b.saved.size,interrupted:b.interrupted,bridge_errors:b.bridgeErrors,page_errors:b.errors,failed_requests:b.requests.filter(r=>r.status>=400).slice(-20)};throw error;}finally{await b.close();}
 }
 module.exports.importMixed=importMixed;
