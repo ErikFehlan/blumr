@@ -27,6 +27,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
    });
    return summarizeBulkScreening({batch,items:batch.items,candidates:[...candidates.values()].filter(c=>batch.items.some(i=>i.status==='saved'&&i.candidate_id===c.candidateId)),source_current:true,cost:{provider_calls_reserved:deepCalls,reserved_usd:deepCalls*.02,actual_usd:deepCalls*.01,unsettled_calls:0,budget_usd:batch.budget_usd}});
   }
+  if(op==='budget'){assert.equal(args[0],batch.id);assert.ok(args[1]>=batch.budget_usd&&args[1]<=100);batch.budget_usd=args[1];return args[1];}
   if(op==='select'){assert.equal(batch.sealed,true);assert.ok(args[1].length<=20);batch.selected_ids=args[1];batch.selection_version++;for(const id of batch.selected_ids){const c=candidates.get(id);if(!c.assessment){c.assessment=assessment(c);deepCalls++;}}return batch.selection_version;}
   if(op==='text')return docs.get(args[0].id)||'';
   throw Error('Unexpected operation '+op);
@@ -48,7 +49,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.addInitScript(()=>{
    const rpc=async(op,...args)=>{const r=await fetch('/__bulk',{method:'POST',body:JSON.stringify({op,args})});const value=await r.json();if(!r.ok)throw Error(value.error);return value;};
    window.AncalagonData={create:()=>({load:()=>rpc('load'),requestResumeIntake:()=>rpc('legacy'),loadResumeIntakes:async()=>[],reviewResumeIntake:(...a)=>rpc('approve',...a),schedule:(_,__,done)=>done('saved'),flush:async()=>{},trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin');},
-    screeningCapabilities:async()=>({enabled:true}),listScreeningBatches:id=>rpc('list',id),createScreeningBatch:(...a)=>rpc('create',...a),prepareScreeningUpload:(...a)=>rpc('prepare',...a),updateScreeningItem:(...a)=>rpc('mark',...a),sealScreeningBatch:(...a)=>rpc('seal',...a),refreshScreeningBatch:(...a)=>rpc('refresh',...a),selectScreeningFinalists:(...a)=>rpc('select',...a),uploadResume:(c,f,t)=>rpc('upload',c,t,f.name),loadResumeText:c=>rpc('text',c),loadResumeDocument:async()=>null})};
+    screeningCapabilities:async()=>({enabled:true}),listScreeningBatches:id=>rpc('list',id),createScreeningBatch:(...a)=>rpc('create',...a),prepareScreeningUpload:(...a)=>rpc('prepare',...a),updateScreeningItem:(...a)=>rpc('mark',...a),sealScreeningBatch:(...a)=>rpc('seal',...a),refreshScreeningBatch:(...a)=>rpc('refresh',...a),selectScreeningFinalists:(...a)=>rpc('select',...a),updateScreeningBudget:(...a)=>rpc('budget',...a),uploadResume:(c,f,t)=>rpc('upload',c,t,f.name),loadResumeText:c=>rpc('text',c),loadResumeDocument:async()=>null})};
    window.ancalagonAuth={session:{user:{id:'test'},access_token:'test-token'},workspace:{id:'workspace'}};
   });
   await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#screeningMode').waitFor();
@@ -68,6 +69,11 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.locator('[data-bulk-refresh]').click();await page.waitForTimeout(150);
   assert.equal(await page.locator('[data-bulk-disclosure="near"]').evaluate(d=>d.open),true,'Refresh closed evidence review');
   assert.equal(await page.locator('[data-bulk-budget]').inputValue(),'1.25','Progress reset the chosen next-batch budget');
+  await page.locator('[data-bulk-current-budget]').fill('2.50');
+  await page.locator('[data-bulk-refresh]').click();await page.waitForTimeout(150);
+  assert.equal(await page.locator('[data-bulk-current-budget]').inputValue(),'2.50','Progress discarded a budget edit');
+  await page.locator('[data-bulk-save-budget]').click();await page.getByText('Budget saved. Save finalists to retry any blocked assessments.',{exact:true}).waitFor();
+  assert.equal(batch.budget_usd,2.5);assert.equal(deepCalls,0,'Raising a budget silently started AI');
   await page.locator('[data-bulk-start]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(deepCalls,20);
   await page.locator('[data-bulk-start]').click();await page.waitForTimeout(250);assert.equal(deepCalls,20,'Repeated shortlist created duplicate model calls');
   await page.locator('[data-bulk-resume]').first().click();await page.locator('dialog[open]').waitFor();assert.ok((await page.locator('[data-resume-text]').textContent()).length>40);await page.locator('dialog [data-close]').click();
@@ -97,6 +103,6 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
     return {documents:count,pdfs,docx:words,duration_ms:Math.round(performance.now()-started),scope:'Repeated synthetic parser fixtures; excludes upload, HTTP, ranking and AI'};
    },inputs);await page.waitForTimeout(100);assert.equal(pdfWorkers.size,0,'PDF workers leaked under volume');assert.ok(peakPdfWorkers<=2,'PDF workers grew with batch size');parsing.peak_pdf_workers=peakPdfWorkers;parsing.remaining_pdf_workers=pdfWorkers.size;
   }
-  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,job_switch_during_manifest:true,pdf_workers_released:true,legacy_calls:legacyCalls,pdf_docx_zip:true,parsing,passed:true}));
+  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,job_switch_during_manifest:true,pdf_workers_released:true,explicit_budget_update:true,legacy_calls:legacyCalls,pdf_docx_zip:true,parsing,passed:true}));
  }finally{await browser?.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

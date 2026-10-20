@@ -112,6 +112,21 @@ begin
  return p_id;
 end $$;
 
+-- A recruiter may explicitly raise a saved batch cap. This never queues work;
+-- selecting finalists again is the separate consent to retry failed analysis.
+create or replace function public.update_screening_budget(p_batch uuid,p_budget numeric) returns numeric
+language plpgsql security definer set search_path='' as $$
+declare b public.screening_batches;
+begin
+ b:=public.require_screening_batch(p_batch);
+ select * into b from public.screening_batches where id=p_batch for update;
+ if p_budget is null or p_budget not between 0.01 and 100 or p_budget<b.budget_usd then
+  raise exception 'Choose a budget at least as large as the current cap, up to $100.' using errcode='22023';
+ end if;
+ update public.screening_batches set budget_usd=p_budget where id=p_batch;
+ return p_budget;
+end $$;
+
 create or replace function public.prepare_screening_upload(p_batch uuid,p_ordinal integer,p_text text) returns jsonb
 language plpgsql security definer set search_path='' as $$
 declare b public.screening_batches;i public.screening_batch_items;c public.candidates;h text;k text;cid uuid;duplicate boolean:=false;
@@ -298,7 +313,7 @@ begin
   on conflict(candidate_id) do update set batch_id=excluded.batch_id,revision=excluded.revision;
   if exists(select from public.screening_managed_candidates where candidate_id=cid) then
    perform public.enqueue_resume_intake(cid);
-   update public.resume_intake_tasks set status='queued',attempts=0,error_code=null,next_run_at=now() where candidate_id=cid and status='failed' and error_code in ('screening_model_rate_missing','screening_not_enabled','usage_limit','ai_rate_limit','ai_unavailable');
+   update public.resume_intake_tasks set status='queued',attempts=0,error_code=null,next_run_at=now() where candidate_id=cid and status='failed' and error_code in ('screening_budget_limit','screening_model_rate_missing','screening_not_enabled','usage_limit','ai_rate_limit','ai_unavailable');
   end if;
  end loop;
  -- Retain the original rules ranking in the cache; this is a recruiter override.
@@ -389,8 +404,8 @@ $$;
 -- Private functions are never a second client write path around authorization.
 revoke all on function public.require_screening_batch(uuid),public.standard_resume_intake_input(uuid),public.resume_content_hash(text),public.screening_finalist_input(uuid),public.resume_intake_input(uuid),public.save_bulk_screening_page(uuid,text,jsonb,jsonb),public.reserve_screening_ai(uuid,text,integer,integer),public.record_screening_ai_usage(uuid,jsonb),public.next_screening_batches(uuid) from public,anon,authenticated;
 grant execute on function public.save_bulk_screening_page(uuid,text,jsonb,jsonb),public.reserve_screening_ai(uuid,text,integer,integer),public.record_screening_ai_usage(uuid,jsonb),public.next_screening_batches(uuid) to service_role;
-revoke all on function public.screening_capabilities(),public.create_screening_batch(uuid,uuid,jsonb,numeric),public.prepare_screening_upload(uuid,integer,text),public.update_screening_item(uuid,integer,text),public.seal_screening_batch(uuid),public.bulk_screening_source(uuid),public.bulk_screening_page(uuid,text,integer),public.select_screening_finalists(uuid,uuid[],text,integer),public.screening_batch_snapshot(uuid) from public,anon;
-grant execute on function public.screening_capabilities(),public.create_screening_batch(uuid,uuid,jsonb,numeric),public.prepare_screening_upload(uuid,integer,text),public.update_screening_item(uuid,integer,text),public.seal_screening_batch(uuid),public.bulk_screening_source(uuid),public.bulk_screening_page(uuid,text,integer),public.select_screening_finalists(uuid,uuid[],text,integer),public.screening_batch_snapshot(uuid) to authenticated;
+revoke all on function public.screening_capabilities(),public.create_screening_batch(uuid,uuid,jsonb,numeric),public.update_screening_budget(uuid,numeric),public.prepare_screening_upload(uuid,integer,text),public.update_screening_item(uuid,integer,text),public.seal_screening_batch(uuid),public.bulk_screening_source(uuid),public.bulk_screening_page(uuid,text,integer),public.select_screening_finalists(uuid,uuid[],text,integer),public.screening_batch_snapshot(uuid) from public,anon;
+grant execute on function public.screening_capabilities(),public.create_screening_batch(uuid,uuid,jsonb,numeric),public.update_screening_budget(uuid,numeric),public.prepare_screening_upload(uuid,integer,text),public.update_screening_item(uuid,integer,text),public.seal_screening_batch(uuid),public.bulk_screening_source(uuid),public.bulk_screening_page(uuid,text,integer),public.select_screening_finalists(uuid,uuid[],text,integer),public.screening_batch_snapshot(uuid) to authenticated;
 grant execute on function public.bulk_screening_source(uuid),public.bulk_screening_page(uuid,text,integer),public.screening_batch_snapshot(uuid) to service_role;
 
 create or replace function public.enqueue_job_reassessments(p_job uuid,p_candidate uuid default null,p_reason text default 'Job priorities changed') returns integer

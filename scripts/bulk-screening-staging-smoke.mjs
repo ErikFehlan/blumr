@@ -21,7 +21,7 @@ try{
  await f.sql("update public.job_criteria_tasks set status='ready',result=jsonb_build_object('criteria','[]'::jsonb,'hiring_priorities',$2::jsonb,'model','synthetic-no-provider'),lease_id=null,lease_until=null where job_id=$1",[job,JSON.stringify(items)]);
  const rows=Array.from({length:500},(_,i)=>({name:'Synthetic-'+i+'.txt',text:pool.candidates[i%5].text+'\nRecord '+i}));
  const manifest=rows.map(r=>({name:r.name,size:Buffer.byteLength(r.text)}));manifest.push({...manifest[0]});
- const start=performance.now();await rpc(user,'create_screening_batch',{p_id:batch,p_job:job,p_manifest:manifest,p_budget:10});
+ const start=performance.now();await rpc(user,'create_screening_batch',{p_id:batch,p_job:job,p_manifest:manifest,p_budget:5});
  report.batch_ack_ms=Math.round(performance.now()-start);const uploadStart=performance.now();
  for(let i=0;i<rows.length;i++){
   const row=rows[i],prepared=await rpc(user,'prepare_screening_upload',{p_batch:batch,p_ordinal:i,p_text:row.text});
@@ -47,6 +47,9 @@ try{
  const [counts]=await f.sql('select (select count(*) from public.ai_provider_usage where workspace_id=$1) as calls,(select count(*) from public.resume_intake_tasks where workspace_id=$1 and status in (\'queued\',\'processing\',\'ready\')) as paid_tasks,(select count(*) from public.candidates where workspace_id=$1) as candidates',[user.workspace]);
  assert.equal(Number(counts.calls),0);assert.equal(Number(counts.paid_tasks),0);assert.equal(Number(counts.candidates),500);report.provider_calls=0;
 
+ const foreignBudget=await f.request('/rest/v1/rpc/update_screening_budget',foreign.access,'POST',{p_batch:batch,p_budget:10},false);assert.ok(foreignBudget.status>=400);
+ assert.equal(await rpc(user,'update_screening_budget',{p_batch:batch,p_budget:10}),10);
+ const budgetOnly=await snapshot(user,batch,'status');assert.equal(budgetOnly.cost.budget_usd,10);assert.equal(budgetOnly.cost.provider_calls_reserved,0);report.explicit_budget_update=true;
  const selected=value.ranking.top.map(c=>c.candidateId),deepStarted=performance.now();
  await rpc(user,'select_screening_finalists',{p_batch:batch,p_ids:selected,p_source:value.batch.source_version,p_version:value.batch.selection_version});
  let deep;
