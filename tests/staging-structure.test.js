@@ -125,3 +125,16 @@ test('bulk deployment overrides must match exact source and keep internal helper
  assert.ok(structuralDifferences([],stage,expected).includes('function:begin_assessment_provider(uuid,uuid)'));
  assert.throws(()=>bulkScreeningExpectations(sql.replace('reserve_screening_ai(p_lease','unexpected_reservation(p_lease')));
 });
+
+
+test('budget governance parity rejects old definitions and unsupported overrides',async()=>{
+ const {bulkScreeningExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261020115320_bulk_screening_workflow.sql','utf8'),override=await readFile('supabase/migrations/20261026181357_screening_budget_governance.sql','utf8');
+ const expected=bulkScreeningExpectations(sql,override),old=bulkScreeningExpectations(sql);
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:false,args:e.args,defaults:e.defaults,security_definer:e.securityDefiner,volatility:e.volatility,config:['search_path=""'],clients_denied:!e.admin,worker_allowed:!e.private,anon_denied:true,authenticated_allowed:e.admin}}));
+ assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ for(const name of ['create_screening_batch(uuid,uuid,jsonb,numeric)','update_screening_budget(uuid,numeric)'])stage.find(r=>r.name===name).routine.source=old.get('function:'+name).body;
+ assert.deepEqual(structuralDifferences([],stage,expected).sort(),['function:create_screening_batch(uuid,uuid,jsonb,numeric)','function:update_screening_budget(uuid,numeric)'].sort());
+ assert.throws(()=>bulkScreeningExpectations(sql,override.replace('update_screening_budget(p_batch','unlisted_update(p_batch')));
+ assert.throws(()=>bulkScreeningExpectations(sql,override+override));
+});

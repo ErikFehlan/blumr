@@ -27,6 +27,13 @@ function fixture() {
   const service=context.window.AncalagonData.create({client,workspace:{id:'workspace'},session:{user:{id:'user'}}});
   return {service,rows,calls,downloads,setRpc(handler){rpcHandler=handler},failNext(){fail=true},loseNextInsert(){lose=true}};
 }
+test('bulk imports omit client budgets and expose no recruiter budget mutation',async()=>{
+  const f=fixture(),calls=[];
+  f.setRpc(async(name,args)=>{calls.push({name,args:clone(args)});return {data:'batch',error:null};});
+  await f.service.createScreeningBatch('batch','job',[{name:'Resume.txt',size:80}],100);
+  assert.deepEqual(calls,[{name:'create_screening_batch',args:{p_id:'batch',p_job:'job',p_manifest:[{name:'Resume.txt',size:80}]}}]);
+  assert.equal(f.service.updateScreeningBudget,undefined);
+});
 test('resume originals resolve only within the workspace, job and candidate; newest upload wins',async()=>{
  const f=fixture(),row={workspace_id:'workspace',job_id:'job',candidate_id:'candidate',file_name:'Resume.pdf',mime_type:'application/pdf'};
  f.rows.candidate_documents=[{...row,storage_path:'workspace/job/candidate/old.pdf',created_at:'2026-01-01'},
