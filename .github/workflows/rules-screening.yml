@@ -41,7 +41,7 @@ jobs:
       - run: psql -h localhost -U postgres -d postgres -f tests/screening-cache.sql
         env:
           PGPASSWORD: postgres
-      - run: createdb -h localhost -U postgres bulk_screening && psql -h localhost -U postgres -d bulk_screening -f tests/bulk-screening.sql
+      - run: createdb -h localhost -U postgres bulk_screening && psql -h localhost -U postgres -d bulk_screening -f tests/screening-budget-governance.sql
         env:
           PGPASSWORD: postgres
       - run: node scripts/benchmark-screening.mjs

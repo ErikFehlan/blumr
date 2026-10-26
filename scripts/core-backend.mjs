@@ -10,7 +10,7 @@ migrations.push('20261014174000_assessment_save_versions.sql');
 migrations.push('20261014192401_retention_feedback_reminders.sql');
 migrations.push('20261014212910_retention_measurement.sql');
 migrations.push('20261016152240_unified_hiring_priorities.sql');
-migrations.push('20261019115657_screening_foundation_cache.sql','20261020115320_bulk_screening_workflow.sql');
+migrations.push('20261019115657_screening_foundation_cache.sql','20261020115320_bulk_screening_workflow.sql','20261026181357_screening_budget_governance.sql');
 // Publish replacement functions atomically; old capacity definitions must never
 // become visible halfway through a repeated deployment.
 const definitions=await Promise.all(migrations.map(name=>readFile('supabase/migrations/'+name,'utf8')));

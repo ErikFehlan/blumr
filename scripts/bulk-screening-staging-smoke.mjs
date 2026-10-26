@@ -56,8 +56,11 @@ try{
  assert.equal(Number(counts.calls),0);assert.equal(Number(counts.paid_tasks),0);assert.equal(Number(counts.candidates),500);assert.equal(Number(counts.documents),500,'Lost upload responses duplicated stored documents');report.provider_calls=0;
 
  const foreignBudget=await f.request('/rest/v1/rpc/update_screening_budget',foreign.access,'POST',{p_batch:batch,p_budget:10},false);assert.ok(foreignBudget.status>=400);
- assert.equal(await rpc(user,'update_screening_budget',{p_batch:batch,p_budget:10}),10);
- const budgetOnly=await snapshot(user,batch,'status');assert.equal(budgetOnly.cost.budget_usd,10);assert.equal(budgetOnly.cost.provider_calls_reserved,0);report.explicit_budget_update=true;
+ const memberBudget=await f.request('/rest/v1/rpc/update_screening_budget',user.access,'POST',{p_batch:batch,p_budget:10},false);assert.equal(memberBudget.status,403);
+ // Only the isolated fixture operator sets the preapproved test ceiling.
+ // Ordinary recruiter credentials cannot raise it; no paid work is queued here.
+ await f.sql('update public.screening_batches set budget_usd=10 where id=$1 and workspace_id=$2',[batch,user.workspace]);
+ const budgetOnly=await snapshot(user,batch,'status');assert.equal(budgetOnly.cost.budget_usd,10);assert.equal(budgetOnly.cost.provider_calls_reserved,0);report.operator_budget_update=true;report.member_budget_denied=true;
  const selected=value.ranking.top.map(c=>c.candidateId),deepStarted=performance.now();
  await rpc(user,'select_screening_finalists',{p_batch:batch,p_ids:selected,p_source:value.batch.source_version,p_version:value.batch.selection_version});
  let deep;

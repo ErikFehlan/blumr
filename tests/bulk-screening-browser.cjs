@@ -13,7 +13,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   if(op==='legacy'){legacyCalls++;throw Error('Bulk candidate entered legacy AI intake');}
   if(op==='approve'){const c=candidates.get(args[0]);assert.equal(args[1],c.assessment.revision);c.approved=true;c.assessment.status='approved';approvals++;return true;}
   if(op==='list')return batch&&batch.job_id===args[0]?[batch]:[];
-  if(op==='create'){createCalls++;if(delayCreate)await new Promise(resolve=>releaseCreate=resolve);const [id,job,manifest,budget]=args;batch={id,job_id:job,created_at:new Date().toISOString(),sealed:false,selected_ids:[],selection_version:0,budget_usd:budget,manifest};batch.items=manifest.map((f,ordinal)=>({ordinal,file_name:f.name,file_size:f.size,status:'pending'}));return id;}
+  if(op==='create'){createCalls++;if(delayCreate)await new Promise(resolve=>releaseCreate=resolve);const [id,job,manifest]=args;assert.equal(args.length,3,'Recruiter sent a budget');batch={id,job_id:job,created_at:new Date().toISOString(),sealed:false,selected_ids:[],selection_version:0,budget_usd:5,manifest};batch.items=manifest.map((f,ordinal)=>({ordinal,file_name:f.name,file_size:f.size,status:'pending'}));return id;}
   if(op==='prepare'){const [,ordinal,text]=args,id=crypto.createHash('sha256').update(text.toLowerCase().replace(/\s+/g,' ').trim()).digest('hex').slice(0,32),item=batch.items[ordinal];item.candidate_id=id;
    if(!candidates.has(id))candidates.set(id,{candidateId:id,name:item.file_name,text});return {candidate_id:id,hash:id.padEnd(64,'0'),stored:docs.has(id)};}
   if(op==='upload'){const [c,text,fileName]=args;if(fileName==='retry.txt'&&!failedOnce){failedOnce=true;throw Error('Simulated upload interruption');}docs.set(c.id,text);return 'stored';}
@@ -27,7 +27,6 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
    });
    return summarizeBulkScreening({batch,items:batch.items,candidates:[...candidates.values()].filter(c=>batch.items.some(i=>i.status==='saved'&&i.candidate_id===c.candidateId)),source_current:true,cost:{provider_calls_reserved:deepCalls,reserved_usd:deepCalls*.02,actual_usd:deepCalls*.01,unsettled_calls:0,budget_usd:batch.budget_usd}});
   }
-  if(op==='budget'){assert.equal(args[0],batch.id);assert.ok(args[1]>=batch.budget_usd&&args[1]<=100);batch.budget_usd=args[1];return args[1];}
   if(op==='select'){assert.equal(batch.sealed,true);assert.ok(args[1].length<=20);batch.selected_ids=args[1];batch.selection_version++;for(const id of batch.selected_ids){const c=candidates.get(id);if(!c.assessment){c.assessment=assessment(c);deepCalls++;}}return batch.selection_version;}
   if(op==='text')return docs.get(args[0].id)||'';
   throw Error('Unexpected operation '+op);
@@ -49,17 +48,17 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.addInitScript(()=>{
    const rpc=async(op,...args)=>{const r=await fetch('/__bulk',{method:'POST',body:JSON.stringify({op,args})});const value=await r.json();if(!r.ok)throw Error(value.error);return value;};
    window.AncalagonData={create:()=>({load:()=>rpc('load'),requestResumeIntake:()=>rpc('legacy'),loadResumeIntakes:async()=>[],reviewResumeIntake:(...a)=>rpc('approve',...a),schedule:(_,__,done)=>done('saved'),flush:async()=>{},trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin');},
-    screeningCapabilities:async()=>({enabled:true}),listScreeningBatches:id=>rpc('list',id),createScreeningBatch:(...a)=>rpc('create',...a),prepareScreeningUpload:(...a)=>rpc('prepare',...a),updateScreeningItem:(...a)=>rpc('mark',...a),sealScreeningBatch:(...a)=>rpc('seal',...a),refreshScreeningBatch:(...a)=>rpc('refresh',...a),selectScreeningFinalists:(...a)=>rpc('select',...a),updateScreeningBudget:(...a)=>rpc('budget',...a),uploadResume:(c,f,t)=>rpc('upload',c,t,f.name),loadResumeText:c=>rpc('text',c),loadResumeDocument:async()=>null})};
+    screeningCapabilities:async()=>({enabled:true}),listScreeningBatches:id=>rpc('list',id),createScreeningBatch:(...a)=>rpc('create',...a),prepareScreeningUpload:(...a)=>rpc('prepare',...a),updateScreeningItem:(...a)=>rpc('mark',...a),sealScreeningBatch:(...a)=>rpc('seal',...a),refreshScreeningBatch:(...a)=>rpc('refresh',...a),selectScreeningFinalists:(...a)=>rpc('select',...a),uploadResume:(c,f,t)=>rpc('upload',c,t,f.name),loadResumeText:c=>rpc('text',c),loadResumeDocument:async()=>null})};
    window.ancalagonAuth={session:{user:{id:'test'},access_token:'test-token'},workspace:{id:'workspace'}};
   });
   await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#screeningMode').waitFor();
-  assert.equal(await page.locator('#screeningMode').inputValue(),'bulk');await page.locator('[data-bulk-budget]').fill('1.25');
+  assert.equal(await page.locator('#screeningMode').inputValue(),'bulk');assert.equal(await page.locator('[data-bulk-budget], [data-bulk-current-budget], [data-bulk-save-budget]').count(),0);
   const text=i=>`Synthetic applicant ${i}\nQA Engineer\nPerformed manual testing.\nReproduced defects.\nMaintained regression tests.\nDocumented test cases.\nValidated user acceptance testing.`;
   const zip=new Zip();for(let i=0;i<20;i++)zip.file(i+'.txt',text(i));zip.file('duplicate.txt',text(0));zip.file('Word.docx',await require('./fixtures/docx-resume.cjs')());zip.file('Readable.pdf',require('./fixtures/pdf-resume.cjs')());zip.file('Broken.pdf','%PDF-1.7\nThis synthetic document deliberately has no cross-reference table.');zip.file('retry.txt',text(99));
   const started=performance.now();await page.locator('#resumeUpload').setInputFiles({name:'Applications.zip',mimeType:'application/zip',buffer:await zip.generateAsync({type:'nodebuffer',compression:'DEFLATE'})});
   await page.locator('[data-bulk-message]').filter({hasText:/Preparing|Import saved|Reading|Saving/}).waitFor();const ack=performance.now()-started;
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Some files need attention'),{},{timeout:45000});
-  assert.equal(pdfWorkers.size,0,'PDF parsing workers leaked after successful or failed documents');assert.equal(batch.budget_usd,1.25,'Budget selection lost');assert.equal(docs.size,22,'Duplicate or readable document handling failed');assert.equal(deepCalls,0,'Upload invoked full AI');assert.equal(batch.sealed,false);assert.match(await page.locator('#bulkScreening').textContent(),/Provisional ranking/);
+  assert.equal(pdfWorkers.size,0,'PDF parsing workers leaked after successful or failed documents');assert.equal(batch.budget_usd,5,'Server budget lost');assert.equal(docs.size,22,'Duplicate or readable document handling failed');assert.equal(deepCalls,0,'Upload invoked full AI');assert.equal(batch.sealed,false);assert.match(await page.locator('#bulkScreening').textContent(),/Provisional ranking/);
   assert.ok([...docs.values()].some(t=>t.includes('Documented regression coverage')),'DOCX text box lost');assert.ok([...docs.values()].some(t=>t.includes('Used SQL to validate billing data')),'PDF extraction lost');
   await page.locator('[data-bulk-resume-files]').setInputFiles({name:'retry.txt',mimeType:'text/plain',buffer:Buffer.from(text(99))});
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Files saved'),{},{timeout:15000});
@@ -68,14 +67,15 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.locator('[data-bulk-disclosure="near"]').evaluate(d=>d.open=true);
   await page.locator('[data-bulk-refresh]').click();await page.waitForTimeout(150);
   assert.equal(await page.locator('[data-bulk-disclosure="near"]').evaluate(d=>d.open),true,'Refresh closed evidence review');
-  assert.equal(await page.locator('[data-bulk-budget]').inputValue(),'1.25','Progress reset the chosen next-batch budget');
-  await page.locator('[data-bulk-current-budget]').fill('2.50');
-  await page.locator('[data-bulk-refresh]').click();await page.waitForTimeout(150);
-  assert.equal(await page.locator('[data-bulk-current-budget]').inputValue(),'2.50','Progress discarded a budget edit');
-  await page.locator('[data-bulk-save-budget]').click();await page.getByText('Budget saved. Save finalists to retry any blocked assessments.',{exact:true}).waitFor();
-  assert.equal(batch.budget_usd,2.5);assert.equal(deepCalls,0,'Raising a budget silently started AI');
+  assert.equal(await page.locator('[data-bulk-budget], [data-bulk-current-budget], [data-bulk-save-budget]').count(),0);
+  assert.doesNotMatch(await page.locator('#bulkScreening').textContent(),/call reservations|reserved \/|Save higher budget/);
+  assert.equal(deepCalls,0,'UI refresh started AI');
   await page.locator('[data-bulk-start]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(deepCalls,20);
   await page.locator('[data-bulk-start]').click();await page.waitForTimeout(250);assert.equal(deepCalls,20,'Repeated shortlist created duplicate model calls');
+  const limited=candidates.get(batch.selected_ids[0]),ready=limited.assessment;limited.assessment={status:'failed',error:'screening_budget_limit'};
+  await page.locator('[data-bulk-refresh]').click();await page.getByText(/Contact your blumr administrator to review the limit/).waitFor();
+  assert.equal(deepCalls,20);assert.equal(await page.locator('[data-bulk-current-budget], [data-bulk-save-budget]').count(),0);
+  limited.assessment=ready;await page.locator('[data-bulk-refresh]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();
   await page.locator('[data-bulk-resume]').first().click();await page.locator('dialog[open]').waitFor();assert.ok((await page.locator('[data-resume-text]').textContent()).length>40);await page.locator('dialog [data-close]').click();
   await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(deepCalls,20);
   assert.equal(legacyCalls,0,'Reload started legacy full AI');
@@ -103,6 +103,6 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
     return {documents:count,pdfs,docx:words,duration_ms:Math.round(performance.now()-started),scope:'Repeated synthetic parser fixtures; excludes upload, HTTP, ranking and AI'};
    },inputs);await page.waitForTimeout(100);assert.equal(pdfWorkers.size,0,'PDF workers leaked under volume');assert.ok(peakPdfWorkers<=2,'PDF workers grew with batch size');parsing.peak_pdf_workers=peakPdfWorkers;parsing.remaining_pdf_workers=pdfWorkers.size;
   }
-  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,job_switch_during_manifest:true,pdf_workers_released:true,explicit_budget_update:true,legacy_calls:legacyCalls,pdf_docx_zip:true,parsing,passed:true}));
+  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,job_switch_during_manifest:true,pdf_workers_released:true,server_budget:true,legacy_calls:legacyCalls,pdf_docx_zip:true,parsing,passed:true}));
  }finally{await browser?.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
