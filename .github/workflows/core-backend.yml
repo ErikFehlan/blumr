@@ -37,9 +37,9 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: |
+          psql -h localhost -U postgres -d postgres -f tests/criteria-queue.sql
           createdb -h localhost -U postgres screening_budget
           psql -h localhost -U postgres -d screening_budget -f tests/screening-budget-governance.sql
-          psql -h localhost -U postgres -d postgres -f tests/criteria-queue.sql
           createdb -h localhost -U postgres retention_measurement
           psql -h localhost -U postgres -d retention_measurement -f tests/retention-measurement.sql
           createdb -h localhost -U postgres retention_reminders
