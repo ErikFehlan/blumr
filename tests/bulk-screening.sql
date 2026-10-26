@@ -72,10 +72,19 @@ do $$declare b uuid:='b0000000-0000-0000-0000-000000000001';s jsonb;rows jsonb;i
  if save_bulk_screening_page(b,'stale',intel,rows) then raise exception 'Stale source write accepted';end if;
  if not save_bulk_screening_page(b,s->>'sourceVersion',intel,rows) then raise exception 'Current page refused';end if;
  if exists(select from resume_intake_tasks where candidate_id=cid and status='queued') then raise exception 'Rules scoring queued AI';end if;
+ -- Put the same source in the ordinary-upload eligibility state, while the
+ -- bulk consent gate still prevents any paid task. Compare complete inputs,
+ -- not scores from the separate deterministic and deep-assessment stages.
+ insert into candidate_assessments(workspace_id,job_id,candidate_id,assessment_type,evidence)
+ select workspace_id,job_id,id,'manual_correction','{"resume_intake":{"phase":"uploading","backend":"durable-v1"}}'::jsonb from candidates where id=cid;
+ if standard_resume_intake_input(cid) is null or standard_resume_intake_input(cid) is distinct from screening_finalist_input(cid) then raise exception 'Individual and finalist deep input contracts diverged';end if;
+ if resume_intake_input(cid) is not null or exists(select from resume_intake_tasks where candidate_id=cid and status='queued') then raise exception 'Parity setup bypassed explicit finalist consent';end if;
  perform select_screening_finalists(b,array[cid],s->>'sourceVersion',0);
+ if resume_intake_input(cid) is distinct from standard_resume_intake_input(cid) then raise exception 'Selected finalist changed shared assessment context';end if;
  perform select_screening_finalists(b,array[cid],s->>'sourceVersion',0); -- lost acknowledgement
  claimed:=claim_assessment_work('intake',null);lease:=(claimed->0->>'lease_id')::uuid;rev:=claimed->0->>'revision';
  if lease is null then raise exception 'Selected finalist not claimable';end if;
+ if claimed->0->'input' is distinct from standard_resume_intake_input(cid) then raise exception 'Worker claim changed deep input contract';end if;
  if begin_assessment_provider(lease,call) then raise exception 'Provider started without batch budget';end if;
  if reserve_screening_ai(lease,'missing-model',1000,1000)->>'code'<>'screening_model_rate_missing' then raise exception 'Unknown rate allowed';end if;
  if reserve_screening_ai(lease,'test-model',300000,16000)->>'allowed'<>'true' then raise exception 'Valid reservation refused';end if;

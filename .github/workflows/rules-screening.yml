@@ -11,6 +11,7 @@ on:
       - 'scripts/bulk-*'
       - 'tests/job-intelligence.test.js'
       - 'tests/fixtures/screening-*.mjs'
+      - 'tests/helpers/screening-*.ts'
       - 'tests/fixtures/mixed-screening-*.cjs'
       - 'scripts/*screening*'
       - 'scripts/readiness-fixtures.mjs'
@@ -37,7 +38,7 @@ jobs:
         with:
           deno-version: v2.x
       - run: node --test tests/*.test.js
-      - run: deno test --allow-env tests/rules-screening-routing.test.ts tests/bulk-screening-backend.test.ts tests/job-reassessment-worker.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
+      - run: deno test --allow-env tests/screening-parity.test.ts tests/rules-screening-routing.test.ts tests/bulk-screening-backend.test.ts tests/resume-intake-backend.test.ts tests/job-reassessment-worker.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
       - run: psql -h localhost -U postgres -d postgres -f tests/screening-cache.sql
         env:
           PGPASSWORD: postgres
