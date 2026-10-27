@@ -4,7 +4,7 @@
  function mount(api){
   const host=api.root.querySelector('#bulkScreening');
   let enabled=false,generation=0,jobId=null,batchId=null,snapshot=null,timer=null,uploads=null,search='',list=[],message='',loading=null,starting=false;
-  const reviews=new Map(),reviewLoads=new Map();let reviewTimer=null;
+  const reviews=new Map(),reviewLoads=new Map(),reviewTimers=new Map();
   const current=g=>g===generation;
   const allResults=()=>snapshot?[...snapshot.ranking.top,...snapshot.ranking.nearMiss,...snapshot.ranking.remaining]:[];
   function status(text){message=text;const node=host.querySelector('[data-bulk-message]');if(node)node.textContent=text;else render();}
@@ -108,8 +108,10 @@
    try{const value=await service.getResumeAnalysis(c.id);if(!current(g))return;let state;if(['ready','approved'].includes(value.assessment?.status)&&value.assessment.result&&api.prepareAssessment)state=await api.prepareAssessment(c,value);if(!current(g))return;if(state){c.resumeIntake=state;value.preparedState=state;}reviews.set(c.id,value);api.changed(c);
    }catch{if(current(g)){reviews.set(c.id,{error:'The assessment could not load. Try again.',stored:true});api.changed(c);}}
    finally{if(reviewLoads.get(c.id)===token)reviewLoads.delete(c.id);}
-   clearTimeout(reviewTimer);const value=reviews.get(c.id);
-   if(current(g)&&value?.started&&(!value.rules||['queued','processing'].includes(value.assessment?.status)))reviewTimer=setTimeout(()=>{if(api.isOpen(c))void loadCandidate(c);},5000);
+   clearTimeout(reviewTimers.get(c.id));reviewTimers.delete(c.id);const value=reviews.get(c.id);
+   const excluded=value?.batchId===snapshot?.batch.id&&snapshot?.batch.auto_selected&&Array.isArray(snapshot.batch.selected_ids)&&!snapshot.batch.selected_ids.includes(c.id);
+   const waiting=['queued','processing'].includes(value?.assessment?.status)||!value?.assessment&&(!value?.rules||!excluded);
+   if(current(g)&&api.isOpen(c)&&value?.started&&waiting)reviewTimers.set(c.id,setTimeout(()=>{reviewTimers.delete(c.id);if(api.isOpen(c))void loadCandidate(c);},5000));
   }
   async function next(c){const g=generation,id=batchId;await refresh();if(!current(g)||id!==batchId||c.jobId!==api.job()?.id)return;const candidate=snapshot?.selected.find(x=>x.candidateId!==c.id&&x.assessment?.status==='ready');if(candidate)await api.openCandidate(candidate.candidateId);else api.showResults();}
   function renderCandidate(c,wrap){
@@ -137,7 +139,7 @@
     if('bulkExclude'in d){button.disabled=true;await api.data().updateScreeningItem(id,Number(d.bulkExclude),'excluded');if(current(g)&&batchId===id)await refresh();}
    }catch(e){if(current(g))status(e.message||'Could not save. Refresh and try again.');}finally{if(button.isConnected)button.disabled=false;}
   });
-  function clear(){generation++;clearTimeout(timer);clearTimeout(reviewTimer);enabled=false;jobId=null;batchId=null;snapshot=null;list=[];uploads=null;loading=null;reviews.clear();reviewLoads.clear();api.root.querySelector('#candidateCards').hidden=false;host.replaceChildren();host.hidden=true;}
+  function clear(){generation++;clearTimeout(timer);reviewTimers.forEach(clearTimeout);reviewTimers.clear();enabled=false;jobId=null;batchId=null;snapshot=null;list=[];uploads=null;loading=null;reviews.clear();reviewLoads.clear();api.root.querySelector('#candidateCards').hidden=false;host.replaceChildren();host.hidden=true;}
   return {init,open,openSaved,add,clear,loadCandidate,renderCandidate,next,isBulk:()=>enabled,hasUnsaved:()=>Boolean(uploads?.running)};
  }
  global.BlumrBulkScreening={mount};
