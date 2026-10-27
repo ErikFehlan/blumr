@@ -108,7 +108,10 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.waitForFunction(()=>document.querySelector('#globalJobSelect')?.value==='job-b');
   const saved=page.waitForResponse(r=>r.url().endsWith('/__bulk')&&r.request().postDataJSON()?.op==='mark');releaseCreate();await saved;await page.waitForTimeout(400);
   assert.equal(batch.job_id,'job-a');assert.equal(await page.locator('[data-bulk-batch]').count(),0,'Old upload replaced the new job’s list');assert.equal(deepCalls,20);
-  // One resume uses exactly the same action and opens the shared assessment.
+  // An older job has no saved priorities. One resume must still use the same
+  // action and reach its shared assessment from the current job description.
+  source.priorities=null;
+  source.job.description='Requires 3 years of manual testing experience. Own regression testing and document defects. Experience with SQL databases.';
   delayCreate=false;await page.locator('#resumeUpload').setInputFiles({name:'Single.txt',mimeType:'text/plain',buffer:Buffer.from(text(3000))});
   await page.getByRole('button',{name:'Analyze 1 resume',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('[data-bulk-start]').disabled);
   assert.equal(deepCalls,20);rulesOnlyRead=true;await page.locator('[data-bulk-start]').click();await page.locator('#page-detail.active').waitFor();await page.locator('[data-intake-approve]').waitFor();assert.equal(rulesOnlyReads,1,'The candidate was not observed between rules and detailed assessment');assert.equal(deepCalls,21);assert.equal(approvals,1);
@@ -123,6 +126,17 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.evaluate(()=>{const select=document.querySelector('#globalJobSelect');select.value='job-b';select.dispatchEvent(new Event('change',{bubbles:true}));});
   await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator(`[data-bulk-open="${single}"]`).click();await page.locator('#page-detail.active').waitFor();
   assert.equal(await page.locator('#submissionDraft').inputValue(),draft,'Saved submittal disappeared after reload');
+  // A deliberately empty reviewed list must remain blocked and explain the
+  // next action on the auto-opened candidate instead of claiming to run AI.
+  source.priorities={source_title:source.job.title,source_description:source.job.description,review_status:'edited',items:[]};
+  await page.locator('.rf-nav [data-page="candidates"]').click();
+  await page.locator('#resumeUpload').setInputFiles({name:'Needs-job-review.txt',mimeType:'text/plain',buffer:Buffer.from(text(4000))});
+  await page.getByRole('button',{name:'Analyze 1 resume',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('[data-bulk-start]').disabled);
+  await page.locator('[data-bulk-start]').click();await page.locator('#page-detail.active').waitFor();
+  await page.locator('#workspaceIntake').getByRole('heading',{name:'Job details need attention',exact:true}).waitFor();
+  assert.match(await page.locator('#workspaceIntake').textContent(),/Analysis is paused/);
+  assert.equal(deepCalls,21,'Blocked job incorrectly started paid analysis');
+  await page.locator('[data-managed-criteria]').click();await page.locator('#page-criteria.active').waitFor();
   let parsing=null;const parseCount=Number(process.env.BULK_PARSE_COUNT||0);
   if(parseCount){
    assert.ok(Number.isInteger(parseCount)&&parseCount>=20&&parseCount<=1000);peakPdfWorkers=0;
