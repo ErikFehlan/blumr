@@ -6,20 +6,22 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
  const {processBulkScreeningBatch,summarizeBulkScreening}=await import('../supabase/functions/_shared/bulk-screening.ts');
  const {qualificationPools,qualificationJob}=await import('./fixtures/screening-qualification-pools.mjs');
  const pool=qualificationPools.find(p=>p.id==='qa'),source={...qualificationJob(pool,'workspace','job-a'),workspaceId:'workspace',feedback:[],assessments:[],lessons:[],sourceVersion:'source'};
+ const batches=new Map();
  let batch=null,docs=new Map(),candidates=new Map(),failedOnce=false,deepCalls=0,legacyCalls=0,approvals=0,delayCreate=false,releaseCreate,createCalls=0,startCalls=0,loseStartResponse=true,rulesOnlyRead=false,rulesOnlyReads=0;
  const assessment=c=>({status:'ready',revision:'current',result:{name:'Candidate',role:'QA Engineer',primary_signal:'Verified synthetic testing evidence.',tags:['QA'],score:c.result.score/10,manager_score:c.result.score/10,jd_reason:'Verified synthetic testing evidence.',manager_reason:'No additional manager preferences supplied.',resume_evidence:[{claim:'Testing work',quote:c.text.split('\n').find(t=>/Performed|Owned/.test(t))||c.text}],concerns:['Verify scope on a phone screen.'],screening_questions:['What testing did you personally own?']}});
  async function operation(op,args){
-  if(op==='load')return {jobs:[{id:'job-a',title:'QA Engineer',description:'Perform manual testing.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1},{id:'job-b',title:'Other role',description:'Other job requirements.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1}],candidates:[...candidates.values()].map(c=>({id:c.candidateId,jobId:c.jobId,name:c.name,short:c.name,role:c.approved?'QA Engineer':'Resume awaiting analysis',screeningManaged:true,jdScore:c.approved?c.assessment.result.score:0,resumeJDScore:c.approved?c.assessment.result.score:0,managerScore:c.approved?c.assessment.result.manager_score:0,originalManagerScore:0,stage:'Sourced',strengths:[],concerns:[],tags:[],screeningQuestions:[],createdAt:1,updatedAt:1,submissionDraft:c.submissionDraft||null,aiReview:c.approved?{source:'resume_intake',verdict:'Accurate',assessment:c.assessment.result}:null})),feedback:[],interviewOutcomes:[]};
+  if(['append','start','prepare','mark','seal','refresh','select','budget'].includes(op))batch=batches.get(args[0])||batch;
+  if(op==='load')return {jobs:[{id:'job-a',title:'QA Engineer',description:'Perform manual testing.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1},{id:'job-b',title:'Other role',description:'Other job requirements.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1}],candidates:[...['job-a','job-b'].map((jobId,i)=>({id:'earlier-'+i,jobId,name:i?'Other Job Candidate':'Earlier Approved Candidate',short:i?'Other Job Candidate':'Earlier Approved Candidate',role:'QA Engineer',jdScore:8,managerScore:8,originalManagerScore:8,resumeJDScore:8,stage:'Sourced',strengths:[],concerns:[],tags:['Prior upload'],screeningQuestions:[],createdAt:1,updatedAt:1,aiReview:{source:'resume_intake',verdict:'Accurate'}})),...[...candidates.values()].map(c=>({id:c.candidateId,jobId:c.jobId,name:c.name,short:c.name,role:c.approved?'QA Engineer':'Resume awaiting analysis',screeningManaged:true,jdScore:c.approved?c.assessment.result.score:0,resumeJDScore:c.approved?c.assessment.result.score:0,managerScore:c.approved?c.assessment.result.manager_score:0,originalManagerScore:0,stage:'Sourced',strengths:[],concerns:[],tags:[],screeningQuestions:[],createdAt:1,updatedAt:1,submissionDraft:c.submissionDraft||null,aiReview:c.approved?{source:'resume_intake',verdict:'Accurate',assessment:c.assessment.result}:null}))],feedback:[],interviewOutcomes:[]};
   if(op==='legacy'){legacyCalls++;throw Error('Bulk candidate entered legacy AI intake');}
   if(op==='flush'){for(const next of args[0].candidates){const saved=candidates.get(next.id);if(saved)saved.submissionDraft=next.submissionDraft||null;}return null;}
   if(op==='approve'){const c=candidates.get(args[0]);assert.equal(args[1],c.assessment.revision);c.approved=true;c.assessment.status='approved';approvals++;return true;}
-  if(op==='list')return batch&&batch.job_id===args[0]?[batch]:[];
+  if(op==='list')return [...batches.values()].filter(b=>b.job_id===args[0]).reverse();
   if(op==='find'){
    if(batch?.job_id!==args[0])return null;
    const c=[...candidates.values()].find(c=>args[1].includes(c.candidateId));
    return c?{id:c.candidateId,jobId:batch.job_id,batchId:batch.id,name:c.name,short:c.name,screeningManaged:true,uploadStatus:'saved'}:null;
   }
-  if(op==='create'){createCalls++;if(delayCreate)await new Promise(resolve=>releaseCreate=resolve);const [id,job,manifest,budget]=args;batch={id,job_id:job,created_at:new Date().toISOString(),sealed:false,selected_ids:[],selection_version:0,budget_usd:5,defer_analysis:true,analysis_requested_at:null,auto_selected:false,manifest};batch.items=manifest.map((f,ordinal)=>({ordinal,file_name:f.name,file_size:f.size,status:'pending'}));return id;}
+  if(op==='create'){createCalls++;if(delayCreate)await new Promise(resolve=>releaseCreate=resolve);const [id,job,manifest,budget]=args;batch={id,job_id:job,created_at:new Date().toISOString(),sealed:false,selected_ids:[],selection_version:0,budget_usd:5,defer_analysis:true,analysis_requested_at:null,auto_selected:false,manifest};batch.items=manifest.map((f,ordinal)=>({ordinal,file_name:f.name,file_size:f.size,status:'pending'}));batches.set(id,batch);return id;}
   if(op==='append'){const [id,offset,manifest]=args;assert.equal(id,batch.id);assert.equal(offset,batch.items.length);batch.items.push(...manifest.map((f,i)=>({ordinal:offset+i,file_name:f.name,file_size:f.size,status:'pending'})));return null;}
   if(op==='start'){startCalls++;assert.ok(!batch.items.some(i=>['pending','failed'].includes(i.status)));batch.sealed=true;batch.analysis_requested_at||=new Date().toISOString();if(loseStartResponse){loseStartResponse=false;throw Error('Interrupted acknowledgment. Try Analyze again.');}return null;}
   if(op==='analysis'){const c=candidates.get(args[0]),gap=rulesOnlyRead&&c.result&&c.assessment;if(gap){rulesOnlyRead=false;rulesOnlyReads++;}return {batchId:batch.id,started:!!batch.analysis_requested_at,stored:docs.has(c.candidateId),fileName:c.name,rules:c.result||null,assessment:gap?null:c.assessment||null};}
@@ -47,7 +49,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
  }).listen(0,'127.0.0.1');
  let browser;
  try{
-  browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME});let peakPdfWorkers=0;const page=await browser.newPage(),errors=[],pdfWorkers=new Set();page.on('worker',worker=>{pdfWorkers.add(worker);peakPdfWorkers=Math.max(peakPdfWorkers,pdfWorkers.size);worker.on('close',()=>pdfWorkers.delete(worker));});page.on('pageerror',e=>errors.push(e.message));
+  browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME});let peakPdfWorkers=0;const page=await browser.newPage(),errors=[],pdfWorkers=new Set();page.on('worker',worker=>{pdfWorkers.add(worker);peakPdfWorkers=Math.max(peakPdfWorkers,pdfWorkers.size);worker.on('close',()=>pdfWorkers.delete(worker));});page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});
   await page.route('https://**',r=>r.abort());
   const pdfDir=path.dirname(require.resolve('pdfjs-dist/package.json'));
   await page.route('**/pdfjs-dist@4.10.38/**',r=>r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(pdfDir,'build',r.request().url().includes('worker')?'pdf.worker.min.mjs':'pdf.mjs'),'utf8')}));
@@ -61,19 +63,26 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
     createResumeUpload:(...a)=>rpc('create',...a),appendResumeUpload:(...a)=>rpc('append',...a),startResumeAnalysis:(...a)=>rpc('start',...a),getResumeAnalysis:(...a)=>rpc('analysis',...a),screeningCapabilities:async()=>({enabled:true}),listScreeningBatches:id=>rpc('list',id),createScreeningBatch:(...a)=>rpc('create',...a),prepareScreeningUpload:(...a)=>rpc('prepare',...a),updateScreeningItem:(...a)=>rpc('mark',...a),sealScreeningBatch:(...a)=>rpc('seal',...a),refreshScreeningBatch:(...a)=>rpc('refresh',...a),selectScreeningFinalists:(...a)=>rpc('select',...a),updateScreeningBudget:(...a)=>rpc('budget',...a),uploadResume:(c,f,t)=>rpc('upload',c,t,f.name),loadResumeText:c=>rpc('text',c),loadResumeDocument:async()=>null})};
    window.ancalagonAuth={session:{user:{id:'test'},access_token:'test-token'},workspace:{id:'workspace'}};
   });
-  await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#bulkScreening').waitFor();
+  await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#candidateCards [data-candidate-id="earlier-0"]').waitFor();assert.equal(await page.locator('#candidateCards [data-candidate-id="earlier-1"]').count(),0);
+  assert.equal(await page.locator('#resumeUploadsPanel').getAttribute('open'),null);await page.locator('#resumeUploadsPanel > summary').click();await page.locator('#bulkScreening').waitFor();
   assert.equal(await page.locator('#screeningMode').count(),0);assert.equal(await page.locator('[data-bulk-budget]').count(),0);
   const text=i=>`Synthetic applicant ${i}\nQA Engineer\nPerformed manual testing.\nReproduced defects.\nMaintained regression tests.\nDocumented test cases.\nValidated user acceptance testing.`;
   const zip=new Zip();for(let i=0;i<20;i++)zip.file(i+'.txt',text(i));zip.file('duplicate.txt',text(0));zip.file('Word.docx',await require('./fixtures/docx-resume.cjs')());zip.file('Readable.pdf',require('./fixtures/pdf-resume.cjs')());zip.file('Broken.pdf','%PDF-1.7\nThis synthetic document deliberately has no cross-reference table.');zip.file('retry.txt',text(99));
   const started=performance.now();await page.locator('#resumeUpload').setInputFiles({name:'Applications.zip',mimeType:'application/zip',buffer:await zip.generateAsync({type:'nodebuffer',compression:'DEFLATE'})});
   await page.locator('[data-bulk-message]').filter({hasText:/Preparing|Reading|Saving/}).waitFor();const ack=performance.now()-started;
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Some files need attention'),{},{timeout:45000});
-  assert.equal(pdfWorkers.size,0,'PDF parsing workers leaked after successful or failed documents');assert.equal(batch.budget_usd,5);assert.equal(docs.size,22,'Duplicate or readable document handling failed');assert.equal(deepCalls,0,'Upload invoked full AI');assert.equal(batch.sealed,false);assert.match(await page.locator('#bulkScreening').textContent(),/Your upload list/);assert.equal([...candidates.values()].filter(c=>c.result).length,0,'Upload started analysis before the button');
+  assert.equal(pdfWorkers.size,0,'PDF parsing workers leaked after successful or failed documents');assert.equal(batch.budget_usd,5);assert.equal(docs.size,22,'Duplicate or readable document handling failed');assert.equal(deepCalls,0,'Upload invoked full AI');assert.equal(await page.locator('#candidateCards [data-candidate-id="earlier-0"]').isVisible(),true,'Current upload hid an earlier saved candidate');assert.equal(await page.locator('#candidateCards [data-candidate-id]').count(),23,'New saved resumes did not join the job list without a reload');assert.equal(batch.sealed,false);assert.match(await page.locator('#bulkScreening').textContent(),/Your upload list/);assert.equal([...candidates.values()].filter(c=>c.result).length,0,'Upload started analysis before the button');
   assert.ok([...docs.values()].some(t=>t.includes('Documented regression coverage')),'DOCX text box lost');assert.ok([...docs.values()].some(t=>t.includes('Used SQL to validate billing data')),'PDF extraction lost');
   await page.locator('[data-bulk-resume-files]').setInputFiles({name:'retry.txt',mimeType:'text/plain',buffer:Buffer.from(text(99))});
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Files saved'),{},{timeout:15000});
   const broken=batch.items.find(i=>i.file_name==='Broken.pdf');await page.locator(`[data-bulk-exclude="${broken.ordinal}"]`).click();
   await page.getByRole('button',{name:'Analyze 23 resumes',exact:true}).waitFor();assert.equal(batch.sealed,false);assert.equal(deepCalls,0);
+  // A newly saved list card loads the canonical record before analysis and
+  // returns to the same unfinished upload without starting any paid work.
+  const firstSaved=batch.items.find(i=>i.status==='saved').candidate_id;
+  await page.locator(`#candidateCards [data-candidate-id="${firstSaved}"]`).click();await page.locator('#page-detail.active').waitFor();
+  await page.getByRole('heading',{name:'Resume saved',exact:true}).waitFor();assert.equal(deepCalls,0);
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('button',{name:'Analyze 23 resumes',exact:true}).waitFor();
   // More files join the same saved draft; a renamed duplicate is reused.
   await page.locator('#resumeUpload').setInputFiles({name:'Same-resume.txt',mimeType:'text/plain',buffer:Buffer.from(text(0))});
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Files saved'));
@@ -92,14 +101,14 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.locator('[data-intake-approve]').waitFor();assert.equal(approvals,0,'Opening an assessment approved it');
   await page.locator('[data-view-resume]').click();await page.locator('#resumeEvidencePanel').waitFor();assert.ok((await page.locator('.rf-resume-document').textContent()).length>40);await page.keyboard.press('Escape');
   await page.locator('[data-intake-next]').click();await page.waitForFunction(id=>document.querySelector('#candidateWorkspace').dataset.workspaceCandidate!==id,ready);await page.locator('[data-intake-approve]').waitFor();assert.equal(approvals,1);
-  await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Ready for review',exact:true}).waitFor();
+  await page.locator('.rf-nav [data-page="candidates"]').click();assert.equal(await page.locator('#resumeUploadsPanel').getAttribute('open'),null);await page.locator('#candidateCards [data-candidate-id="earlier-0"]').waitFor();await page.locator('#resumeUploadsPanel > summary').click();await page.getByRole('heading',{name:'Ready for review',exact:true}).waitFor();
   const rules=[...candidates.values()].find(c=>batch.items.some(i=>i.candidate_id===c.candidateId&&i.status==='saved')&&!batch.selected_ids.includes(c.candidateId));
   await page.locator(`[data-bulk-open="${rules.candidateId}"]`).click();await page.getByRole('heading',{name:'Resume evidence',exact:true}).waitFor();
   assert.doesNotMatch(await page.locator('#candidateWorkspace').textContent(),/Review this candidate in bulk|No stored resume/);
   await page.locator('[data-managed-resume]').click();await page.locator('#resumeEvidencePanel').waitFor();await page.keyboard.press('Escape');
-  await page.locator('.rf-nav [data-page="candidates"]').click();await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Ready for review',exact:true}).waitFor();assert.equal(deepCalls,20);assert.equal(legacyCalls,0);
-  await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Mobile overflow');
-  fs.mkdirSync('test-results/bulk-screening',{recursive:true});await page.screenshot({path:'test-results/bulk-screening/mobile.png',fullPage:true});await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'test-results/bulk-screening/desktop.png',fullPage:true});
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#candidateCards [data-candidate-id="earlier-0"]').waitFor();await page.locator('#candidateSearch').fill('Earlier');assert.equal(await page.locator('#candidateCards [data-candidate-id]').count(),1);await page.locator('#candidateSearch').fill('');assert.equal(await page.locator('#candidateCards [data-candidate-id]').count(),24);assert.equal(deepCalls,20);assert.equal(legacyCalls,0);
+  await page.setViewportSize({width:390,height:844});if(await page.locator('.rf-nav').isVisible())await page.locator('#mobileNavToggle').click();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Mobile overflow');
+  fs.mkdirSync('test-results/bulk-screening',{recursive:true});await page.screenshot({path:'test-results/bulk-screening/mobile.png'});await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'test-results/bulk-screening/desktop.png',fullPage:true});
   // A delayed manifest remains scoped to its captured job.
   delayCreate=true;const requested=page.waitForRequest(r=>r.url().endsWith('/__bulk')&&r.postDataJSON()?.op==='create');
   await page.locator('#resumeUpload').setInputFiles({name:'Job-A-only.txt',mimeType:'text/plain',buffer:Buffer.from(text(2000))});await requested;
@@ -107,7 +116,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.evaluate(()=>{const select=document.querySelector('#globalJobSelect');select.value='job-b';select.dispatchEvent(new Event('change',{bubbles:true}));});
   await page.waitForFunction(()=>document.querySelector('#globalJobSelect')?.value==='job-b');
   const saved=page.waitForResponse(r=>r.url().endsWith('/__bulk')&&r.request().postDataJSON()?.op==='mark');releaseCreate();await saved;await page.waitForTimeout(400);
-  assert.equal(batch.job_id,'job-a');assert.equal(await page.locator('[data-bulk-batch]').count(),0,'Old upload replaced the new job’s list');assert.equal(deepCalls,20);
+  assert.equal(batch.job_id,'job-a');assert.equal(await page.locator('#candidateCards [data-candidate-id="earlier-0"]').count(),0);assert.equal(await page.locator('#candidateCards [data-candidate-id="earlier-1"]').isVisible(),true);assert.equal(await page.locator('[data-bulk-batch]').count(),0,'Old upload replaced the new job’s list');assert.equal(deepCalls,20);
   // An older job has no saved priorities. One resume must still use the same
   // action and reach its shared assessment from the current job description.
   source.priorities=null;
@@ -119,12 +128,12 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   // Saving must update the current workspace object, not a captured older one.
   const single=batch.items.find(i=>i.status==='saved').candidate_id,draft='Saved introduction after assessment approval and reopening.';
   await page.locator('[data-intake-approve]').click();await page.locator('#workspaceIntake').waitFor({state:'hidden'});assert.equal(approvals,2);
-  await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator(`[data-bulk-open="${single}"]`).click();await page.locator('#page-detail.active').waitFor();
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator(`#candidateCards [data-candidate-id="${single}"]`).click();await page.locator('#page-detail.active').waitFor();
   await page.locator('#workspaceSubmission > summary').click();await page.locator('#submissionDraft').fill(draft);await page.locator('#saveSubmissionDraft').click();
   await page.locator('#submissionDraftStatus').filter({hasText:'Saved draft'}).waitFor();assert.equal(candidates.get(single).submissionDraft?.text,draft,'Save reported success without persisting the current candidate draft');
   await page.reload();await page.locator('#page-home.active').waitFor();
   await page.evaluate(()=>{const select=document.querySelector('#globalJobSelect');select.value='job-b';select.dispatchEvent(new Event('change',{bubbles:true}));});
-  await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator(`[data-bulk-open="${single}"]`).click();await page.locator('#page-detail.active').waitFor();
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator(`#candidateCards [data-candidate-id="${single}"]`).click();await page.locator('#page-detail.active').waitFor();
   assert.equal(await page.locator('#submissionDraft').inputValue(),draft,'Saved submittal disappeared after reload');
   // A deliberately empty reviewed list must remain blocked and explain the
   // next action on the auto-opened candidate instead of claiming to run AI.
@@ -137,6 +146,19 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   assert.match(await page.locator('#workspaceIntake').textContent(),/Analysis is paused/);
   assert.equal(deepCalls,21,'Blocked job incorrectly started paid analysis');
   await page.locator('[data-managed-criteria]').click();await page.locator('#page-criteria.active').waitFor();
+  // The newest upload and the earlier completed upload cannot filter the job list.
+  await page.evaluate(()=>{const select=document.querySelector('#globalJobSelect');select.value='job-a';select.dispatchEvent(new Event('change',{bubbles:true}));});
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#candidateCards [data-candidate-id="earlier-0"]').waitFor();
+  assert.equal(await page.locator('#candidateCards [data-candidate-id="earlier-1"]').count(),0);
+  const allCount=await page.locator('#candidateCards [data-candidate-id]').count();assert.equal(allCount,25);
+  await page.locator('#candidateSearch').fill('Earlier');assert.equal(await page.locator('#candidateCards [data-candidate-id]').count(),1);
+  await page.locator('#candidateSearch').fill('');await page.locator('#candidateSort').selectOption('name');const sortedNames=await page.locator('#candidateCards h4').allTextContents();assert.deepEqual(sortedNames,[...sortedNames].sort((a,b)=>a.localeCompare(b)),'Candidate names are not sorted across all uploads');
+  if(await page.locator('#resumeUploadsPanel').getAttribute('open')===null)await page.locator('#resumeUploadsPanel > summary').click();
+  const firstBatch=[...batches.values()].find(b=>b.job_id==='job-a'&&b.analysis_requested_at);
+  await page.locator('[data-bulk-batch]').selectOption(firstBatch.id);await page.locator('[data-bulk-refresh]').waitFor();
+  assert.equal(await page.locator('#candidateCards').isVisible(),true);assert.equal(await page.locator('#candidateCards [data-candidate-id]').count(),allCount);
+  await page.locator('[data-bulk-batch]').selectOption('');assert.equal(await page.locator('#candidateCards [data-candidate-id]').count(),allCount);
+  await page.locator('#resumeUploadsPanel > summary').click();await page.locator('#candidateCards [data-candidate-id="earlier-0"]').click();await page.locator('#page-detail.active').waitFor();
   let parsing=null;const parseCount=Number(process.env.BULK_PARSE_COUNT||0);
   if(parseCount){
    assert.ok(Number.isInteger(parseCount)&&parseCount>=20&&parseCount<=1000);peakPdfWorkers=0;

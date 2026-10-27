@@ -114,6 +114,23 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
   await page.keyboard.press('Escape');pass(doc.label+' original download matches uploaded bytes and denies the other account');
 
  }
+ stage='candidate-list';await nav('candidates');
+ const assertAllCandidates=async()=>{
+  assert.equal(await page.locator('#candidateCards').isVisible(),true,'Saved upload hid the job candidate list');
+  assert.equal(await page.locator('#candidateCards [data-candidate-id]').count(),candidateIds.length,'Candidates from earlier uploads are missing');
+  for(const id of candidateIds)assert.equal(await page.locator(`#candidateCards [data-candidate-id="${id}"]`).isVisible(),true);
+ };
+ await assertAllCandidates();assert.equal(await page.locator('#resumeUploadsPanel').getAttribute('open'),null);
+ for(const name of ['Alex','Jamie','Morgan']){
+  await page.locator('#candidateSearch').fill(name);assert.equal(await page.locator('#candidateCards [data-candidate-id]').count(),1,'Search missed an earlier upload');
+ }
+ await page.locator('#candidateSearch').fill('');await page.locator('#candidateSort').selectOption('name');const sortedNames=await page.locator('#candidateCards h4').allTextContents();assert.deepEqual(sortedNames,[...sortedNames].sort((a,b)=>a.localeCompare(b)),'Candidate names are not sorted across all uploads');await assertAllCandidates();
+ await page.locator('#resumeUploadsPanel > summary').click();
+ const batches=page.locator('[data-bulk-batch]');await batches.waitFor();
+ const earliest=await batches.locator('option').last().getAttribute('value');await batches.selectOption(earliest);await assertAllCandidates();
+ await batches.selectOption('');await assertAllCandidates();
+ await page.reload();await page.locator('#page-home.active').waitFor({timeout:60000});await nav('candidates');await assertAllCandidates();
+ pass('Candidates from all three uploads stay visible, searchable and openable across batch selection and reload');
  stage='comparison';await nav('compare');await page.locator('#compare1').selectOption(candidateIds[0]);await page.locator('#compare2').selectOption(candidateIds[1]);
  await require('./fixtures/assert-comparison.cjs')(page,candidateIds.slice(0,2));pass('Live comparison opens the two selected candidates');
  await openCandidate(candidateIds.at(-1));
