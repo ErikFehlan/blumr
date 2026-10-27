@@ -17,7 +17,7 @@
   async function open(){
    if(!enabled||!api.job()){host.hidden=true;return;}
    const target=api.job().id,g=generation;
-   if(jobId===target){render();if(batchId)void refresh();return;}
+   if(jobId===target){if(snapshot&&!snapshot.batch.sealed)api.root.querySelector('#resumeUploadsPanel').open=true;render();if(batchId)void refresh();return;}
    jobId=target;batchId=null;snapshot=null;list=[];search='';message='';render();
    try{const rows=await api.data().listScreeningBatches(target);if(!current(g)||jobId!==target)return;list=rows;batchId=rows[0]?.id||null;render();if(batchId)await refresh();}catch{if(current(g)&&jobId===target){status('Saved uploads could not load. Reopen this page to retry.');jobId=null;}}
   }
@@ -25,7 +25,7 @@
    if(!batchId)return;if(loading?.id===batchId)return loading.promise;
    const id=batchId,g=generation,service=api.data();
    const run={id,promise:null};loading=run;
-   run.promise=(async()=>{try{const value=await service.refreshScreeningBatch(id,Boolean(snapshot?.batch.sealed));if(!current(g)||batchId!==id)return;snapshot=value;render();
+   run.promise=(async()=>{try{const value=await service.refreshScreeningBatch(id,Boolean(snapshot?.batch.sealed));if(!current(g)||batchId!==id)return;if(!snapshot&&!value.batch.sealed)api.root.querySelector('#resumeUploadsPanel').open=true;snapshot=value;api.uploadResults?.(value,jobId);render();
     }catch(e){if(current(g)&&batchId===id)status(e.message);}finally{if(loading===run)loading=null;if(current(g))schedule();}})();
    return run.promise;
   }
@@ -39,6 +39,7 @@
    const job=api.job(),service=api.data(),g=generation;
    if(!job||job.status==='closed'){api.toast('Choose an open job.','error');return;}
    if(uploads?.running||starting){api.toast('Wait for these files to finish saving before adding more.','error');return;}
+   api.root.querySelector('#resumeUploadsPanel').open=true;
    const run={running:true,id:null,job:job.id,work:[]};uploads=run;status('Preparing your upload…');
    try{
     const entries=await global.BlumrBulkFiles.expand(files);if(!current(g))return;
@@ -67,7 +68,7 @@
       const prepared=await service.prepareScreeningUpload(id,item.ordinal,text);if(!current(g))break;
       if(!prepared.stored)await service.uploadResume({id:prepared.candidate_id,jobId:job.id,resumeIntake:{hash:prepared.hash}},file,text);
       if(!current(g))break;
-      await service.updateScreeningItem(id,item.ordinal,'saved');item.state='saved';item.entry=null;
+      await service.updateScreeningItem(id,item.ordinal,'saved');if(current(g))api.savedResume?.({id:prepared.candidate_id,jobId:job.id,name:item.entry.name});item.state='saved';item.entry=null;
      }catch(e){item.state='failed';item.error=e.message||'Document needs attention';if(current(g))try{await service.updateScreeningItem(id,item.ordinal,'failed');}catch{}}
      if(!current(g))break;
      if(batchId===id&&Date.now()-lastRefresh>2000){lastRefresh=Date.now();await refresh();}
@@ -89,7 +90,7 @@
   function render(){
    if(!enabled){host.hidden=true;return;}host.hidden=false;const s=snapshot,draft=s&&!s.batch.sealed,items=s?.items||[],saved=items.filter(i=>i.status==='saved'),problems=items.filter(i=>['pending','failed'].includes(i.status)),count=new Set(saved.map(i=>i.candidate_id)).size;
    const focused=document.activeElement,editing=host.contains(focused)&&focused.matches('[data-bulk-search]')?{start:focused.selectionStart,end:focused.selectionEnd}:null;
-   api.root.querySelector('#candidateCards').hidden=Boolean(batchId);
+   api.root.querySelector('#candidateCards').hidden=false;
    const selected=new Map((s?.selected||[]).map(c=>[c.candidateId,c]));
    const results=allResults().filter(c=>String(selected.get(c.candidateId)?.assessment?.result?.name||c.name).toLowerCase().includes(search.toLowerCase()));
    host.innerHTML=(list.length?'<label>Saved uploads <select data-bulk-batch><option value="">New upload</option>'+list.map(b=>'<option value="'+esc(b.id)+'" '+(batchId===b.id?'selected':'')+'>'+esc(b.created_at?new Date(b.created_at).toLocaleString():'Earlier upload')+'</option>').join('')+'</select></label>':'')+
@@ -147,7 +148,7 @@
    }catch(e){if(current(g))status(e.message||'Could not save. Refresh and try again.');}finally{if(button.isConnected)button.disabled=false;}
   });
   function clear(){generation++;clearTimeout(timer);reviewTimers.forEach(clearTimeout);reviewTimers.clear();enabled=false;jobId=null;batchId=null;snapshot=null;list=[];uploads=null;loading=null;reviews.clear();reviewLoads.clear();api.root.querySelector('#candidateCards').hidden=false;host.replaceChildren();host.hidden=true;}
-  return {init,open,openSaved,add,clear,loadCandidate,renderCandidate,next,isBulk:()=>enabled,hasUnsaved:()=>Boolean(uploads?.running)};
+  return {init,open,openSaved,add,clear,loadCandidate,renderCandidate,next,openCandidate:id=>api.openCandidate(id),isBulk:()=>enabled,hasUnsaved:()=>Boolean(uploads?.running)};
  }
  global.BlumrBulkScreening={mount};
 })(window);

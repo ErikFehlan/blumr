@@ -42,8 +42,9 @@
     'assets/retention-analytics.js?v=20261014-retention',
     'assets/vendor/jszip-3.10.1.min.js',
     'assets/bulk-files.js?v=20261020-bulk',
-    'assets/bulk-screening.js?v=20261027-legacy-analysis',
-    'assets/app.js?v=20261027-legacy-analysis'
+    'assets/candidate-list.js?v=20261027-all-candidates',
+    'assets/bulk-screening.js?v=20261027-all-candidates',
+    'assets/app.js?v=20261027-all-candidates'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
