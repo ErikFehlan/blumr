@@ -8,11 +8,11 @@ function fixture() {
   const calls=[]; let fail=false,lose=false,rpcHandler;
   const downloads=[];
   const client={storage:{from(bucket){return {download:async path=>{downloads.push({bucket,path});return {data:'original-bytes',error:null};}};}},rpc:(name,args)=>rpcHandler(name,args),from(table){let operation='select',payload,filters=[],columns='*';const q={
-    select(value='*'){columns=value;return q},eq(k,v){filters.push([k,v]);return q},is(k,v){return q.eq(k,v)},
+    select(value='*'){columns=value;return q},eq(k,v){filters.push([k,v]);return q},is(k,v){return q.eq(k,v)},in(k,v){filters.push([k,v,'in']);return q},
     insert(v){operation='insert';payload=v;return q},update(v){operation='update';payload=v;return q},delete(){operation='delete';return q},
     then(resolve,reject){return Promise.resolve().then(()=>{
       rows[table] ||= [];
-      const matching=rows[table].filter(row=>filters.every(([k,v])=>typeof row[k]==='object'&&row[k]!==null?JSON.stringify(row[k])===v:row[k]===v));
+      const matching=rows[table].filter(row=>filters.every(([k,v,op])=>op==='in'?v.includes(row[k]):typeof row[k]==='object'&&row[k]!==null?JSON.stringify(row[k])===v:row[k]===v));
       if(operation==='select')return {data:clone(columns==='*'?matching:matching.map(row=>Object.fromEntries(columns.split(',').filter(k=>k in row).map(k=>[k,row[k]])))),error:null};
       calls.push({table,operation,payload,filters});
       if(fail){fail=false;return {data:null,error:new Error('network unavailable')}}
@@ -224,4 +224,20 @@ test('a colliding insert with different evidence is never adopted as the local s
  const f=fixture(),state=await f.service.load();state.candidates.push({id:'collision',jobId:'job',name:'Local',short:'Local',strengths:[],concerns:[],tags:[],jdScore:7,managerScore:7,createdAt:1,updatedAt:1});
  f.rows.candidates=[{id:'collision',workspace_id:'workspace',job_id:'job',name:'Another tab'}];
  await assert.rejects(f.service.flush(state),e=>e.code==='23505');assert.equal(f.rows.candidates[0].name,'Another tab');
+});
+
+test('individual uploads find server-created bulk resumes without changing the save baseline',async()=>{
+ const f=fixture(),state=await f.service.load();
+ f.rows.screening_managed_candidates=[{candidate_id:'bulk-candidate',workspace_id:'workspace',job_id:'job'}];
+ f.rows.screening_batch_items=[
+  {candidate_id:'bulk-candidate',workspace_id:'other',job_id:'job',batch_id:'private-batch',status:'saved',file_name:'Private.pdf'},
+  {candidate_id:'bulk-candidate',workspace_id:'workspace',job_id:'other-job',batch_id:'wrong-job',status:'saved',file_name:'Other.pdf'},
+  {candidate_id:'bulk-candidate',workspace_id:'workspace',job_id:'job',batch_id:'saved-batch',status:'saved',file_name:'Resume.pdf'}
+ ];
+ const saved=await f.service.findScreeningResume('job',['bulk-candidate']);
+ assert.equal(saved.batchId,'saved-batch');assert.equal(saved.id,'bulk-candidate');assert.equal(saved.screeningManaged,true);
+ assert.equal(await f.service.findScreeningResume('job',['missing']),null);
+ assert.equal(await f.service.findScreeningResume('other-job',['bulk-candidate']),null);
+ assert.equal(await f.service.findScreeningResume('job',[]),null);
+ await f.service.flush(state);assert.equal(f.calls.length,0,'lookup must not write or cause deletion on the next save');
 });

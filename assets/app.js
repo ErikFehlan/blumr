@@ -591,6 +591,8 @@
       const intake=window.AncalagonIntake.create({
         root,bindLessons:wrap=>assessmentMemory.bind(wrap),beforeReview:prepareAssessmentReview,next:advanceAfterReview,reviewed:()=>{void guidance?.complete('assessment');void guidance?.complete('approval');},job:id=>id?jobs.find(j=>j.id===id):activeJob(),candidates:()=>candidates,
         workspace:()=>window.ancalagonAuth.workspace.id,extract:extractLocalResume,
+        findScreeningResume:(job,ids)=>dataService.findScreeningResume?.(job,ids),
+        openScreeningResume:saved=>bulk.openSaved(saved),
         add:value=>{const c=ensureScores({...value,short:value.name,initials:initialsFor(value.name)});candidates.push(c);return c;},
         persist:()=>dataService.flush(stateSnapshot()),upload:async(c,file,text)=>{const service=dataService,result=await service.uploadResume(c,file,text);if(service===dataService)recordActivation('resume_saved',c.jobId);return result;},
         text:c=>dataService.loadResumeText(c),document:c=>dataService.loadResumeDocument?.(c),analyze:analyzeResumeWithHybrid,

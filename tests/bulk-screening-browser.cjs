@@ -13,8 +13,13 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   if(op==='legacy'){legacyCalls++;throw Error('Bulk candidate entered legacy AI intake');}
   if(op==='approve'){const c=candidates.get(args[0]);assert.equal(args[1],c.assessment.revision);c.approved=true;c.assessment.status='approved';approvals++;return true;}
   if(op==='list')return batch&&batch.job_id===args[0]?[batch]:[];
+  if(op==='find'){
+   if(batch?.job_id!==args[0])return null;
+   const c=[...candidates.values()].find(c=>args[1].includes(c.candidateId));
+   return c?{id:c.candidateId,jobId:batch.job_id,batchId:batch.id,name:c.name,short:c.name,screeningManaged:true,uploadStatus:'saved'}:null;
+  }
   if(op==='create'){createCalls++;if(delayCreate)await new Promise(resolve=>releaseCreate=resolve);const [id,job,manifest,budget]=args;batch={id,job_id:job,created_at:new Date().toISOString(),sealed:false,selected_ids:[],selection_version:0,budget_usd:budget,manifest};batch.items=manifest.map((f,ordinal)=>({ordinal,file_name:f.name,file_size:f.size,status:'pending'}));return id;}
-  if(op==='prepare'){const [,ordinal,text]=args,id=crypto.createHash('sha256').update(text.toLowerCase().replace(/\s+/g,' ').trim()).digest('hex').slice(0,32),item=batch.items[ordinal];item.candidate_id=id;
+  if(op==='prepare'){const [,ordinal,text]=args,{id}=await require('../assets/resume-intake.js').identity('workspace',batch.job_id,text),item=batch.items[ordinal];item.candidate_id=id;
    if(!candidates.has(id))candidates.set(id,{candidateId:id,name:item.file_name,text});return {candidate_id:id,hash:id.padEnd(64,'0'),stored:docs.has(id)};}
   if(op==='upload'){const [c,text,fileName]=args;if(fileName==='retry.txt'&&!failedOnce){failedOnce=true;throw Error('Simulated upload interruption');}docs.set(c.id,text);return 'stored';}
   if(op==='mark'){batch.items[args[1]].status=args[2];return null;}
@@ -48,7 +53,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.route('**/assets/resume-intake.js*',r=>r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(dir,'assets/resume-intake.js'),'utf8')+";{const original=window.AncalagonIntake.create;window.AncalagonIntake.create=api=>{window.testExtractLocalResume=api.extract;return original(api);};}"}));
   await page.addInitScript(()=>{
    const rpc=async(op,...args)=>{const r=await fetch('/__bulk',{method:'POST',body:JSON.stringify({op,args})});const value=await r.json();if(!r.ok)throw Error(value.error);return value;};
-   window.AncalagonData={create:()=>({load:()=>rpc('load'),requestResumeIntake:()=>rpc('legacy'),loadResumeIntakes:async()=>[],reviewResumeIntake:(...a)=>rpc('approve',...a),schedule:(_,__,done)=>done('saved'),flush:async()=>{},trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin');},
+   window.AncalagonData={create:()=>({load:()=>rpc('load'),requestResumeIntake:()=>rpc('legacy'),loadResumeIntakes:async()=>[],reviewResumeIntake:(...a)=>rpc('approve',...a),schedule:(_,__,done)=>done('saved'),flush:async()=>{window.individualFlushes=(window.individualFlushes||0)+1;},findScreeningResume:(...a)=>rpc('find',...a),trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin');},
     screeningCapabilities:async()=>({enabled:true}),listScreeningBatches:id=>rpc('list',id),createScreeningBatch:(...a)=>rpc('create',...a),prepareScreeningUpload:(...a)=>rpc('prepare',...a),updateScreeningItem:(...a)=>rpc('mark',...a),sealScreeningBatch:(...a)=>rpc('seal',...a),refreshScreeningBatch:(...a)=>rpc('refresh',...a),selectScreeningFinalists:(...a)=>rpc('select',...a),updateScreeningBudget:(...a)=>rpc('budget',...a),uploadResume:(c,f,t)=>rpc('upload',c,t,f.name),loadResumeText:c=>rpc('text',c),loadResumeDocument:async()=>null})};
    window.ancalagonAuth={session:{user:{id:'test'},access_token:'test-token'},workspace:{id:'workspace'}};
   });
@@ -65,6 +70,20 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Files saved'),{},{timeout:15000});
   const broken=batch.items.find(i=>i.file_name==='Broken.pdf');await page.locator(`[data-bulk-exclude="${broken.ordinal}"]`).click();await page.getByText('Screening complete for this batch',{exact:true}).waitFor();
   assert.equal(docs.size,23);assert.equal(deepCalls,0);assert.equal(batch.sealed,true);
+  // A bulk import exists remotely but has not been hydrated into local candidates.
+  // Re-uploading through the individual path must reuse it without any save or AI.
+  const beforeHandoff={docs:docs.size,candidates:candidates.size,flushes:await page.evaluate(()=>window.individualFlushes||0)};
+  await page.locator('#screeningMode').selectOption('standard');
+  await page.locator('#resumeUpload').setInputFiles({name:'Same-resume.txt',mimeType:'text/plain',buffer:Buffer.from(text(0))});
+  await page.waitForFunction(()=>document.querySelector('#screeningMode').value==='bulk');
+  await page.getByRole('button',{name:'Open saved import',exact:true}).waitFor();
+  assert.match(await page.locator('#resumeUploadRecovery').textContent(),/already saved/);
+  assert.equal(docs.size,beforeHandoff.docs);assert.equal(candidates.size,beforeHandoff.candidates);
+  assert.equal(await page.evaluate(()=>window.individualFlushes||0),beforeHandoff.flushes,'handoff attempted an individual candidate save');
+  assert.equal(deepCalls,0);assert.equal(legacyCalls,0);
+  await page.locator('#screeningMode').selectOption('standard');
+  await page.getByRole('button',{name:'Open saved import',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#screeningMode').value==='bulk');
   await page.locator('[data-bulk-disclosure="near"]').evaluate(d=>d.open=true);
   await page.locator('[data-bulk-refresh]').click();await page.waitForTimeout(150);
   assert.equal(await page.locator('[data-bulk-disclosure="near"]').evaluate(d=>d.open),true,'Refresh closed evidence review');
