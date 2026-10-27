@@ -35,6 +35,12 @@ let browser,page,stage='setup';
   if(await group.count()&&await group.getAttribute('open')===null)await group.locator('summary').click();
   await page.locator(`.rf-nav [data-page="${name}"]`).click();await page.locator(`#page-${name}.active`).waitFor();
  };
+ const openCandidate=async id=>{
+  await nav('candidates');
+  await page.locator(`[data-bulk-open="${id}"], [data-candidate-id="${id}"]`).filter({visible:true}).first().click();
+  await page.locator('#page-detail.active').waitFor();
+  await poll(async()=>await page.locator('#candidateWorkspace').getAttribute('data-workspace-candidate')===id,'Saved candidate did not finish opening');
+ };
  stage='login';await login(owner);pass('Live password login reaches Home');
  stage='create-job';await page.locator('[data-home-action="new"]').click();
  const jobTitle='Synthetic live QA '+fixture.run.slice(0,8);
@@ -78,8 +84,7 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
    await page.goto(fixture.app,{waitUntil:'domcontentloaded',timeout:45000});
    await page.locator('#page-home.active').waitFor({timeout:60000});
    await nav('jobs');await page.locator(`[data-activate-job="${job.id}"]`).click();
-   await nav('candidates');await page.locator(`[data-bulk-open="${id}"], [data-candidate-id="${id}"]`).filter({visible:true}).first().click();
-   assert.equal(await page.locator('#candidateWorkspace').getAttribute('data-workspace-candidate'),id);
+   await openCandidate(id);
    assert.equal((await api(owner,'candidates?select=id&id=eq.'+id)).length,1,'Tab close duplicated the saved candidate');
    pass(`Saved resume and candidate survive closing and reopening the tab (task at close: ${statusAtClose||'not yet visible'})`);
   }
@@ -111,7 +116,7 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
  }
  stage='comparison';await nav('compare');await page.locator('#compare1').selectOption(candidateIds[0]);await page.locator('#compare2').selectOption(candidateIds[1]);
  await require('./fixtures/assert-comparison.cjs')(page,candidateIds.slice(0,2));pass('Live comparison opens the two selected candidates');
- await nav('candidates');if(await page.locator(`[data-bulk-open="${candidateIds.at(-1)}"]`).count())await page.locator(`[data-bulk-open="${candidateIds.at(-1)}"]`).click();else await page.locator(`[data-candidate-id="${candidateIds.at(-1)}"]`).click();
+ await openCandidate(candidateIds.at(-1));
  stage='submittal';
  await page.locator('#workspaceSubmission > summary').click();const draft='Synthetic submittal: manual regression testing and documented defect remediation.';
  await page.locator('#submissionDraft').fill(draft);await page.locator('#saveSubmissionDraft').click();
@@ -126,7 +131,7 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
  const feedback=await api(owner,'manager_feedback?select=id,feedback_text&job_id=eq.'+job.id);assert.equal(feedback.length,1);assert.match(feedback[0].feedback_text,/Synthetic feedback/);
  pass('Manager feedback is saved and receives an AI interpretation');
  stage='reload';await page.locator('#syncStatus[data-state="saved"]').waitFor();await page.reload();await page.locator('#page-home.active').waitFor({timeout:60000});
- await nav('jobs');await page.locator(`[data-activate-job="${job.id}"]`).click();await nav('candidates');await page.locator(`[data-candidate-id="${last}"]`).click();
+ await nav('jobs');await page.locator(`[data-activate-job="${job.id}"]`).click();await openCandidate(last);
  await page.locator('#workspaceSubmission > summary').click();assert.equal(await page.locator('#submissionDraft').inputValue(),draft);
  pass('Job, candidates and submittal survive a real page reload');
  stage='mobile';await page.setViewportSize({width:390,height:844});
