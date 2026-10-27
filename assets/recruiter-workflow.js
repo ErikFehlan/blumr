@@ -30,8 +30,8 @@
    // Keep a bounded session history. Durable progress is rebuilt from candidates.
    while(items.length+selected.length>60){const old=items.findIndex(i=>!i.file);if(old<0)break;items.splice(old,1);}
    const open=selected.length===1&&!running&&!retained.length;
-   for(const file of selected)items.push({id:String(++sequence),file,fileName:file.name,jobId:job.id,jobTitle:job.title,workspaceId:api.workspace(),state:'waiting',open});
-   changed();void drain();return true;
+   for(const file of selected)items.push({id:String(++sequence),file,fileName:file.name,jobId:job.id,jobTitle:job.title,workspaceId:api.workspace(),state:api.deferStart?'staged':'waiting',open});
+   changed();if(!api.deferStart)void drain();return true;
   }
   async function drain(){
    if(running)return;running=true;
@@ -47,19 +47,21 @@
     }catch(e){item.state='error';item.error=e.message||'Upload could not finish.';changed();}
    }}finally{running=false;changed();}
   }
+  function start(){const staged=items.filter(i=>i.state==='staged'&&i.jobId===api.job()?.id&&i.workspaceId===api.workspace());for(const i of staged){i.state='waiting';i.open=staged.length===1;}changed();void drain();}
   function retry(id){const i=items.find(x=>x.id===id);if(!i||i.state!=='error'||!i.file)return;i.state='waiting';i.error='';i.open=false;changed();void drain();}
-  function dismiss(id){const i=items.find(x=>x.id===id);if(!i||!['waiting','error','saved'].includes(i.state))return;items.splice(items.indexOf(i),1);if(i.candidateId&&!items.some(x=>x.candidateId===i.candidateId&&x.file))api.release?.(i.candidateId);i.file=null;changed();}
+  function dismiss(id){const i=items.find(x=>x.id===id);if(!i||!['staged','waiting','error','saved'].includes(i.state))return;items.splice(items.indexOf(i),1);if(i.candidateId&&!items.some(x=>x.candidateId===i.candidateId&&x.file))api.release?.(i.candidateId);i.file=null;changed();}
   function view(){return items.map(({file,...i})=>({...i,retained:!!file}));}
-  return {add,retry,dismiss,view,hasUnsaved:()=>items.some(i=>!!i.file)};
+  return {add,start,retry,dismiss,view,hasUnsaved:()=>items.some(i=>!!i.file)};
  }
  function renderBatch(host,items,currentJob,candidates=[]){
   if(!host)return;host.hidden=!items.length;if(host.hidden)return;
   const active=items.filter(i=>['waiting','reading','saving'].includes(i.state)),errors=items.filter(i=>i.state==='error'),saved=items.filter(i=>i.state==='saved');
-  const summary=active.length?`${saved.length} of ${items.length} files saved · ${active.length} uploading`:errors.length?`${errors.length} upload${errors.length===1?'':'s'} need attention`:`${saved.length} file${saved.length===1?'':'s'} saved`;
-  const labels={waiting:'Waiting to upload',reading:'Reading resume…',saving:'Saving resume…',saved:'Resume saved',error:'Upload needs attention'};
+  const summary=items.some(i=>i.state==='staged')?'Resumes ready to analyze':active.length?`${saved.length} of ${items.length} files saved · ${active.length} uploading`:errors.length?`${errors.length} upload${errors.length===1?'':'s'} need attention`:`${saved.length} file${saved.length===1?'':'s'} saved`;
+  const labels={staged:'Ready to upload and analyze',waiting:'Waiting to upload',reading:'Reading resume…',saving:'Saving resume…',saved:'Resume saved',error:'Upload needs attention'};
   const byId=new Map(candidates.map(c=>[c.id,c]));
-  const rows=items.map(i=>{const candidate=byId.get(i.candidateId),ready=candidate&&phase(candidate)==='ready';return `<div class="rf-upload-row"><div><strong>${esc(i.fileName)}</strong><small>${i.jobId!==currentJob?esc(i.jobTitle)+' · ':''}${i.duplicate&&i.state==='saved'?'Already attached · no duplicate created':labels[i.state]}</small>${i.error?`<p class="rf-upload-error">${esc(i.error)}</p>`:''}</div><div class="rf-actions">${i.state==='saved'&&candidate?`<button type="button" class="rf-btn" data-batch-open="${esc(candidate.id)}">${ready?'View screening brief':'View candidate'}</button>`:''}${i.state==='error'?`<button type="button" class="rf-btn" data-batch-retry="${i.id}">Retry</button>`:''}${['waiting','error'].includes(i.state)?`<button type="button" class="rf-linkbtn" data-batch-dismiss="${i.id}">Remove from upload queue</button>`:''}</div></div>`}).join('');
-  const html=`<summary><strong>Resume uploads</strong><span role="status">${summary}</span></summary><div class="rf-batch-body"><p class="rf-sub">${active.length||errors.length?'Keep this tab open until each file is saved. Removing a file from this queue keeps any candidate already created.':'Your resumes are saved. You can close this tab while assessments finish.'}</p>${rows}</div>`;
+  const rows=items.map(i=>{const candidate=byId.get(i.candidateId),ready=candidate&&phase(candidate)==='ready';return `<div class="rf-upload-row"><div><strong>${esc(i.fileName)}</strong><small>${i.jobId!==currentJob?esc(i.jobTitle)+' · ':''}${i.duplicate&&i.state==='saved'?'Already attached · no duplicate created':labels[i.state]}</small>${i.error?`<p class="rf-upload-error">${esc(i.error)}</p>`:''}</div><div class="rf-actions">${i.state==='saved'&&candidate?`<button type="button" class="rf-btn" data-batch-open="${esc(candidate.id)}">${ready?'View screening brief':'View candidate'}</button>`:''}${i.state==='error'?`<button type="button" class="rf-btn" data-batch-retry="${i.id}">Retry</button>`:''}${['staged','waiting','error'].includes(i.state)?`<button type="button" class="rf-linkbtn" data-batch-dismiss="${i.id}">Remove from upload queue</button>`:''}</div></div>`}).join('');
+  const staged=items.filter(i=>i.state==='staged'&&i.jobId===currentJob);
+  const html=`<summary><strong>Resume uploads</strong><span role="status">${summary}</span></summary><div class="rf-batch-body"><p class="rf-sub">${staged.length?'Your files are ready. Click Analyze resumes to upload and start.':active.length||errors.length?'Keep this tab open until each file is saved. Removing a file from this queue keeps any candidate already created.':'Your resumes are saved. You can close this tab while assessments finish.'}</p>${rows}${staged.length?`<button type="button" class="rf-btn primary" data-batch-start>Analyze ${staged.length} resume${staged.length===1?'':'s'}</button>`:''}</div>`;
   if(host.dataset.markup!==html){
    const focused=host.contains(global.document?.activeElement)?{...global.document.activeElement.dataset}:null;
    host.innerHTML=html;host.dataset.markup=html;
@@ -68,7 +70,7 @@
     (button||host.querySelector('summary'))?.focus({preventScroll:true});break;
    }
   }
-  if(errors.length&&!host.dataset.hadError)host.open=true;host.dataset.hadError=errors.length?'yes':'';
+  if(staged.length||errors.length&&!host.dataset.hadError)host.open=true;host.dataset.hadError=errors.length?'yes':'';
  }
  const api={createBatch,phase,queue,jobList,renderBatch};if(typeof module!=='undefined')module.exports=api;global.AncalagonRecruiter=api;
 })(typeof window==='undefined'?globalThis:window);

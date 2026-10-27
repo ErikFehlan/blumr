@@ -64,7 +64,8 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
   {label:'Scanned PDF OCR',name:'Synthetic-Morgan-Scanned.pdf',mimeType:'application/pdf',buffer:scanned,ocr:true}];
  const candidateIds=[];
  for(const doc of docs){
-  stage='upload-'+doc.name;await nav('candidates');if(await page.locator('#screeningMode').isVisible())await page.locator('#screeningMode').selectOption('standard');await page.locator('#resumeUpload').setInputFiles({name:doc.name,mimeType:doc.mimeType,buffer:doc.buffer});
+  stage='upload-'+doc.name;await nav('candidates');await page.locator('#resumeUpload').setInputFiles({name:doc.name,mimeType:doc.mimeType,buffer:doc.buffer});
+  await page.getByRole('button',{name:'Analyze 1 resume',exact:true}).click({timeout:120000});
   await page.locator('#page-detail.active').waitFor({timeout:doc.ocr?120000:20000});
   const id=await poll(()=>page.locator('#candidateWorkspace').getAttribute('data-workspace-candidate'),'Candidate was not opened');candidateIds.push(id);
   const saved=await poll(async()=> (await api(owner,'candidate_documents?select=file_name,extracted_text,storage_path&candidate_id=eq.'+id)).find(d=>d.file_name===doc.name),'Uploaded document was not persisted');
@@ -77,7 +78,7 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
    await page.goto(fixture.app,{waitUntil:'domcontentloaded',timeout:45000});
    await page.locator('#page-home.active').waitFor({timeout:60000});
    await nav('jobs');await page.locator(`[data-activate-job="${job.id}"]`).click();
-   await nav('candidates');await page.locator(`[data-candidate-id="${id}"]`).click();
+   await nav('candidates');await page.locator(`[data-bulk-open="${id}"], [data-candidate-id="${id}"]`).filter({visible:true}).first().click();
    assert.equal(await page.locator('#candidateWorkspace').getAttribute('data-workspace-candidate'),id);
    assert.equal((await api(owner,'candidates?select=id&id=eq.'+id)).length,1,'Tab close duplicated the saved candidate');
    pass(`Saved resume and candidate survive closing and reopening the tab (task at close: ${statusAtClose||'not yet visible'})`);
@@ -110,7 +111,7 @@ await page.locator('#jobForm button[type="submit"]').click();await page.locator(
  }
  stage='comparison';await nav('compare');await page.locator('#compare1').selectOption(candidateIds[0]);await page.locator('#compare2').selectOption(candidateIds[1]);
  await require('./fixtures/assert-comparison.cjs')(page,candidateIds.slice(0,2));pass('Live comparison opens the two selected candidates');
- await nav('candidates');await page.locator(`[data-candidate-id="${candidateIds.at(-1)}"]`).click();
+ await nav('candidates');if(await page.locator(`[data-bulk-open="${candidateIds.at(-1)}"]`).count())await page.locator(`[data-bulk-open="${candidateIds.at(-1)}"]`).click();else await page.locator(`[data-candidate-id="${candidateIds.at(-1)}"]`).click();
  stage='submittal';
  await page.locator('#workspaceSubmission > summary').click();const draft='Synthetic submittal: manual regression testing and documented defect remediation.';
  await page.locator('#submissionDraft').fill(draft);await page.locator('#saveSubmissionDraft').click();

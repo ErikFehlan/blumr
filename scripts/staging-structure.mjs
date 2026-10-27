@@ -25,10 +25,11 @@ export function capacityExpectations(sql) {
 export const normalizeStructure=value=>value.replaceAll('\r\n','\n').replaceAll('zqiqjzxcpznhzjengfff','PROJECT').replaceAll('momfzjmycveqginxmqib','PROJECT');
 // Check each bulk override against its exact source and intended caller class.
 // This is not an exemption for changed legacy intake or export functions.
-export function bulkScreeningExpectations(sql){
+export function bulkScreeningExpectations(sql,{unified=false}={}){
  const members=new Set(['screening_capabilities','resume_content_hash','create_screening_batch','update_screening_budget','prepare_screening_upload','update_screening_item','seal_screening_batch','bulk_screening_source','bulk_screening_page','select_screening_finalists','screening_batch_snapshot','get_account_export']);
  const workers=new Set(['save_bulk_screening_page','reserve_screening_ai','record_screening_ai_usage','next_screening_batches','begin_assessment_provider']);
  const internal=new Set(['require_screening_batch','screening_finalist_input','resume_intake_input','enqueue_resume_intake','enqueue_job_reassessments','intake_source_changed']);
+ if(unified){members.clear();workers.clear();internal.clear();for(const name of ['create_resume_upload','append_resume_upload','start_resume_analysis','get_resume_analysis','prepare_screening_upload','update_screening_item','seal_screening_batch','bulk_screening_source'])members.add(name);for(const name of ['auto_start_resume_analysis','next_screening_batches'])workers.add(name);}
  const expected=new Map(),pattern=/create or replace function public\.(\w+)\(([^)]*)\) returns (?:public\.)?(\w+)\s+language (sql|plpgsql)\s+(?:(immutable|stable|volatile)\s+)?(?:(?:parallel safe)\s+)?(?:security (definer|invoker)\s+)?set search_path='' as \$\$([\s\S]*?)\$\$;/g;
  for(const [,name,args,result,language,volatility,security,body] of sql.matchAll(pattern)){
   if(!members.has(name)&&!workers.has(name)&&!internal.has(name))throw Error('Unexpected bulk screening routine');

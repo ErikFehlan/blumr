@@ -24,3 +24,13 @@ Deno.test('bulk route verifies requested workspace before any privileged cache w
  globalThis.fetch=async()=>{requests++;return Response.json({workspaceId:'foreign'});};
  try{const response=await handleBulkScreening({batch_id:'00000000-0000-0000-0000-000000000001',action:'refresh'},{workspace:'owned',base:'https://example.invalid',serviceKey:'secret',headers:{Authorization:'Bearer caller'}});assert(response.status===403&&requests===1,'Foreign batch crossed scope');}finally{globalThis.fetch=original;}
 });
+Deno.test('saved drafts perform no scoring or selection before Analyze; requested work continues on the worker',async()=>{
+ const pool=qualificationPools[0],source:any={...qualificationJob(pool),workspaceId:'workspace',feedback:[],assessments:[],lessons:[],sourceVersion:'source',batch:{defer_analysis:true,analysis_requested_at:null,auto_selected:false}};
+ const calls:string[]=[];
+ const rpc=async(name:string)=>{calls.push(name);if(name==='bulk_screening_source')return source;if(name==='bulk_screening_page')return [];if(name==='save_bulk_screening_page')return true;if(name==='auto_start_resume_analysis')return true;throw Error(name);};
+ const draft=await processBulkScreeningBatch('batch',rpc);assert(draft.status==='awaiting_start'&&calls.length===1,'Draft ran analysis');
+ source.batch.analysis_requested_at='2026-10-27T14:00:00Z';calls.length=0;
+ await processBulkScreeningBatch('batch',rpc);assert(calls.at(-1)==='auto_start_resume_analysis','Explicit request did not continue after scoring');
+ source.batch.auto_selected=true;calls.length=0;
+ await processBulkScreeningBatch('batch',rpc);assert(!calls.includes('auto_start_resume_analysis'),'Completed selection was replayed');
+});

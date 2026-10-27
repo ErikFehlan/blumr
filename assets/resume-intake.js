@@ -254,6 +254,7 @@
       }}finally{running=false;}
     }
     async function retry(c){
+      if(c?.screeningManaged){await api.retryScreening?.(c);return;}
       if(!valid(c)||reviewing.has(c.id))return;
       if(!c.resumeIntake.stored&&!files.has(c.id)){
         // A document may have saved just before the browser closed.
@@ -271,6 +272,7 @@
     }
     function duplicates(c){return api.candidates().filter(x=>x.id!==c.id&&x.jobId===c.jobId&&normalize(x.name)===normalize(c.name)&&c.resumeIntake?.brief?.name!=='Candidate');}
     async function approve(c,{next=false}={}){
+      if(c?.screeningManaged){if(reviewing.has(c.id))return;reviewing.add(c.id);changed(c);try{await api.reviewScreening?.(c);if(next)api.next?.(c);}catch(e){api.toast(e.message||'Approval could not save. Try again.','error');}finally{reviewing.delete(c.id);changed(c);}return;}
       if(!valid(c)||reviewing.has(c.id)||c.resumeIntake.phase!=='ready'||!pending(c))return;
       if(c.resumeIntake.signature!==api.signature(context(c))){await retry(c);return;}
       reviewing.add(c.id);changed(c);
@@ -368,7 +370,7 @@
     }
     function renderCandidate(c,wrap){
       if(!wrap)return;const state=c?.resumeIntake;wrap.hidden=!state||(wrap.id==='workspaceIntake'&&!pending(c));if(wrap.hidden){wrap.innerHTML='';delete wrap.dataset.markup;return;}
-      const prose=global.AncalagonPresentation,brief=state.brief,needsReview=pending(c),stale=needsReview&&state.phase==='ready'&&state.signature!==api.signature(context(c));
+      const prose=global.AncalagonPresentation,brief=state.brief,needsReview=pending(c),stale=!c.screeningManaged&&needsReview&&state.phase==='ready'&&state.signature!==api.signature(context(c));
       if(stale)queueMicrotask(()=>enqueue(c));
       let html='<span class="rf-kicker">Resume screening brief</span>';
       if(needsReview&&api.job(c.jobId)?.status==='closed')html+='<h3>Search closed · assessment paused</h3><p class="rf-sub">Reopen this search from Jobs to resume assessment work. Existing candidate records are retained.</p>';

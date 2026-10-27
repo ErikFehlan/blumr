@@ -6,10 +6,10 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
  const {processBulkScreeningBatch,summarizeBulkScreening}=await import('../supabase/functions/_shared/bulk-screening.ts');
  const {qualificationPools,qualificationJob}=await import('./fixtures/screening-qualification-pools.mjs');
  const pool=qualificationPools.find(p=>p.id==='qa'),source={...qualificationJob(pool,'workspace','job-a'),workspaceId:'workspace',feedback:[],assessments:[],lessons:[],sourceVersion:'source'};
- let batch=null,docs=new Map(),candidates=new Map(),failedOnce=false,deepCalls=0,legacyCalls=0,approvals=0,delayCreate=false,releaseCreate,createCalls=0;
- const assessment=c=>({status:'ready',revision:'current',result:{name:'Candidate',score:c.result.score/10,manager_score:c.result.score/10,jd_reason:'Verified synthetic testing evidence.',manager_reason:'No additional manager preferences supplied.',resume_evidence:[{claim:'Testing work',quote:c.text.split('\n').find(t=>/Performed|Owned/.test(t))||c.text}],concerns:['Verify scope on a phone screen.'],screening_questions:['What testing did you personally own?']}});
+ let batch=null,docs=new Map(),candidates=new Map(),failedOnce=false,deepCalls=0,legacyCalls=0,approvals=0,delayCreate=false,releaseCreate,createCalls=0,startCalls=0,loseStartResponse=true;
+ const assessment=c=>({status:'ready',revision:'current',result:{name:'Candidate',role:'QA Engineer',primary_signal:'Verified synthetic testing evidence.',tags:['QA'],score:c.result.score/10,manager_score:c.result.score/10,jd_reason:'Verified synthetic testing evidence.',manager_reason:'No additional manager preferences supplied.',resume_evidence:[{claim:'Testing work',quote:c.text.split('\n').find(t=>/Performed|Owned/.test(t))||c.text}],concerns:['Verify scope on a phone screen.'],screening_questions:['What testing did you personally own?']}});
  async function operation(op,args){
-  if(op==='load')return {jobs:[{id:'job-a',title:'QA Engineer',description:'Perform manual testing.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1},{id:'job-b',title:'Other role',description:'Other job requirements.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1}],candidates:[...candidates.values()].map(c=>({id:c.candidateId,jobId:'job-a',name:c.name,short:c.name,role:c.approved?'QA Engineer':'Resume awaiting analysis',screeningManaged:true,jdScore:c.approved?c.assessment.result.score:0,resumeJDScore:c.approved?c.assessment.result.score:0,managerScore:c.approved?c.assessment.result.manager_score:0,originalManagerScore:0,stage:'Sourced',strengths:[],concerns:[],tags:[],screeningQuestions:[],createdAt:1,updatedAt:1,aiReview:c.approved?{source:'resume_intake',verdict:'Accurate',assessment:c.assessment.result}:null})),feedback:[],interviewOutcomes:[]};
+  if(op==='load')return {jobs:[{id:'job-a',title:'QA Engineer',description:'Perform manual testing.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1},{id:'job-b',title:'Other role',description:'Other job requirements.',criteria:[],knockouts:[],weights:[],status:'active',createdAt:1,updatedAt:1}],candidates:[...candidates.values()].map(c=>({id:c.candidateId,jobId:c.jobId,name:c.name,short:c.name,role:c.approved?'QA Engineer':'Resume awaiting analysis',screeningManaged:true,jdScore:c.approved?c.assessment.result.score:0,resumeJDScore:c.approved?c.assessment.result.score:0,managerScore:c.approved?c.assessment.result.manager_score:0,originalManagerScore:0,stage:'Sourced',strengths:[],concerns:[],tags:[],screeningQuestions:[],createdAt:1,updatedAt:1,aiReview:c.approved?{source:'resume_intake',verdict:'Accurate',assessment:c.assessment.result}:null})),feedback:[],interviewOutcomes:[]};
   if(op==='legacy'){legacyCalls++;throw Error('Bulk candidate entered legacy AI intake');}
   if(op==='approve'){const c=candidates.get(args[0]);assert.equal(args[1],c.assessment.revision);c.approved=true;c.assessment.status='approved';approvals++;return true;}
   if(op==='list')return batch&&batch.job_id===args[0]?[batch]:[];
@@ -18,17 +18,20 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
    const c=[...candidates.values()].find(c=>args[1].includes(c.candidateId));
    return c?{id:c.candidateId,jobId:batch.job_id,batchId:batch.id,name:c.name,short:c.name,screeningManaged:true,uploadStatus:'saved'}:null;
   }
-  if(op==='create'){createCalls++;if(delayCreate)await new Promise(resolve=>releaseCreate=resolve);const [id,job,manifest,budget]=args;batch={id,job_id:job,created_at:new Date().toISOString(),sealed:false,selected_ids:[],selection_version:0,budget_usd:budget,manifest};batch.items=manifest.map((f,ordinal)=>({ordinal,file_name:f.name,file_size:f.size,status:'pending'}));return id;}
+  if(op==='create'){createCalls++;if(delayCreate)await new Promise(resolve=>releaseCreate=resolve);const [id,job,manifest,budget]=args;batch={id,job_id:job,created_at:new Date().toISOString(),sealed:false,selected_ids:[],selection_version:0,budget_usd:5,defer_analysis:true,analysis_requested_at:null,auto_selected:false,manifest};batch.items=manifest.map((f,ordinal)=>({ordinal,file_name:f.name,file_size:f.size,status:'pending'}));return id;}
+  if(op==='append'){const [id,offset,manifest]=args;assert.equal(id,batch.id);assert.equal(offset,batch.items.length);batch.items.push(...manifest.map((f,i)=>({ordinal:offset+i,file_name:f.name,file_size:f.size,status:'pending'})));return null;}
+  if(op==='start'){startCalls++;assert.ok(!batch.items.some(i=>['pending','failed'].includes(i.status)));batch.sealed=true;batch.analysis_requested_at||=new Date().toISOString();if(loseStartResponse){loseStartResponse=false;throw Error('Interrupted acknowledgment. Try Analyze again.');}return null;}
+  if(op==='analysis'){const c=candidates.get(args[0]);return {batchId:batch.id,started:!!batch.analysis_requested_at,stored:docs.has(c.candidateId),fileName:c.name,rules:c.result||null,assessment:c.assessment||null};}
   if(op==='prepare'){const [,ordinal,text]=args,{id}=await require('../assets/resume-intake.js').identity('workspace',batch.job_id,text),item=batch.items[ordinal];item.candidate_id=id;
-   if(!candidates.has(id))candidates.set(id,{candidateId:id,name:item.file_name,text});return {candidate_id:id,hash:id.padEnd(64,'0'),stored:docs.has(id)};}
+   if(!candidates.has(id))candidates.set(id,{candidateId:id,jobId:batch.job_id,name:item.file_name,text});return {candidate_id:id,hash:id.padEnd(64,'0'),stored:docs.has(id)};}
   if(op==='upload'){const [c,text,fileName]=args;if(fileName==='retry.txt'&&!failedOnce){failedOnce=true;throw Error('Simulated upload interruption');}docs.set(c.id,text);return 'stored';}
   if(op==='mark'){batch.items[args[1]].status=args[2];return null;}
   if(op==='seal'){if(batch.items.some(i=>['pending','failed'].includes(i.status)))throw Error('Unfinished files');batch.sealed=true;return null;}
   if(op==='refresh'){
    await processBulkScreeningBatch(batch.id,async(name,body)=>{
-    if(name==='bulk_screening_source')return source;
-    if(name==='bulk_screening_page')return [...candidates.values()].filter(c=>docs.has(c.candidateId)&&!c.result).slice(0,100).map(c=>({candidate_id:c.candidateId,document_id:c.candidateId,resume_hash:'hash',resume_text:c.text}));
-    if(name==='save_bulk_screening_page'){batch.source_version=body.p_source;batch.intelligence=body.p_intelligence;for(const r of body.p_rows)candidates.get(r.candidate_id).result=r.result;return true;}throw Error(name);
+    if(name==='bulk_screening_source')return {...source,batch};
+    if(name==='bulk_screening_page')return [...candidates.values()].filter(c=>batch.items.some(i=>i.status==='saved'&&i.candidate_id===c.candidateId)&&docs.has(c.candidateId)&&!c.result).slice(0,100).map(c=>({candidate_id:c.candidateId,document_id:c.candidateId,resume_hash:'hash',resume_text:c.text}));
+    if(name==='save_bulk_screening_page'){batch.source_version=body.p_source;batch.intelligence=body.p_intelligence;for(const r of body.p_rows)candidates.get(r.candidate_id).result=r.result;return true;}if(name==='auto_start_resume_analysis'){if(!batch.auto_selected){const pool=[...candidates.values()].filter(c=>batch.items.some(i=>i.status==='saved'&&i.candidate_id===c.candidateId));if(pool.some(c=>!c.result))return false;await operation('select',[batch.id,pool.sort((a,b)=>b.result.score-a.result.score||a.candidateId.localeCompare(b.candidateId)).slice(0,20).map(c=>c.candidateId)]);batch.auto_selected=true;}return true;}throw Error(name);
    });
    return summarizeBulkScreening({batch,items:batch.items,candidates:[...candidates.values()].filter(c=>batch.items.some(i=>i.status==='saved'&&i.candidate_id===c.candidateId)),source_current:true,cost:{provider_calls_reserved:deepCalls,reserved_usd:deepCalls*.02,actual_usd:deepCalls*.01,unsettled_calls:0,budget_usd:batch.budget_usd}});
   }
@@ -54,64 +57,60 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.addInitScript(()=>{
    const rpc=async(op,...args)=>{const r=await fetch('/__bulk',{method:'POST',body:JSON.stringify({op,args})});const value=await r.json();if(!r.ok)throw Error(value.error);return value;};
    window.AncalagonData={create:()=>({load:()=>rpc('load'),requestResumeIntake:()=>rpc('legacy'),loadResumeIntakes:async()=>[],reviewResumeIntake:(...a)=>rpc('approve',...a),schedule:(_,__,done)=>done('saved'),flush:async()=>{window.individualFlushes=(window.individualFlushes||0)+1;},findScreeningResume:(...a)=>rpc('find',...a),trackEvent:async()=>{},loadAdminAnalytics:async()=>{throw Error('not admin');},
-    screeningCapabilities:async()=>({enabled:true}),listScreeningBatches:id=>rpc('list',id),createScreeningBatch:(...a)=>rpc('create',...a),prepareScreeningUpload:(...a)=>rpc('prepare',...a),updateScreeningItem:(...a)=>rpc('mark',...a),sealScreeningBatch:(...a)=>rpc('seal',...a),refreshScreeningBatch:(...a)=>rpc('refresh',...a),selectScreeningFinalists:(...a)=>rpc('select',...a),updateScreeningBudget:(...a)=>rpc('budget',...a),uploadResume:(c,f,t)=>rpc('upload',c,t,f.name),loadResumeText:c=>rpc('text',c),loadResumeDocument:async()=>null})};
+    createResumeUpload:(...a)=>rpc('create',...a),appendResumeUpload:(...a)=>rpc('append',...a),startResumeAnalysis:(...a)=>rpc('start',...a),getResumeAnalysis:(...a)=>rpc('analysis',...a),screeningCapabilities:async()=>({enabled:true}),listScreeningBatches:id=>rpc('list',id),createScreeningBatch:(...a)=>rpc('create',...a),prepareScreeningUpload:(...a)=>rpc('prepare',...a),updateScreeningItem:(...a)=>rpc('mark',...a),sealScreeningBatch:(...a)=>rpc('seal',...a),refreshScreeningBatch:(...a)=>rpc('refresh',...a),selectScreeningFinalists:(...a)=>rpc('select',...a),updateScreeningBudget:(...a)=>rpc('budget',...a),uploadResume:(c,f,t)=>rpc('upload',c,t,f.name),loadResumeText:c=>rpc('text',c),loadResumeDocument:async()=>null})};
    window.ancalagonAuth={session:{user:{id:'test'},access_token:'test-token'},workspace:{id:'workspace'}};
   });
-  await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#screeningMode').waitFor();
-  assert.equal(await page.locator('#screeningMode').inputValue(),'bulk');await page.locator('[data-bulk-budget]').fill('1.25');
+  await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#bulkScreening').waitFor();
+  assert.equal(await page.locator('#screeningMode').count(),0);assert.equal(await page.locator('[data-bulk-budget]').count(),0);
   const text=i=>`Synthetic applicant ${i}\nQA Engineer\nPerformed manual testing.\nReproduced defects.\nMaintained regression tests.\nDocumented test cases.\nValidated user acceptance testing.`;
   const zip=new Zip();for(let i=0;i<20;i++)zip.file(i+'.txt',text(i));zip.file('duplicate.txt',text(0));zip.file('Word.docx',await require('./fixtures/docx-resume.cjs')());zip.file('Readable.pdf',require('./fixtures/pdf-resume.cjs')());zip.file('Broken.pdf','%PDF-1.7\nThis synthetic document deliberately has no cross-reference table.');zip.file('retry.txt',text(99));
   const started=performance.now();await page.locator('#resumeUpload').setInputFiles({name:'Applications.zip',mimeType:'application/zip',buffer:await zip.generateAsync({type:'nodebuffer',compression:'DEFLATE'})});
-  await page.locator('[data-bulk-message]').filter({hasText:/Preparing|Import saved|Reading|Saving/}).waitFor();const ack=performance.now()-started;
+  await page.locator('[data-bulk-message]').filter({hasText:/Preparing|Reading|Saving/}).waitFor();const ack=performance.now()-started;
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Some files need attention'),{},{timeout:45000});
-  assert.equal(pdfWorkers.size,0,'PDF parsing workers leaked after successful or failed documents');assert.equal(batch.budget_usd,1.25,'Budget selection lost');assert.equal(docs.size,22,'Duplicate or readable document handling failed');assert.equal(deepCalls,0,'Upload invoked full AI');assert.equal(batch.sealed,false);assert.match(await page.locator('#bulkScreening').textContent(),/Provisional ranking/);
+  assert.equal(pdfWorkers.size,0,'PDF parsing workers leaked after successful or failed documents');assert.equal(batch.budget_usd,5);assert.equal(docs.size,22,'Duplicate or readable document handling failed');assert.equal(deepCalls,0,'Upload invoked full AI');assert.equal(batch.sealed,false);assert.match(await page.locator('#bulkScreening').textContent(),/Your upload list/);assert.equal([...candidates.values()].filter(c=>c.result).length,0,'Upload started analysis before the button');
   assert.ok([...docs.values()].some(t=>t.includes('Documented regression coverage')),'DOCX text box lost');assert.ok([...docs.values()].some(t=>t.includes('Used SQL to validate billing data')),'PDF extraction lost');
   await page.locator('[data-bulk-resume-files]').setInputFiles({name:'retry.txt',mimeType:'text/plain',buffer:Buffer.from(text(99))});
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Files saved'),{},{timeout:15000});
-  const broken=batch.items.find(i=>i.file_name==='Broken.pdf');await page.locator(`[data-bulk-exclude="${broken.ordinal}"]`).click();await page.getByText('Screening complete for this batch',{exact:true}).waitFor();
-  assert.equal(docs.size,23);assert.equal(deepCalls,0);assert.equal(batch.sealed,true);
-  // A bulk import exists remotely but has not been hydrated into local candidates.
-  // Re-uploading through the individual path must reuse it without any save or AI.
-  const beforeHandoff={docs:docs.size,candidates:candidates.size,flushes:await page.evaluate(()=>window.individualFlushes||0)};
-  await page.locator('#screeningMode').selectOption('standard');
+  const broken=batch.items.find(i=>i.file_name==='Broken.pdf');await page.locator(`[data-bulk-exclude="${broken.ordinal}"]`).click();
+  await page.getByRole('button',{name:'Analyze 23 resumes',exact:true}).waitFor();assert.equal(batch.sealed,false);assert.equal(deepCalls,0);
+  // More files join the same saved draft; a renamed duplicate is reused.
   await page.locator('#resumeUpload').setInputFiles({name:'Same-resume.txt',mimeType:'text/plain',buffer:Buffer.from(text(0))});
-  await page.waitForFunction(()=>document.querySelector('#screeningMode').value==='bulk');
-  await page.getByRole('button',{name:'Open saved import',exact:true}).waitFor();
-  assert.match(await page.locator('#resumeUploadRecovery').textContent(),/already saved/);
-  assert.equal(docs.size,beforeHandoff.docs);assert.equal(candidates.size,beforeHandoff.candidates);
-  assert.equal(await page.evaluate(()=>window.individualFlushes||0),beforeHandoff.flushes,'handoff attempted an individual candidate save');
-  assert.equal(deepCalls,0);assert.equal(legacyCalls,0);
-  await page.locator('#screeningMode').selectOption('standard');
-  await page.getByRole('button',{name:'Open saved import',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelector('#screeningMode').value==='bulk');
-  await page.locator('[data-bulk-disclosure="near"]').evaluate(d=>d.open=true);
-  await page.locator('[data-bulk-refresh]').click();await page.waitForTimeout(150);
-  assert.equal(await page.locator('[data-bulk-disclosure="near"]').evaluate(d=>d.open),true,'Refresh closed evidence review');
-  assert.equal(await page.locator('[data-bulk-budget]').inputValue(),'1.25','Progress reset the chosen next-batch budget');
-  await page.locator('[data-bulk-current-budget]').fill('2.50');
-  await page.locator('[data-bulk-refresh]').click();await page.waitForTimeout(150);
-  assert.equal(await page.locator('[data-bulk-current-budget]').inputValue(),'2.50','Progress discarded a budget edit');
-  await page.locator('[data-bulk-save-budget]').click();await page.getByText('Budget saved. Save finalists to retry any blocked assessments.',{exact:true}).waitFor();
-  assert.equal(batch.budget_usd,2.5);assert.equal(deepCalls,0,'Raising a budget silently started AI');
-  await page.locator('[data-bulk-start]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(deepCalls,20);
-  await page.locator('[data-bulk-start]').click();await page.waitForTimeout(250);assert.equal(deepCalls,20,'Repeated shortlist created duplicate model calls');
-  await page.locator('[data-bulk-resume]').first().click();await page.locator('dialog[open]').waitFor();assert.ok((await page.locator('[data-resume-text]').textContent()).length>40);await page.locator('dialog [data-close]').click();
-  await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(deepCalls,20);
-  assert.equal(legacyCalls,0,'Reload started legacy full AI');
-  await page.locator('[data-bulk-review]').first().click();await page.locator('#page-detail.active').waitFor();assert.equal(approvals,1);assert.notEqual((await page.locator('#detailJDScore').textContent()).trim(),'—');
-  await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Recommended phone screens',exact:true}).waitFor();assert.equal(legacyCalls,0);assert.equal(deepCalls,20);
-  assert.equal(await page.locator('#candidateCards').isHidden(),true,'Legacy cards remained visible under bulk results');
+  await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Files saved'));
+  assert.equal(createCalls,1);assert.equal(docs.size,23);assert.equal(candidates.size,23);assert.equal(deepCalls,0);assert.equal(legacyCalls,0);
+  const remove=batch.items.find(i=>i.file_name==='1.txt');await page.locator(`[data-bulk-exclude="${remove.ordinal}"]`).click();
+  await page.getByRole('button',{name:'Analyze 22 resumes',exact:true}).waitFor();
+  await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();
+  await page.getByRole('button',{name:'Analyze 22 resumes',exact:true}).waitFor();assert.equal(deepCalls,0,'Reload started a draft');
+  fs.mkdirSync('test-results/bulk-screening',{recursive:true});await page.screenshot({path:'test-results/bulk-screening/upload-list.png',fullPage:true});
+  await page.locator('[data-bulk-start]').click();await page.locator('[data-bulk-message]').filter({hasText:'Interrupted acknowledgment'}).waitFor();assert.equal(deepCalls,0);
+  await page.locator('[data-bulk-start]').click();await page.getByRole('heading',{name:'Ready for review',exact:true}).waitFor();assert.equal(deepCalls,20);assert.equal(startCalls,2);
+  assert.ok(!batch.selected_ids.includes(remove.candidate_id),'Removed file entered analysis');
+  assert.equal(await page.locator('[data-bulk-start]').count(),0,'A second start step remained');
+  assert.equal(await page.locator('[data-bulk-open]').count(),22,'Results hid candidates outside the detailed assessment pool');
+  const ready=batch.selected_ids[0];await page.locator(`[data-bulk-open="${ready}"]`).click();await page.locator('#page-detail.active').waitFor();
+  await page.locator('[data-intake-approve]').waitFor();assert.equal(approvals,0,'Opening an assessment approved it');
+  await page.locator('[data-view-resume]').click();await page.locator('#resumeEvidencePanel').waitFor();assert.ok((await page.locator('.rf-resume-document').textContent()).length>40);await page.keyboard.press('Escape');
+  await page.locator('[data-intake-approve]').click();await page.waitForFunction(()=>!document.querySelector('#workspaceIntake')||document.querySelector('#workspaceIntake').hidden);assert.equal(approvals,1);
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Ready for review',exact:true}).waitFor();
+  const rules=[...candidates.values()].find(c=>batch.items.some(i=>i.candidate_id===c.candidateId&&i.status==='saved')&&!batch.selected_ids.includes(c.candidateId));
+  await page.locator(`[data-bulk-open="${rules.candidateId}"]`).click();await page.getByRole('heading',{name:'Resume evidence',exact:true}).waitFor();
+  assert.doesNotMatch(await page.locator('#candidateWorkspace').textContent(),/Review this candidate in bulk|No stored resume/);
+  await page.locator('[data-managed-resume]').click();await page.locator('#resumeEvidencePanel').waitFor();await page.keyboard.press('Escape');
+  await page.locator('.rf-nav [data-page="candidates"]').click();await page.reload();await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Ready for review',exact:true}).waitFor();assert.equal(deepCalls,20);assert.equal(legacyCalls,0);
   await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Mobile overflow');
   fs.mkdirSync('test-results/bulk-screening',{recursive:true});await page.screenshot({path:'test-results/bulk-screening/mobile.png',fullPage:true});await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'test-results/bulk-screening/desktop.png',fullPage:true});
-  // A delayed manifest must not hijack a newly selected job or allow a second
-  // import to bypass the one-upload-at-a-time bound.
+  // A delayed manifest remains scoped to its captured job.
   delayCreate=true;const requested=page.waitForRequest(r=>r.url().endsWith('/__bulk')&&r.postDataJSON()?.op==='create');
   await page.locator('#resumeUpload').setInputFiles({name:'Job-A-only.txt',mimeType:'text/plain',buffer:Buffer.from(text(2000))});await requested;
-  await page.locator('#resumeUpload').setInputFiles({name:'Should-not-start.txt',mimeType:'text/plain',buffer:Buffer.from(text(2001))});await page.waitForTimeout(100);assert.equal(createCalls,2,'Concurrent manifest creation bypassed upload bound');
+  await page.locator('#resumeUpload').setInputFiles({name:'Should-not-start.txt',mimeType:'text/plain',buffer:Buffer.from(text(2001))});await page.waitForTimeout(100);assert.equal(createCalls,2);
   await page.evaluate(()=>{const select=document.querySelector('#globalJobSelect');select.value='job-b';select.dispatchEvent(new Event('change',{bubbles:true}));});
-  await page.waitForFunction(()=>document.querySelector('#globalJobSelect')?.value==='job-b'&&document.querySelector('[data-bulk-batch]')?.value==='');
-  const sealed=page.waitForResponse(r=>r.url().endsWith('/__bulk')&&r.request().postDataJSON()?.op==='seal');releaseCreate();await sealed;await page.waitForTimeout(100);
-  assert.equal(batch.job_id,'job-a');assert.equal(await page.locator('[data-bulk-batch]').inputValue(),'','Old import replaced the new job’s batch');assert.equal(deepCalls,20);assert.equal(legacyCalls,0);
+  await page.waitForFunction(()=>document.querySelector('#globalJobSelect')?.value==='job-b');
+  const saved=page.waitForResponse(r=>r.url().endsWith('/__bulk')&&r.request().postDataJSON()?.op==='mark');releaseCreate();await saved;await page.waitForTimeout(400);
+  assert.equal(batch.job_id,'job-a');assert.equal(await page.locator('[data-bulk-batch]').count(),0,'Old upload replaced the new job’s list');assert.equal(deepCalls,20);
+  // One resume uses exactly the same action and opens the shared assessment.
+  delayCreate=false;await page.locator('#resumeUpload').setInputFiles({name:'Single.txt',mimeType:'text/plain',buffer:Buffer.from(text(3000))});
+  await page.getByRole('button',{name:'Analyze 1 resume',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('[data-bulk-start]').disabled);
+  assert.equal(deepCalls,20);await page.locator('[data-bulk-start]').click();await page.locator('#page-detail.active').waitFor();await page.locator('[data-intake-approve]').waitFor();assert.equal(deepCalls,21);assert.equal(approvals,1);
   let parsing=null;const parseCount=Number(process.env.BULK_PARSE_COUNT||0);
   if(parseCount){
    assert.ok(Number.isInteger(parseCount)&&parseCount>=20&&parseCount<=1000);peakPdfWorkers=0;
@@ -122,6 +121,6 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
     return {documents:count,pdfs,docx:words,duration_ms:Math.round(performance.now()-started),scope:'Repeated synthetic parser fixtures; excludes upload, HTTP, ranking and AI'};
    },inputs);await page.waitForTimeout(100);assert.equal(pdfWorkers.size,0,'PDF workers leaked under volume');assert.ok(peakPdfWorkers<=2,'PDF workers grew with batch size');parsing.peak_pdf_workers=peakPdfWorkers;parsing.remaining_pdf_workers=pdfWorkers.size;
   }
-  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,job_switch_during_manifest:true,pdf_workers_released:true,explicit_budget_update:true,legacy_calls:legacyCalls,pdf_docx_zip:true,parsing,passed:true}));
+  assert.deepEqual(errors,[]);console.log(JSON.stringify({browser:'bulk screening',files:25,unique_saved:23,ui_ack_ms:Math.round(ack),rules_provider_calls:0,simulated_deep_calls:deepCalls,reload_and_replay:true,explicit_approval:true,job_switch_during_manifest:true,pdf_workers_released:true,explicit_start:true,durable_draft:true,single_and_multiple:true,legacy_calls:legacyCalls,pdf_docx_zip:true,parsing,passed:true}));
  }finally{await browser?.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

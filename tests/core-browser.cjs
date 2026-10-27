@@ -30,6 +30,7 @@ const root=path.resolve(__dirname,'..');
   await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('#page-home.active').waitFor();assert.match(await page.locator('#searchFlow').textContent(),/Upload resumes/);await page.locator('.rf-nav [data-page="candidates"]').click();
   const text='Alex Carter\nQA Analyst\nOwned manual regression testing for billing systems and documented defects.';
   await page.locator('#resumeUpload').setInputFiles({name:'Synthetic.txt',mimeType:'text/plain',buffer:Buffer.from(text)});
+  await page.locator('[data-batch-start]').click();
   await page.locator('#page-detail.active').waitFor();await page.waitForFunction(()=>window.coreRequests>0);
   assert.equal(await page.locator('#detailManagerScore').textContent(),'—');
   // Simulate completion while the original browser is absent, then restore only

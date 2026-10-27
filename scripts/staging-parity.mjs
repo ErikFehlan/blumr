@@ -35,6 +35,7 @@ for(const [key,value] of retentionExpectations(await readFile('supabase/migratio
 for(const [key,value] of measurementExpectations(await readFile('supabase/migrations/20261014212910_retention_measurement.sql','utf8')))expected.set(key,value);
 for(const [key,value] of priorityExpectations(await readFile('supabase/migrations/20261016152240_unified_hiring_priorities.sql','utf8')))expected.set(key,value);
 for(const [key,value] of bulkScreeningExpectations(await readFile('supabase/migrations/20261020115320_bulk_screening_workflow.sql','utf8')))expected.set(key,value);
+for(const [key,value] of bulkScreeningExpectations(await readFile('supabase/migrations/20261027140859_unified_resume_screening.sql','utf8'),{unified:true}))expected.set(key,value);
 const differences=structuralDifferences(production,stage,expected);
 if(differences.length)throw Error('Staging structural differences: '+differences.join(', '));
 const [knowledge]=await api('momfzjmycveqginxmqib','/database/query',{query:`select

@@ -40,6 +40,7 @@ const root=path.resolve(__dirname,'..');
   if(process.env.CAPTURE_UI)await page.locator('#addCandidatePanel').screenshot({path:process.env.CAPTURE_UI+'-upload.png',animations:'disabled'});
   const resume=(name,filename=name+'.txt')=>({name:filename,mimeType:'text/plain',buffer:Buffer.from(name+'\nQA Analyst\nOwned manual regression testing for billing systems and documented defects.')});
   await page.locator('#resumeUpload').setInputFiles([resume('Alex Example'),resume('Sam Example','Retry.txt'),resume('Alex Example','Duplicate.txt'),resume('Taylor Example')]);
+  await page.locator('[data-batch-start]').click();
   await page.waitForFunction(()=>window.testState.candidates.length===3&&Object.keys(window.testDocs).length===2);
   assert.equal(await page.locator('#page-candidates').evaluate(e=>e.classList.contains('active')),true,'bulk upload preserves current page');
   await page.locator('#resumeBatch [data-batch-retry]').waitFor();assert.match(await page.locator('#resumeBatch').textContent(),/Already attached/);
@@ -108,6 +109,8 @@ const root=path.resolve(__dirname,'..');
   // A resume can finish saving and processing while the recruiter is writing.
   // Its new name must appear without changing the chosen candidate or note.
   await page.locator('#resumeUpload').setInputFiles(resume('Jordan Example','New resume.txt'));
+  // Simulate an upload already started before returning to this feedback form.
+  await page.locator('[data-batch-start]').evaluate(button=>button.click());
   await page.waitForFunction(()=>window.testState.candidates.length===4&&window.testState.candidates.every(c=>c.resumeIntake.phase==='ready'));
   await page.waitForFunction(()=>[...document.querySelector('#feedbackCandidate').options].some(o=>o.textContent==='Jordan Example'));
   assert.equal(await page.locator('#page-feedback.active').count(),1);
@@ -174,6 +177,7 @@ const root=path.resolve(__dirname,'..');
   // Close the tab after a durable save but before the assessment finishes.
   await page.locator('.rf-nav [data-page="candidates"]').click();await page.evaluate(()=>window.pauseIntake=true);
   await page.locator('#resumeUpload').setInputFiles(resume('Recovery Example'));
+  await page.locator('[data-batch-start]').click();
   await page.waitForFunction(()=>window.testState.candidates.length===5&&window.testState.candidates.at(-1).resumeIntake.phase==='processing');
   const recoveryId=await page.evaluate(()=>window.testState.candidates.at(-1).id);
   await page.evaluate(()=>sessionStorage.setItem('blumr-interruption-fixture',JSON.stringify({state:window.testState,docs:window.testDocs,tasks:window.testTasks})));

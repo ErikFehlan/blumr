@@ -139,3 +139,66 @@ do $$declare b uuid:='b0000000-0000-0000-0000-000000000002';j uuid:='f0000000-00
  if (select count(*) from jsonb_array_elements(snapshot->'candidates') r where r->'result'='null'::jsonb)<>5 then raise exception 'Unprocessed candidates received fabricated scores';end if;
  if (select count(*) from jsonb_array_elements(snapshot->'candidates') r where (r->'result')?'rubricKey')<>55 then raise exception 'Brief scores lost their rubric binding';end if;
 end $$;
+
+reset role;
+\ir ../supabase/migrations/20261027140859_unified_resume_screening.sql
+\ir ../supabase/migrations/20261027140859_unified_resume_screening.sql
+insert into jobs(id,workspace_id,title,description) values('f0000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000001','Unified upload','Manual regression testing');
+set test.role='authenticated';
+set role authenticated;
+select create_resume_upload('b0000000-0000-0000-0000-000000000003','f0000000-0000-0000-0000-000000000013','[{"name":"One.txt","size":150}]');
+select append_resume_upload('b0000000-0000-0000-0000-000000000003',1,'[{"name":"Remove.txt","size":150},{"name":"Retry.txt","size":150}]');
+select append_resume_upload('b0000000-0000-0000-0000-000000000003',1,'[{"name":"Remove.txt","size":150},{"name":"Retry.txt","size":150}]');
+do $$declare b uuid:='b0000000-0000-0000-0000-000000000003';p jsonb;i integer;text_value text;begin
+ if (select count(*) from screening_batch_items where batch_id=b)<>3 then raise exception 'Manifest replay duplicated files';end if;
+ begin perform append_resume_upload(b,1,'[{"name":"Unexpected.txt","size":150}]');raise exception 'Conflicting append accepted';exception when sqlstate 'PT409' then null;end;
+ for i in 0..1 loop
+  text_value:='Synthetic unified applicant '||i||'. Owned manual testing and documented defects in billing systems.';
+  p:=prepare_screening_upload(b,i,text_value);
+  insert into candidate_documents(workspace_id,job_id,candidate_id,storage_path,file_name,extracted_text) values('00000000-0000-0000-0000-000000000001','f0000000-0000-0000-0000-000000000013',(p->>'candidate_id')::uuid,'00000000-0000-0000-0000-000000000001/f0000000-0000-0000-0000-000000000013/'||(p->>'candidate_id')||'/source.txt','Synthetic.txt',text_value);
+  perform update_screening_item(b,i,'saved');
+ end loop;
+ perform update_screening_item(b,1,'excluded');
+ perform update_screening_item(b,2,'failed');
+ begin perform start_resume_analysis(b);raise exception 'Analysis accepted unfinished uploads';exception when sqlstate 'PT409' then null;end;
+ begin perform seal_screening_batch(b);raise exception 'Old seal bypassed explicit start';exception when sqlstate 'PT409' then null;end;
+ if exists(select from resume_intake_tasks where job_id='f0000000-0000-0000-0000-000000000013') then raise exception 'Upload started analysis';end if;
+ if (select worker_requested_at is not null or analysis_requested_at is not null or sealed from screening_batches where id=b) then raise exception 'Draft was queued or sealed';end if;
+end $$;
+set test.workspace='00000000-0000-0000-0000-000000000002';
+do $$begin
+ begin perform start_resume_analysis('b0000000-0000-0000-0000-000000000003');raise exception 'Foreign start accepted';exception when insufficient_privilege then null;end;
+ begin perform append_resume_upload('b0000000-0000-0000-0000-000000000003',3,'[{"name":"Foreign.txt","size":150}]');raise exception 'Foreign append accepted';exception when insufficient_privilege then null;end;
+end $$;
+set test.workspace='00000000-0000-0000-0000-000000000001';
+select update_screening_item('b0000000-0000-0000-0000-000000000003',2,'excluded');
+select start_resume_analysis('b0000000-0000-0000-0000-000000000003');
+select start_resume_analysis('b0000000-0000-0000-0000-000000000003');
+do $$begin
+ begin perform append_resume_upload('b0000000-0000-0000-0000-000000000003',3,'[{"name":"Late.txt","size":150}]');raise exception 'Append after start accepted';exception when sqlstate 'PT409' then null;end;
+ begin perform update_screening_item('b0000000-0000-0000-0000-000000000003',0,'excluded');raise exception 'Removal after start accepted';exception when invalid_parameter_value then null;end;
+ if has_function_privilege('authenticated','public.auto_start_resume_analysis(uuid)','execute') then raise exception 'Client can choose automatic finalists';end if;
+end $$;
+reset role;
+set test.role='service_role';
+set role service_role;
+do $$declare b uuid:='b0000000-0000-0000-0000-000000000003';rows jsonb;source text;begin
+ if auto_start_resume_analysis(b) then raise exception 'Incomplete rules admitted paid work';end if;
+ source:=bulk_screening_source(b)->>'sourceVersion';rows:=bulk_screening_page(b,repeat('c',64),100);
+ select jsonb_agg(value||jsonb_build_object('result',jsonb_build_object('candidateId',value->>'candidate_id','rubricKey',repeat('c',64),'score',85,'requiredStatus','evidenced','findings',jsonb_build_array(jsonb_build_object('title','Manual testing'))))) into rows from jsonb_array_elements(rows);
+ perform save_bulk_screening_page(b,source,jsonb_build_object('status','ready','asOf',current_date::text,'rubric',jsonb_build_object('key',repeat('c',64))),rows);
+ if not auto_start_resume_analysis(b) then raise exception 'Explicit request did not continue in background';end if;
+ if auto_start_resume_analysis(b) then raise exception 'Replay restarted analysis';end if;
+ if (select cardinality(selected_ids)<>1 or selection_version<>1 or not auto_selected from screening_batches where id=b) then raise exception 'Removed resumes were selected or replay changed selection';end if;
+ if (select count(*) from resume_intake_tasks where job_id='f0000000-0000-0000-0000-000000000013' and status='queued')<>1 then raise exception 'Wrong analysis count';end if;
+end $$;
+reset role;
+set test.role='authenticated';
+set role authenticated;
+do $$declare c uuid;v jsonb;begin
+ select candidate_id into c from screening_batch_items where batch_id='b0000000-0000-0000-0000-000000000003' and ordinal=0;
+ v:=get_resume_analysis(c);
+ if v->>'stored'<>'true' or v#>>'{rules,findings,0,title}'<>'Manual testing' or v#>>'{assessment,status}'<>'queued' then raise exception 'Shared candidate review lost source or evidence';end if;
+ perform set_config('test.workspace','00000000-0000-0000-0000-000000000002',true);
+ begin perform get_resume_analysis(c);raise exception 'Foreign candidate evidence exposed';exception when insufficient_privilege then null;end;
+end $$;
