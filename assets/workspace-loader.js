@@ -5,7 +5,7 @@
     'assets/job-intake-code.js?v=20261002-guided-experience',
     'assets/job-wizard.js?v=20261016-priorities',
     'assets/hiring-priorities.js?v=20261016-priorities',
-    'assets/data.js?v=20261020-bulk',
+    'assets/data.js?v=20261027-unified-resumes',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20261014-decisions',
     'assets/evidence.js?v=20260911-quick-feedback',
@@ -20,18 +20,18 @@
     'assets/pdf-text.js?v=20260915-intake',
     'assets/resume-viewer.js?v=20261014-repeat-resume',
     'assets/experience.js?v=20261015-experience',
-    'assets/resume-intake.js?v=20261020-bulk-reload',
+    'assets/resume-intake.js?v=20261027-unified-resumes',
     'assets/resume-remote.js?v=20261020-bulk-reload',
     'assets/feedback-impact.js?v=20261015-shortlist',
     'assets/job-review.js?v=20261020-bulk-reload',
     'assets/candidate-automation.js?v=20260914-job-review',
     'assets/quick-notes.js?v=20260914-focus',
-    'assets/candidate-workspace.js?v=20261020-bulk-reload',
+    'assets/candidate-workspace.js?v=20261027-unified-resumes',
     'assets/criteria-automation.js?v=20261002-guided-experience',
-    'assets/decision-workspace.js?v=20261020-bulk-reload',
+    'assets/decision-workspace.js?v=20261027-unified-resumes',
     'assets/home.js?v=20261015-experience',
     'assets/focus-ui.js?v=20261014-decisions',
-    'assets/recruiter-workflow.js?v=20261020-bulk-reload',
+    'assets/recruiter-workflow.js?v=20261027-unified-resumes',
     'assets/tutorial.js?v=20260915-tutorial',
     'assets/tutorial-ui.js?v=20260915-settings',
     'assets/admin-tools.js?v=20261002-guided-experience',
@@ -42,8 +42,8 @@
     'assets/retention-analytics.js?v=20261014-retention',
     'assets/vendor/jszip-3.10.1.min.js',
     'assets/bulk-files.js?v=20261020-bulk',
-    'assets/bulk-screening.js?v=20261020-read-efficiency',
-    'assets/app.js?v=20261020-pdf-cleanup'
+    'assets/bulk-screening.js?v=20261027-unified-resumes',
+    'assets/app.js?v=20261027-unified-resumes'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;

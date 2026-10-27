@@ -4,12 +4,14 @@ type RPC=(name:string,body:Record<string,unknown>)=>Promise<any>;
 // Deterministic pages can safely repeat. Every write checks its source version.
 export async function processBulkScreeningBatch(batchId:string,rpc:RPC){
  const source=await rpc('bulk_screening_source',{p_batch:batchId});
+ if(source.batch?.defer_analysis&&!source.batch.analysis_requested_at)return {processed:0,status:'awaiting_start',ai_calls:0};
  const feedbackVersion=await fingerprint({feedback:source.feedback,assessments:source.assessments,lessons:source.lessons});
  const intelligence=await buildJobIntelligence({...source,feedbackVersion});
  const inputs=intelligence.status==='ready'?await rpc('bulk_screening_page',{p_batch:batchId,p_key:intelligence.rubric!.key,p_limit:100}):[];
  const compiled=intelligence.status==='ready'?compileScreeningRubric(intelligence.rubric):null;
  const rows=inputs.map((input:any)=>({...input,resume_text:undefined,result:scoreScreeningCandidate(compiled,parseScreeningEvidence(input.resume_text,{asOf:intelligence.asOf}),input.candidate_id)}));
  if(await rpc('save_bulk_screening_page',{p_batch:batchId,p_source:source.sourceVersion,p_intelligence:intelligence,p_rows:rows})!==true)throw Error('screening_source_changed');
+ if(source.batch?.analysis_requested_at&&!source.batch.auto_selected)await rpc('auto_start_resume_analysis',{p_batch:batchId});
  return {processed:rows.length,status:intelligence.status,ai_calls:0};
 }
 export function summarizeBulkScreening(snapshot:any){
@@ -44,7 +46,7 @@ export async function handleBulkScreening(payload:Record<string,unknown>,scope:{
   const source=await rpc('bulk_screening_source',{p_batch:payload.batch_id});
   if(source.workspaceId!==scope.workspace)return reply({code:'screening_forbidden'},403);
   if(!(await rpc('screening_capabilities',{}))?.enabled)return reply({code:'screening_not_enabled'},404);
-  if(payload.action==='refresh')await processBulkScreeningBatch(payload.batch_id,(name,body)=>rpc(name,body,name==='save_bulk_screening_page'));
+  if(payload.action==='refresh')await processBulkScreeningBatch(payload.batch_id,(name,body)=>rpc(name,body,['save_bulk_screening_page','auto_start_resume_analysis'].includes(name)));
   return reply(summarizeBulkScreening(await rpc('screening_batch_snapshot',{p_batch:payload.batch_id})));
  }catch(error){return reply({code:error instanceof Error?error.message:'screening_unavailable',error:'Screening could not finish. Saved files and assessments are retained.'},503);}
 }

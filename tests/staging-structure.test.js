@@ -125,3 +125,11 @@ test('bulk deployment overrides must match exact source and keep internal helper
  assert.ok(structuralDifferences([],stage,expected).includes('function:begin_assessment_provider(uuid,uuid)'));
  assert.throws(()=>bulkScreeningExpectations(sql.replace('reserve_screening_ai(p_lease','unexpected_reservation(p_lease')));
 });
+test('unified upload release verifies the new member actions and service-only continuation',async()=>{
+ const {bulkScreeningExpectations,structuralDifferences}=await import('../scripts/staging-structure.mjs');
+ const sql=await readFile('supabase/migrations/20261027140859_unified_resume_screening.sql','utf8'),expected=bulkScreeningExpectations(sql,{unified:true});
+ const stage=[...expected].map(([key,e])=>({kind:'function',name:key.slice(9),routine:{source:e.body,language:e.language,result:e.result,setof:false,args:e.args,defaults:e.defaults,security_definer:e.securityDefiner,volatility:e.volatility,config:['search_path=""'],worker_allowed:true,clients_denied:!e.admin,anon_denied:true,authenticated_allowed:e.admin}}));
+ assert.equal(expected.size,10);assert.deepEqual(structuralDifferences([],stage,expected),[]);
+ stage.find(r=>r.name==='auto_start_resume_analysis(uuid)').routine.clients_denied=false;
+ assert.deepEqual(structuralDifferences([],stage,expected),['function:auto_start_resume_analysis(uuid)']);
+});

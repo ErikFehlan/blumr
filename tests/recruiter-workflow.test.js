@@ -83,3 +83,9 @@ test('batched data reads stay workspace scoped, deduplicate IDs, and chunk reque
  for(const call of calls){assert.equal(call.table,'resume_intake_tasks');assert.deepEqual(call.scope,['workspace_id','workspace']);assert.doesNotMatch(call.columns,/result/);}
  await service.loadResumeIntakes([]);assert.equal(calls.length,3);
 });
+test('the upload list accumulates and removes files without starting until Analyze is clicked',async()=>{
+ const calls=[],batch=recruiter.createBatch({deferStart:true,job:()=>({id:'job'}),workspace:()=> 'workspace',toast:()=>{},upload:async(f,o)=>{calls.push([f.name,o.open]);return {id:f.name};}});
+ batch.add([file('one.txt')]);batch.add([file('two.txt'),file('remove.txt')]);await tick();
+ assert.deepEqual(calls,[]);assert.equal(batch.hasUnsaved(),true);batch.dismiss(batch.view()[2].id);batch.start();batch.start();await settled(batch);
+ assert.deepEqual(calls,[['one.txt',false],['two.txt',false]]);assert.equal(batch.hasUnsaved(),false);
+});

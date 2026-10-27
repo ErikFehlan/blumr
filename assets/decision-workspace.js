@@ -10,7 +10,7 @@
  function priorities(job){const p=job?.hiringPriorities;return p?.source_title===job.title&&p.source_description===(job.description||'')?p.items?.slice(0,5)||[]:[];}
  function assessment(c){return c.aiReview?.assessment||c.screeningInsight?.assessment||c.resumeIntake?.brief||null;}
  function reviewState(c,signature){
-  if(pending(c)){if(c.screeningManaged||!c.resumeIntake)return {label:'Bulk screening',tone:'neutral',pending:true,rules:true};const phase=c.resumeIntake.phase||c.resumeIntake.status;return {label:['error','failed'].includes(phase)?'Needs another try':phase==='ready'?'Awaiting review':'Processing',tone:phase==='ready'?'review':'neutral',pending:true};}
+  if(pending(c)){if(c.screeningManaged||!c.resumeIntake)return {label:'Resume assessment',tone:'neutral',pending:true,rules:true};const phase=c.resumeIntake.phase||c.resumeIntake.status;return {label:['error','failed'].includes(phase)?'Needs another try':phase==='ready'?'Awaiting review':'Processing',tone:phase==='ready'?'review':'neutral',pending:true};}
   if(signature&&c.aiReview?.contextSignature&&signature!==c.aiReview.contextSignature)return {label:'Context changed',tone:'warning',stale:true};
   return {label:reviewed(c)?'Assessment reviewed':'Recorded profile',tone:reviewed(c)?'reviewed':'neutral'};
  }
@@ -46,7 +46,7 @@
   return `<div class="rf-candidate-fit" aria-label="${state.stale?'Previously saved':'Saved'} fit scores">${[['JD Fit',c.jdScore],['Manager Fit',c.managerScore]].map(([label,value])=>`<div><span>${label}</span><strong>${score(value)}<small> / 10</small></strong></div>`).join('')}</div>`;
  }
  function highlights(c,state){
-  if(state.rules)return '<p class="rf-candidate-context">Review the rules evidence and finalist selection in bulk screening.</p>';
+  if(state.rules)return '<p class="rf-candidate-context">Open this candidate to review the saved resume and supporting evidence.</p>';
   if(state.pending)return '<p class="rf-candidate-context">Open the assessment to check the proposed evidence and scores.</p>';
   if(state.stale)return '<p class="rf-candidate-context">Context changed. Recheck the saved assessment before using these scores.</p>';
   const strength=(c.strengths||[]).map(prose.evidence).find(e=>prose.supportedPoint(c,e));

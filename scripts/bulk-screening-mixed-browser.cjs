@@ -30,7 +30,7 @@ async function openBrowser({f,user,report={}}={}){
     const body=raw.length?JSON.parse(raw):undefined;
     const result=await f.request(url.pathname+url.search,user.access,req.method,body,false);
     requests.push({path:url.pathname,method:req.method,status:result.status});
-    if(url.pathname==='/rest/v1/rpc/create_screening_batch'&&result.ok)batch=body.p_id;
+    if(['/rest/v1/rpc/create_screening_batch','/rest/v1/rpc/create_resume_upload'].includes(url.pathname)&&result.ok)batch=body.p_id;
     if(url.pathname==='/rest/v1/candidate_documents'&&req.method==='POST'&&result.ok){for(const doc of Array.isArray(body)?body:[body])saved.set(doc.candidate_id,doc);if(saved.size%100===0)console.log('Mixed browser saved '+saved.size);}
     res.statusCode=result.status;res.end(result.status===204?'':JSON.stringify(result.data));return;
    }
@@ -90,8 +90,8 @@ async function importMixed({f,user,report,count=500}){
  const b=await openBrowser({f,user,report});
  try{
   const fixture=await mixedFiles(b.page,count),page=b.page;
-  await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#screeningMode').waitFor();
-  assert.equal(await page.locator('#screeningMode').inputValue(),'bulk');
+  await page.locator('#page-home.active').waitFor();await page.locator('.rf-nav [data-page="candidates"]').click();await page.locator('#bulkScreening').waitFor();
+  assert.equal(await page.locator('#screeningMode').count(),0);
   const upload={name:'Mixed-Applications.zip',mimeType:'application/zip',buffer:fixture.zip};
   const started=performance.now();await page.locator('#resumeUpload').setInputFiles(upload);
   await page.locator('[data-bulk-message]').filter({hasText:/Preparing|Import saved|Reading|Saving/}).waitFor();report.browser_ack_ms=Math.round(performance.now()-started);
@@ -109,7 +109,7 @@ async function importMixed({f,user,report,count=500}){
   assert.equal(b.saved.size,count,'Retry lost or duplicated a document');
   const retry=await loadSnapshot(),remaining=retry.items.filter(i=>i.status==='failed');assert.equal(remaining.length,3);
   for(const item of remaining){assert.ok(/Damaged\.|Blank-scan/.test(item.file_name),'Readable resume failed: '+item.file_name);await page.locator(`[data-bulk-exclude="${item.ordinal}"]`).click();await page.waitForFunction(ordinal=>!document.querySelector(`[data-bulk-exclude="${ordinal}"]`),item.ordinal);}
-  await page.getByText('Screening complete for this batch',{exact:true}).waitFor({timeout:180000});
+  await page.getByRole('button',{name:'Analyze '+count+' resumes',exact:true}).waitFor({timeout:180000});
   report.upload_ms=Math.round(performance.now()-started);report.mixed={formats:fixture.formats,layouts:fixture.layouts,manifest_entries:count+5,unique_saved:count,duplicates:2,explicitly_excluded:3,lost_storage_response_recovered:true,reload_recovery:true,workers:b.workers,transport:'Actual assets/data.js and Supabase SDK through a staging-only authenticated loopback proxy; real original files and database records'};
   const rows=fixture.rows.map((row,i)=>{
    const doc=[...b.saved.values()].find(d=>d.file_name===row.name);assert.ok(doc,'Stored original missing: '+row.name);

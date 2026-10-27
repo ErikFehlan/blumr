@@ -29,19 +29,20 @@ const {chromium}=require('playwright');
   await page.locator('#authEmail').fill(owner.email);await page.locator('#authPassword').fill(owner.password);await page.locator('#authSubmit').click();await page.locator('#page-home.active').waitFor({timeout:60000});
   const nav=async name=>{const group=page.locator('.rf-nav details').filter({has:page.locator(`[data-page="${name}"]`)});if(await group.count()&&await group.getAttribute('open')===null)await group.locator('summary').click();await page.locator(`.rf-nav [data-page="${name}"]`).click();await page.locator(`#page-${name}.active`).waitFor();};
   await nav('jobs');await page.locator(`[data-activate-job="${rollout.job}"]`).click();await nav('candidates');
-  assert.equal(await page.locator('#screeningMode').inputValue(),'bulk');
+  assert.equal(await page.locator('#screeningMode').count(),0);
   await page.locator('#resumeUpload').setInputFiles([0,1].map(i=>({name:`Synthetic-Release-${i}.txt`,mimeType:'text/plain',buffer:Buffer.from(pool.candidates[i].text+'\nRelease '+i)})));
-  await page.getByText('Screening complete for this batch',{exact:true}).waitFor({timeout:120000});
+  await page.getByRole('button',{name:'Analyze 2 resumes',exact:true}).waitFor({timeout:120000});
+  await page.waitForFunction(()=>!document.querySelector('[data-bulk-start]')?.disabled);
   const batches=await request(owner,'/rest/v1/screening_batches?select=id&job_id=eq.'+rollout.job);assert.ok(batches.ok);assert.equal(batches.data.length,1);
   const batch=batches.data[0].id;
   const ranked=await request(owner,'/functions/v1/analyze-patterns-beta',{analysis_type:'bulk_screening',workspace_id:owner.workspace,batch_id:batch,action:'status'});
-  assert.ok(ranked.ok);assert.equal(ranked.data.status,'complete');assert.equal(ranked.data.total,2);assert.equal(ranked.data.ai_calls_for_rules,0);assert.equal(ranked.data.cost.provider_calls_reserved,0);assert.deepEqual(ranked.data.batch.selected_ids,[]);
+  assert.ok(ranked.ok);assert.equal(ranked.data.status,'provisional');assert.equal(ranked.data.batch.sealed,false);assert.equal(ranked.data.processed,0);assert.equal(ranked.data.total,2);assert.equal(ranked.data.ai_calls_for_rules,0);assert.equal(ranked.data.cost.provider_calls_reserved,0);assert.deepEqual(ranked.data.batch.selected_ids,[]);
   const documents=await request(owner,'/rest/v1/candidate_documents?select=file_name,file_size,extracted_text&job_id=eq.'+rollout.job);assert.ok(documents.ok);assert.equal(documents.data.length,2);
   for(let i=0;i<2;i++){const original=pool.candidates[i].text+'\nRelease '+i,doc=documents.data.find(d=>d.file_name===`Synthetic-Release-${i}.txt`);assert.equal(doc?.extracted_text,original);assert.equal(doc.file_size,Buffer.byteLength(original));}
   const tasks=await request(owner,'/rest/v1/resume_intake_tasks?select=candidate_id&job_id=eq.'+rollout.job);assert.ok(tasks.ok);assert.deepEqual(tasks.data,[]);
   const forbidden=await request(other,'/rest/v1/rpc/screening_batch_snapshot',{p_batch:batch});assert.ok(!forbidden.ok);assert.deepEqual(errors,[]);
   await fs.mkdir('test-results/live',{recursive:true});await page.screenshot({path:'test-results/live/bulk-screening.png'});
   await fs.writeFile('test-results/live/screening.json',JSON.stringify({passed:true,site:fixture.app,unique_candidates:2,rules_provider_calls:0,paid_tasks:0,workspace_isolation:true}));
-  console.log('PASS: production bulk UI, saved originals, complete rules ranking, zero paid intake tasks, and cross-workspace isolation.');
+  console.log('PASS: production bulk UI, saved originals, draft awaiting explicit analysis, zero paid intake tasks, and cross-workspace isolation.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,140 +1,144 @@
 (function(global){
  'use strict';
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const money=n=>'$'+Number(n||0).toFixed(4);
  function mount(api){
-  const host=api.root.querySelector('#bulkScreening'),mode=api.root.querySelector('#screeningMode');
-  let enabled=false,generation=0,jobId=null,batchId=null,snapshot=null,selected=[],dirty=false,loading=false,timer=null,uploads=null,search='',list=[],message='',resumeCleanup=null,budgetUsd=5,batchBudgetUsd=null,renderedBatch=null;
+  const host=api.root.querySelector('#bulkScreening');
+  let enabled=false,generation=0,jobId=null,batchId=null,snapshot=null,timer=null,uploads=null,search='',list=[],message='',loading=null,starting=false;
+  const reviews=new Map(),reviewLoads=new Map();let reviewTimer=null;
   const current=g=>g===generation;
+  const allResults=()=>snapshot?[...snapshot.ranking.top,...snapshot.ranking.nearMiss,...snapshot.ranking.remaining]:[];
   function status(text){message=text;const node=host.querySelector('[data-bulk-message]');if(node)node.textContent=text;else render();}
-  function schedule(){clearTimeout(timer);if(enabled&&batchId&&(!snapshot||snapshot.status!=='complete'||snapshot.deep_total>snapshot.deep_completed))timer=setTimeout(()=>{if(!document.hidden)void refresh();else schedule();},5000);}
-  async function init(){const g=++generation;enabled=false;try{enabled=Boolean((await api.data()?.screeningCapabilities?.())?.enabled);}catch{}if(!current(g))return;mode.hidden=!enabled;mode.value=enabled?'bulk':'standard';updateUploadLabel();await open();}
-  function updateUploadLabel(){const bulk=enabled&&mode.value==='bulk';api.root.querySelector('#resumeUpload').accept=bulk?'.pdf,.doc,.docx,.txt,.zip':'.pdf,.doc,.docx,.txt';api.root.querySelector('#resumeDropZone label span').textContent=bulk?'Up to 1,000 PDF, DOC, DOCX, or TXT resumes · ZIP supported · 10 MB each · workspace limits apply':'Choose up to 20 PDF, DOC, DOCX, or TXT files · 10 MB each · 100 MB total';api.root.querySelector('#resumeUploadNote').textContent=bulk?'Rules screening uses no AI calls. Review the Top 20 before starting deep assessments.':'Add the resumes. We’ll prepare the evidence and proposed scores for your review.';}
-  mode.addEventListener('change',()=>{updateUploadLabel();api.root.querySelector('#candidateCards').hidden=mode.value==='bulk'&&Boolean(batchId);});
-  async function open(){
-   if(!enabled||!api.job()){host.hidden=true;return;}host.hidden=false;
-   const target=api.job().id,g=generation;
-   if(jobId===target){render();if(batchId)void refresh();return;}jobId=target;batchId=null;snapshot=null;selected=[];dirty=false;list=[];search='';render();
-   try{const rows=await api.data().listScreeningBatches(target);if(!current(g)||jobId!==target)return;list=rows;batchId=rows[0]?.id||null;render();if(batchId)await refresh();}catch{status('Saved batches could not load. Reopen this page to retry.');jobId=null;}
+  function schedule(){clearTimeout(timer);if(enabled&&batchId&&snapshot?.batch.sealed&&(snapshot.status!=='complete'||snapshot.deep_total>snapshot.deep_completed||snapshot.batch.analysis_requested_at&&!snapshot.batch.auto_selected))timer=setTimeout(()=>{if(!document.hidden)void refresh();else schedule();},5000);}
+  async function init(){const g=++generation;enabled=false;try{enabled=Boolean((await api.data()?.screeningCapabilities?.())?.enabled);}catch{}if(!current(g))return;
+   api.root.querySelector('#resumeUpload').accept=enabled?'.pdf,.doc,.docx,.txt,.zip':'.pdf,.doc,.docx,.txt';
+   api.root.querySelector('#resumeDropZone label span').textContent=enabled?'PDF, DOC, DOCX, or TXT · ZIP supported · up to 1,000 resumes · 10 MB each':'PDF, DOC, DOCX, or TXT · up to 20 resumes · 10 MB each';
+   await open();
   }
-  async function refresh(force=false){
-   if(!batchId||loading)return;const id=batchId,g=generation,service=api.data();loading=true;
-   try{const value=await service.refreshScreeningBatch(id,force||snapshot?.status!=='complete');if(!current(g)||batchId!==id)return;snapshot=value;
-    if(!dirty)selected=value.batch.selected_ids.length?[...value.batch.selected_ids]:value.ranking.top.map(c=>c.candidateId);
-    message='';render();
-   }catch(e){if(current(g)&&batchId===id)status(e.message);}finally{loading=false;if(current(g))schedule();}
+  async function open(){
+   if(!enabled||!api.job()){host.hidden=true;return;}
+   const target=api.job().id,g=generation;
+   if(jobId===target){render();if(batchId)void refresh();return;}
+   jobId=target;batchId=null;snapshot=null;list=[];search='';message='';render();
+   try{const rows=await api.data().listScreeningBatches(target);if(!current(g)||jobId!==target)return;list=rows;batchId=rows[0]?.id||null;render();if(batchId)await refresh();}catch{if(current(g)&&jobId===target){status('Saved uploads could not load. Reopen this page to retry.');jobId=null;}}
+  }
+  async function refresh(){
+   if(!batchId)return;if(loading?.id===batchId)return loading.promise;
+   const id=batchId,g=generation,service=api.data();
+   const run={id,promise:null};loading=run;
+   run.promise=(async()=>{try{const value=await service.refreshScreeningBatch(id,Boolean(snapshot?.batch.sealed));if(!current(g)||batchId!==id)return;snapshot=value;render();
+    }catch(e){if(current(g)&&batchId===id)status(e.message);}finally{if(loading===run)loading=null;if(current(g))schedule();}})();
+   return run.promise;
   }
   async function openSaved(saved){
    if(!enabled||saved.jobId!==api.job()?.id)return;
-   const g=generation,service=api.data();
-   const rows=await service.listScreeningBatches(saved.jobId);
-   if(!current(g)||saved.jobId!==api.job()?.id)return;
-   // Preserve an unsaved finalist selection when the target is already open.
-   if(jobId!==saved.jobId||batchId!==saved.batchId){snapshot=null;selected=[];dirty=false;search='';}
-   jobId=saved.jobId;batchId=saved.batchId;list=rows;
-   if(!list.some(b=>b.id===batchId))list.push({id:batchId});
-   mode.value='bulk';updateUploadLabel();render();await refresh();
-   if(current(g)&&batchId===saved.batchId){
-    status('This resume is already saved here. Review the results or select finalists for deep assessment.');
-    host.scrollIntoView({block:'start',behavior:'smooth'});
-   }
+   const g=generation,rows=await api.data().listScreeningBatches(saved.jobId);if(!current(g)||saved.jobId!==api.job()?.id)return;
+   jobId=saved.jobId;batchId=saved.batchId;snapshot=null;list=rows;search='';if(!list.some(b=>b.id===batchId))list.push({id:batchId});
+   await refresh();status('This resume is already saved.');host.scrollIntoView({block:'start',behavior:'smooth'});
   }
   async function add(files,{resume=false}={}){
-   const job=api.job(),service=api.data(),g=generation,budget=Number(host.querySelector('[data-bulk-budget]')?.value||5);
+   const job=api.job(),service=api.data(),g=generation;
    if(!job||job.status==='closed'){api.toast('Choose an open job.','error');return;}
-   if(uploads?.running){api.toast('Wait for this batch to finish uploading.','error');return;}
-   const run={id:null,job:job.id,service,g,work:[],running:true};uploads=run;
-   status('Preparing your import…');
+   if(uploads?.running||starting){api.toast('Wait for these files to finish saving before adding more.','error');return;}
+   const run={running:true,id:null,job:job.id,work:[]};uploads=run;status('Preparing your upload…');
    try{
     const entries=await global.BlumrBulkFiles.expand(files);if(!current(g))return;
-    let id=batchId,work;
+    if(jobId===job.id&&batchId&&!snapshot)await refresh();
+    const draft=jobId===job.id&&snapshot&&!snapshot.batch.sealed;
+    let id=draft?batchId:crypto.randomUUID(),work;
     if(resume){
-     if(!snapshot||snapshot.batch.sealed)throw Error('Choose an unfinished batch.');
-     const available=[...entries];work=snapshot.items.filter(i=>['pending','failed'].includes(i.status)).map(item=>{const index=available.findIndex(f=>f.name===item.file_name&&f.size===item.file_size);return {ordinal:item.ordinal,entry:index<0?null:available.splice(index,1)[0],state:'pending'};}).filter(i=>i.entry);
-     if(!work.length)throw Error('Choose the original files, with their original names and sizes, for this batch.');
+     if(!draft)throw Error('Choose an unfinished upload.');const available=[...entries];
+     work=snapshot.items.filter(i=>['pending','failed'].includes(i.status)).map(item=>{const index=available.findIndex(f=>f.name===item.file_name&&f.size===item.file_size);return {ordinal:item.ordinal,entry:index<0?null:available.splice(index,1)[0]};}).filter(i=>i.entry);
+     if(!work.length)throw Error('Choose the original files, with their original names and sizes.');
     }else{
-     id=crypto.randomUUID();work=entries.map((entry,ordinal)=>({entry,ordinal,state:'pending'}));
-     await service.createScreeningBatch(id,job.id,entries.map(({name,size})=>({name,size})),budget);
-     if(!current(g))return;if(jobId===job.id){list.unshift({id,created_at:new Date().toISOString()});batchId=id;snapshot=null;dirty=false;selected=[];}
+     const offset=draft?snapshot.items.length:0,manifest=entries.map(({name,size})=>({name,size}));
+     work=entries.map((entry,i)=>({entry,ordinal:offset+i}));
+     if(draft)await service.appendResumeUpload(id,offset,manifest);else await service.createResumeUpload(id,job.id,manifest);
+     if(!current(g))return;
+     if(jobId===job.id){if(!draft)list.unshift({id,created_at:new Date().toISOString()});batchId=id;snapshot=null;}
     }
-    Object.assign(run,{id,work});if(jobId===job.id&&batchId===id)status('Import saved. Reading resumes…');
-    let lastRefresh=0;
+    Object.assign(run,{id,work});let lastRefresh=0;
     for(const item of work){
      if(!current(g))break;
      try{
-      item.state='reading';if(jobId===job.id&&batchId===id)status('Reading '+item.entry.name);
+      item.state='reading';if(batchId===id)status('Reading '+item.entry.name);
       const file=await item.entry.load(),extracted=await api.extract(file,text=>{if(current(g)&&batchId===id)status(text);});
-      const text=typeof extracted==='string'?extracted:extracted?.text;
-      if(!current(g))break;
-      item.state='saving';if(jobId===job.id&&batchId===id)status('Saving '+item.entry.name);
-      const prepared=await service.prepareScreeningUpload(id,item.ordinal,text);
-      if(!current(g))break;
+      const text=typeof extracted==='string'?extracted:extracted?.text;if(!current(g))break;
+      item.state='saving';if(batchId===id)status('Saving '+item.entry.name);
+      const prepared=await service.prepareScreeningUpload(id,item.ordinal,text);if(!current(g))break;
       if(!prepared.stored)await service.uploadResume({id:prepared.candidate_id,jobId:job.id,resumeIntake:{hash:prepared.hash}},file,text);
       if(!current(g))break;
       await service.updateScreeningItem(id,item.ordinal,'saved');item.state='saved';item.entry=null;
-     }catch(e){item.state='failed';item.error=e.message||'Document needs attention';if(current(g))try{await service.updateScreeningItem(id,item.ordinal,'failed');}catch{} }
+     }catch(e){item.state='failed';item.error=e.message||'Document needs attention';if(current(g))try{await service.updateScreeningItem(id,item.ordinal,'failed');}catch{}}
      if(!current(g))break;
-     if(batchId===id&&Date.now()-lastRefresh>2000){lastRefresh=Date.now();void refresh();}
-     // Storage has its own connection quota. Keep upload concurrency at one;
-     // rules scoring and durable AI continue independently in the background.
+     if(batchId===id&&Date.now()-lastRefresh>2000){lastRefresh=Date.now();await refresh();}
      await new Promise(resolve=>setTimeout(resolve,250));
     }
     run.running=false;
-    if(current(g)){
-     try{await service.sealScreeningBatch(id);}catch{/* Failed/unselected files remain explicitly unfinished. */}
-     if(batchId===id){await refresh();status(work.some(i=>i.state==='failed')?'Some files need attention. Retry their originals or explicitly exclude them.':'Files saved. Screening continues in the background.');}
-    }
-   }catch(e){if(current(g)&&jobId===job.id)status(e.message||'Import could not start.');}finally{run.running=false;}
+    if(current(g)&&batchId===id){await refresh();status(work.some(i=>i.state==='failed')?'Some files need attention. Retry their originals or remove them before analyzing.':'Files saved. Add more resumes or click Analyze when you’re ready.');}
+   }catch(e){if(current(g)&&jobId===job.id)status(e.message||'Upload could not start.');}finally{run.running=false;if(current(g))render();}
   }
-  function evidence(result){return (result?.findings||[]).map(f=>'<li><strong>'+esc(f.title)+'</strong> · '+esc(f.status)+' · weight '+esc(f.weight)+(f.evidence||[]).slice(0,2).map(e=>'<blockquote>'+esc(e.quote)+'</blockquote>').join('')+'</li>').join('');}
-  function row(c,index,deep=false){const id=c.candidateId,r=c.assessment?.result;return '<li class="rf-bulk-candidate"><div class="rf-bulk-row"><strong>'+esc(index+1)+'. '+esc(r?.name&&r.name!=='Candidate'?r.name:c.name)+'</strong><span>'+ (deep?'JD '+Number(r.score).toFixed(1)+' · Manager '+Number(r.manager_score).toFixed(1):'Evidence '+Number(c.score).toFixed(1)+'/100 · '+esc(c.requiredStatus))+'</span></div>'+
-   (deep?'<p>'+esc(r.jd_reason)+'</p><p>'+esc(r.manager_reason)+'</p><ul>'+(r.resume_evidence||[]).map(e=>'<li>'+esc(e.claim)+'<blockquote>'+esc(e.quote)+'</blockquote></li>').join('')+'</ul><p><strong>Concerns:</strong> '+esc((r.concerns||[]).join(' '))+'</p><ul>'+(r.screening_questions||[]).map(q=>'<li>'+esc(q)+'</li>').join('')+'</ul>':'<details data-bulk-disclosure="evidence-'+esc(id)+'"><summary>Supporting evidence and uncertainties</summary><ul>'+evidence(c)+'</ul></details>')+
-   '<div class="rf-actions"><button class="rf-linkbtn" data-bulk-resume="'+esc(id)+'">View resume</button>'+(deep&&api.review?'<button class="rf-btn" data-bulk-review="'+esc(id)+'">Approve assessment & open candidate</button>':'')+(!deep?'<button class="rf-btn" data-bulk-toggle="'+esc(id)+'">'+(selected.includes(id)?'Remove from finalists':'Add to finalists')+'</button>':'')+'</div></li>';}
+  async function start(){
+   if(starting||uploads?.running||!snapshot)return;
+   const id=batchId,g=generation,service=api.data(),saved=snapshot.items.filter(i=>i.status==='saved'),ids=[...new Set(saved.map(i=>i.candidate_id))];
+   if(!ids.length||snapshot.items.some(i=>['pending','failed'].includes(i.status)))return;
+   starting=true;render();
+   try{await service.startResumeAnalysis(id);if(!current(g)||batchId!==id)return;message='Analysis started. You can keep working while results are prepared.';await refresh();if(ids.length===1)await api.openCandidate(ids[0]);}
+   catch(e){if(current(g)&&batchId===id)status(e.message||'Analysis could not start. Your files are saved; try again.');}
+   finally{starting=false;if(current(g))render();}
+  }
   function render(){
-   const expanded=new Map(renderedBatch===batchId?[...host.querySelectorAll('details[data-bulk-disclosure]')].map(d=>[d.dataset.bulkDisclosure,d.open]):[]);
-   const active=document.activeElement,selector=host.contains(active)?['[data-bulk-search]','[data-bulk-budget]','[data-bulk-current-budget]'].find(s=>active.matches(s)):null,editing=selector?{selector,start:active.selectionStart,end:active.selectionEnd}:null;
-   if(!enabled){host.hidden=true;return;}host.hidden=false;const s=snapshot;
-   if(renderedBatch!==batchId)batchBudgetUsd=null;if(s&&batchBudgetUsd===null)batchBudgetUsd=s.cost.budget_usd;
-   const all=s?[...s.ranking.top,...s.ranking.nearMiss,...s.ranking.remaining]:[],byId=new Map(all.map(c=>[c.candidateId,c]));
-   const problems=s?.items.filter(i=>['pending','failed'].includes(i.status))||[];
-   const listHTML='<label>Saved import <select data-bulk-batch><option value="">Choose a batch</option>'+list.map(b=>'<option value="'+esc(b.id)+'" '+(batchId===b.id?'selected':'')+'>'+esc(b.created_at?new Date(b.created_at).toLocaleString():'Earlier import')+'</option>').join('')+'</select></label>';
-   api.root.querySelector('#candidateCards').hidden=mode.value==='bulk'&&Boolean(batchId);
-   host.innerHTML='<div class="rf-cardhead"><div><span class="rf-kicker">Bulk screening</span><h3>Top 20 → Top 10 phone screens</h3><p class="rf-sub">Upload authorized exports or resume files. You decide whom to contact. No candidate is automatically rejected. Keep this tab open until files are saved; saved files continue screening in the background.</p></div></div>'+listHTML+
-    '<label>New batch AI budget (USD) <input data-bulk-budget type="number" min="0.01" max="100" step="0.01" value="'+esc(budgetUsd)+'"></label>'+
-    '<p data-bulk-message role="status" aria-live="polite">'+esc(message||(!batchId?'Choose resumes above to start.':''))+'</p>'+
-    (s?'<div class="rf-bulk-progress"><strong>'+(s.status==='complete'?'Screening complete for this batch':'Provisional ranking — processing is incomplete')+'</strong><p>'+s.items.filter(i=>i.status==='saved').length+' / '+s.items.length+' files saved · '+s.processed+' / '+s.total+' unique candidates ranked'+(s.excluded?' · '+s.excluded+' files explicitly excluded':'')+'</p><progress max="'+Math.max(1,s.items.length)+'" value="'+s.items.filter(i=>['saved','excluded'].includes(i.status)).length+'"></progress><button class="rf-btn" data-bulk-refresh>Refresh results</button></div><p class="rf-note">Rules screening: 0 AI calls. Deep analysis: '+s.cost.provider_calls_reserved+' call reservations · '+money(s.cost.actual_usd)+' recorded · '+money(s.cost.reserved_usd)+' reserved / '+money(s.cost.budget_usd)+' cap'+(s.cost.unsettled_calls?' · '+s.cost.unsettled_calls+' reservations without final usage':'')+'.</p><label>This batch AI budget (USD) <input data-bulk-current-budget type="number" min="'+esc(s.cost.budget_usd)+'" max="100" step="0.01" value="'+esc(batchBudgetUsd)+'"></label><button class="rf-btn" data-bulk-save-budget>Save higher budget</button><p class="rf-sub">Changing the cap does not restart assessments. Save finalists below to retry budget-blocked analysis; completed results are reused. Per-candidate and batch request limits still apply.</p>'+
-     (s.batch.intelligence?.status==='needs_review'?'<p class="rf-upload-error">The job priorities need review before ranking can finish. Open Job Details to review the Top 5 priorities.</p>':'')+
-     (problems.length?'<details open data-bulk-disclosure="problems"><summary>'+problems.length+' files need attention</summary><p>Saved documents are retained. Reselect the original files to resume, or explicitly exclude a file from this batch.</p><input type="file" multiple accept=".pdf,.doc,.docx,.txt,.zip" data-bulk-resume-files aria-label="Reselect unfinished resume files"><ul>'+problems.slice(0,50).map(i=>'<li>'+esc(i.file_name)+' · '+esc(i.status)+' <button class="rf-linkbtn" data-bulk-exclude="'+i.ordinal+'">Exclude file</button></li>').join('')+'</ul>'+(problems.length>50?'<p>Showing 50 of '+problems.length+' unfinished files.</p>':'')+'</details>':'')+
-     '<details open data-bulk-disclosure="top20"><summary>Initial Top '+s.ranking.top.length+'</summary><ol class="rf-bulk-list">'+s.ranking.top.map((c,i)=>row(c,i)).join('')+'</ol></details><details data-bulk-disclosure="near"><summary>Near misses ('+s.ranking.nearMiss.length+')</summary><ol class="rf-bulk-list">'+s.ranking.nearMiss.map((c,i)=>row(c,i+20)).join('')+'</ol></details>'+
-     '<details data-bulk-disclosure="search"><summary>Search all ranked candidates ('+all.length+')</summary><input data-bulk-search value="'+esc(search)+'" placeholder="Candidate name" aria-label="Search batch candidates"><ul>'+all.filter(c=>String(c.name).toLowerCase().includes(search.toLowerCase())).slice(0,50).map(c=>'<li>'+esc(c.name)+' · '+Number(c.score).toFixed(1)+' <button class="rf-linkbtn" data-bulk-toggle="'+esc(c.candidateId)+'">'+(selected.includes(c.candidateId)?'Remove':'Add')+'</button><button class="rf-linkbtn" data-bulk-resume="'+esc(c.candidateId)+'">Resume</button></li>').join('')+'</ul></details>'+
-     '<h4>Your finalists ('+selected.length+'/20)</h4><ol>'+selected.map((id,i)=>'<li>'+esc(byId.get(id)?.name||s.selected.find(c=>c.candidateId===id)?.name||'Candidate')+' <button class="rf-linkbtn" data-bulk-up="'+esc(id)+'" '+(!i?'disabled':'')+'>Move up</button><button class="rf-linkbtn" data-bulk-toggle="'+esc(id)+'">Remove</button></li>').join('')+'</ol><button class="rf-btn primary" data-bulk-start '+(s.status!=='complete'||!selected.length?'disabled':'')+'>Save finalists & start deep analysis</button><p class="rf-sub">Up to 20 selected candidates. Unchanged assessments are reused; the budget also covers any validation repair.</p>'+
-     (s.deep_total?'<h4>'+(s.deep_status==='complete'?'Recommended phone screens':'Provisional phone-screen recommendations')+'</h4><p>'+s.deep_completed+' / '+s.deep_total+' deep assessments ready. '+esc(s.deep_ranking_basis)+'</p><ol class="rf-bulk-list">'+s.top10.map((c,i)=>row(c,i,true)).join('')+'</ol>'+s.selected.filter(c=>!c.assessment||!['ready','approved'].includes(c.assessment.status)).map(c=>'<p>'+esc(c.name)+': '+esc(c.assessment?.error==='screening_budget_limit'?'AI budget or request limit reached. Review the batch budget and retry finalists.':c.assessment?.error||c.assessment?.status||'Evidence changed — refresh and reselect finalists')+'</p>').join(''):''):'');
-   renderedBatch=batchId;host.querySelectorAll('details[data-bulk-disclosure]').forEach(d=>{if(expanded.has(d.dataset.bulkDisclosure))d.open=expanded.get(d.dataset.bulkDisclosure);});
-   if(editing){const input=host.querySelector(editing.selector);input?.focus({preventScroll:true});if(input&&editing.start!==null)input.setSelectionRange(editing.start,editing.end);}
-
+   if(!enabled){host.hidden=true;return;}host.hidden=false;const s=snapshot,draft=s&&!s.batch.sealed,items=s?.items||[],saved=items.filter(i=>i.status==='saved'),problems=items.filter(i=>['pending','failed'].includes(i.status)),count=new Set(saved.map(i=>i.candidate_id)).size;
+   const focused=document.activeElement,editing=host.contains(focused)&&focused.matches('[data-bulk-search]')?{start:focused.selectionStart,end:focused.selectionEnd}:null;
+   api.root.querySelector('#candidateCards').hidden=Boolean(batchId);
+   const selected=new Map((s?.selected||[]).map(c=>[c.candidateId,c]));
+   const results=allResults().filter(c=>String(selected.get(c.candidateId)?.assessment?.result?.name||c.name).toLowerCase().includes(search.toLowerCase()));
+   host.innerHTML=(list.length?'<label>Saved uploads <select data-bulk-batch><option value="">New upload</option>'+list.map(b=>'<option value="'+esc(b.id)+'" '+(batchId===b.id?'selected':'')+'>'+esc(b.created_at?new Date(b.created_at).toLocaleString():'Earlier upload')+'</option>').join('')+'</select></label>':'')+
+    '<p data-bulk-message role="status" aria-live="polite">'+esc(message||(!batchId?'Add one or more resumes above.':''))+'</p>'+
+    (s?'<div class="rf-cardhead"><div><span class="rf-kicker">'+(draft?'Your upload list':'Resume results')+'</span><h3>'+(draft?'Ready when you are':(s.deep_status==='complete'||s.status==='complete'&&s.batch.auto_selected&&!s.deep_total)?'Ready for review':'Preparing assessments')+'</h3><p class="rf-sub">'+(draft?'Add more resumes or remove files below, then start the analysis.':s.processed+' of '+s.total+' resumes checked'+(s.deep_total?' · '+s.deep_completed+' of '+s.deep_total+' detailed assessments ready':'')+'. All candidates remain available for review.')+'</p></div><button class="rf-linkbtn" data-bulk-refresh>Refresh</button></div>'+
+     (draft?'<ul class="rf-bulk-list rf-upload-list" tabindex="0" aria-label="Uploaded resumes">'+items.filter(i=>i.status!=='excluded').map(i=>'<li class="rf-upload-row"><div><strong>'+esc(i.file_name)+'</strong><small>'+esc(i.status==='saved'?'Saved · ready to analyze':i.status==='failed'?'Needs attention':'Saving resume…')+'</small></div><button class="rf-linkbtn" data-bulk-exclude="'+i.ordinal+'" '+(uploads?.running?'disabled':'')+'>Remove</button></li>').join('')+'</ul>'+(problems.length?'<p class="rf-upload-error">'+problems.length+' file'+(problems.length===1?' needs':'s need')+' attention. Reselect the originals to retry, or remove them.</p><input type="file" multiple accept=".pdf,.doc,.docx,.txt,.zip" data-bulk-resume-files aria-label="Retry unfinished resume files">':'')+(saved.length>count?'<p class="rf-sub">'+saved.length+' files · '+count+' unique resumes. Duplicate files reuse the saved candidate.</p>':'')+'<button class="rf-btn primary" data-bulk-start '+(!count||problems.length||uploads?.running||starting?'disabled':'')+'>'+(starting?'Starting analysis…':'Analyze '+count+' resume'+(count===1?'':'s'))+'</button><p class="rf-sub">'+(count>20?'Every resume is checked against the job. Detailed assessments are prepared for the 20 strongest matches. ':'')+'Keep this tab open until files finish saving.</p>':
+      (s.batch.intelligence?.status==='needs_review'?'<p class="rf-upload-error">Review the job’s Top 5 priorities in Job Details to continue.</p>':'')+
+      (s.status==='complete'&&s.batch.auto_selected&&s.selected.some(c=>!c.assessment)?'<p class="rf-sub">The job evidence has changed. Analyze the updated resumes before approving new assessments.</p><button class="rf-btn primary" data-bulk-update>Analyze updated resumes</button>':'')+
+      (!s.batch.analysis_requested_at&&!s.deep_total?'<button class="rf-btn primary" data-bulk-start>Analyze '+count+' resume'+(count===1?'':'s')+'</button>':'')+
+      '<label>Find a candidate <input data-bulk-search value="'+esc(search)+'" placeholder="Candidate name" aria-label="Search resume results"></label><ol class="rf-bulk-list">'+results.map((c,i)=>{const a=selected.get(c.candidateId)?.assessment,r=a?.result;return '<li class="rf-bulk-candidate"><div class="rf-bulk-row"><strong>'+esc(r?.name&&r.name!=='Candidate'?r.name:c.name)+'</strong><span>'+esc(r?'Assessment '+(a.status==='approved'?'reviewed':'ready'):'Evidence match '+Number(c.score).toFixed(1)+'/100')+'</span></div><p class="rf-sub">'+esc(a?.status==='failed'?'Assessment needs attention. Open this candidate to retry.':r?.primary_signal||'Review the supporting evidence and questions to verify.')+'</p><button class="rf-btn" data-bulk-open="'+esc(c.candidateId)+'">Review candidate</button></li>';}).join('')+'</ol>'+(!results.length?'<p class="rf-sub">'+(search?'No matching candidates.':'Results will appear here as analysis finishes.')+'</p>':'')):'');
+   if(editing){const input=host.querySelector('[data-bulk-search]');input?.focus({preventScroll:true});input?.setSelectionRange(editing.start,editing.end);}
   }
-  host.addEventListener('change',event=>{if(event.target.matches('[data-bulk-batch]')){batchId=event.target.value;snapshot=null;selected=[];dirty=false;void refresh();}if(event.target.matches('[data-bulk-resume-files]')){const files=[...event.target.files];event.target.value='';void add(files,{resume:true});}});
-  host.addEventListener('input',event=>{if(event.target.matches('[data-bulk-budget]'))budgetUsd=event.target.value;if(event.target.matches('[data-bulk-current-budget]'))batchBudgetUsd=event.target.value;if(event.target.matches('[data-bulk-search]')){search=event.target.value;const start=event.target.selectionStart;render();const input=host.querySelector('[data-bulk-search]');input.closest('details').open=true;input.focus();input.setSelectionRange(start,start);}});
-  host.addEventListener('click',async event=>{
-   const button=event.target.closest('button');if(!button)return;const d=button.dataset;
-   try{
-    if('bulkRefresh' in d)await refresh(true);
-    if(d.bulkToggle){if(selected.includes(d.bulkToggle))selected=selected.filter(id=>id!==d.bulkToggle);else if(selected.length<20)selected.push(d.bulkToggle);else{api.toast('Remove one finalist before adding another.','error');return;}dirty=true;render();}
-    if(d.bulkUp){const i=selected.indexOf(d.bulkUp);if(i>0)[selected[i-1],selected[i]]=[selected[i],selected[i-1]];dirty=true;render();}
-    if('bulkExclude' in d){await api.data().updateScreeningItem(batchId,Number(d.bulkExclude),'excluded');try{await api.data().sealScreeningBatch(batchId);}catch{}await refresh();}
-    if('bulkSaveBudget' in d){const id=batchId,g=generation;button.disabled=true;await api.data().updateScreeningBudget(id,Number(batchBudgetUsd));if(current(g)&&batchId===id){await refresh();status('Budget saved. Save finalists to retry any blocked assessments.');}}
-    if('bulkStart' in d){button.disabled=true;await api.data().selectScreeningFinalists(batchId,selected,snapshot.batch.source_version,snapshot.batch.selection_version);dirty=false;await refresh();}
-    if(d.bulkReview){const c=snapshot.top10.find(c=>c.candidateId===d.bulkReview);if(c?.assessment?.revision)await api.review(c.candidateId,c.assessment.revision);}
-    if(d.bulkResume){
-     const g=generation,c={id:d.bulkResume,jobId},service=api.data();const text=await service.loadResumeText(c);if(!current(g))return;
-     resumeCleanup?.();const dialog=document.createElement('dialog');dialog.className='rf-bulk-dialog';dialog.innerHTML='<button class="rf-btn" data-close>Close resume</button><div data-viewer><pre data-resume-text></pre></div>';document.body.append(dialog);
-     const textHost=dialog.querySelector('[data-resume-text]');textHost.textContent=text;const dispose=global.BlumrResumeViewer.mount({host:dialog.querySelector('[data-viewer]'),textHost,load:()=>service.loadResumeDocument(c)});
-     resumeCleanup=()=>{dispose();dialog.remove();};dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>{resumeCleanup?.();resumeCleanup=null;},{once:true});dialog.showModal();
-    }
-   }catch(e){status(e.message||'Could not save. Refresh and try again.');}finally{if(button.isConnected)button.disabled=false;}
+  async function loadCandidate(c){
+   if(!c?.screeningManaged||reviewLoads.has(c.id)||!api.data()?.getResumeAnalysis)return;
+   const g=generation,service=api.data(),token={};reviewLoads.set(c.id,token);
+   try{const value=await service.getResumeAnalysis(c.id);if(!current(g))return;let state;if(['ready','approved'].includes(value.assessment?.status)&&value.assessment.result&&api.prepareAssessment)state=await api.prepareAssessment(c,value);if(!current(g))return;if(state){c.resumeIntake=state;value.preparedState=state;}reviews.set(c.id,value);api.changed(c);
+   }catch{if(current(g)){reviews.set(c.id,{error:'The assessment could not load. Try again.',stored:true});api.changed(c);}}
+   finally{if(reviewLoads.get(c.id)===token)reviewLoads.delete(c.id);}
+   clearTimeout(reviewTimer);const value=reviews.get(c.id);
+   if(current(g)&&value?.started&&(!value.rules||['queued','processing'].includes(value.assessment?.status)))reviewTimer=setTimeout(()=>{if(api.isOpen(c))void loadCandidate(c);},5000);
+  }
+  async function next(c){const g=generation,id=batchId;await refresh();if(!current(g)||id!==batchId||c.jobId!==api.job()?.id)return;const candidate=snapshot?.selected.find(x=>x.candidateId!==c.id&&x.assessment?.status==='ready');if(candidate)await api.openCandidate(candidate.candidateId);else api.showResults();}
+  function renderCandidate(c,wrap){
+   if(!c.screeningManaged)return false;
+   const value=reviews.get(c.id);wrap.hidden=Boolean(c.aiReview);if(wrap.hidden)return true;
+   const a=value?.assessment,r=a?.result,ready=['ready','approved'].includes(a?.status)&&r;
+   if(ready&&api.renderAssessment){if(value.preparedState)c.resumeIntake={...value.preparedState,evidenceReviews:c.resumeIntake?.remoteRevision===value.preparedState.remoteRevision?c.resumeIntake?.evidenceReviews:undefined};api.renderAssessment(c,wrap);return true;}
+   const html='<span class="rf-kicker">Resume assessment</span><div class="rf-cardhead"><h3>'+(value?.error?'Assessment unavailable':ready?'Ready for your review':value?.rules?'Resume evidence':value?.started?'Preparing your assessment':'Resume saved')+'</h3><button class="rf-btn" data-managed-resume>View resume</button></div>'+
+    (value?.error?'<p>'+esc(value.error)+'</p>':
+     value?.rules?'<p>Evidence match: '+Number(value.rules.score).toFixed(1)+'/100. This is a rules-based evidence check; approved assessment scores are shown separately.</p><ul>'+value.rules.findings.map(f=>'<li><strong>'+esc(f.title)+'</strong> · '+esc(f.status)+(f.evidence||[]).slice(0,2).map(e=>'<blockquote>'+esc(e.quote)+'</blockquote>').join('')+'</li>').join('')+'</ul><p class="rf-sub">'+esc(a?.status==='failed'?'The detailed assessment needs another try.':a?'A detailed assessment is being prepared.':'The detailed assessments focus on the strongest matches. You can review this candidate’s evidence and resume here.')+'</p>':'<p class="rf-sub">'+(value?.started?'You can keep working while the assessment is prepared.':'Add any remaining resumes, then click Analyze resumes on the upload page.')+'</p>')+
+    '<p class="rf-evidence-caution">Missing evidence is a question to verify, not proof of a missing skill. Scores require your approval.</p><button class="rf-linkbtn" data-managed-refresh>Refresh assessment</button>'+(a?.status==='failed'?'<button class="rf-btn" data-managed-retry>Retry assessment</button>':'');
+   if(wrap.dataset.markup===html&&wrap.dataset.candidate===c.id)return true;
+   const expanded=wrap.dataset.candidate===c.id?[...wrap.querySelectorAll('details')].map(d=>d.open):[];wrap.innerHTML=html;wrap.dataset.markup=html;wrap.dataset.candidate=c.id;wrap.querySelectorAll('details').forEach((d,i)=>d.open=!!expanded[i]);
+   wrap.querySelector('[data-managed-resume]').onclick=()=>api.openResume(c);
+   wrap.querySelector('[data-managed-refresh]').onclick=()=>loadCandidate(c);
+   const approve=wrap.querySelector('[data-managed-approve]');if(approve)approve.onclick=async()=>{approve.disabled=true;try{await api.review(c.id,a.revision);await loadCandidate(c);}catch(e){api.toast(e.message||'Approval could not save. Try again.','error');}finally{if(approve.isConnected)approve.disabled=false;}};
+   const retry=wrap.querySelector('[data-managed-retry]');if(retry)retry.onclick=async()=>{retry.disabled=true;try{await api.data().requestResumeIntake(c.id,true);await loadCandidate(c);}catch(e){api.toast(e.message||'Assessment could not restart. Try again.','error');}finally{if(retry.isConnected)retry.disabled=false;}};
+   return true;
+  }
+  host.addEventListener('change',event=>{if(event.target.matches('[data-bulk-batch]')){batchId=event.target.value||null;snapshot=null;search='';message='';render();void refresh();}if(event.target.matches('[data-bulk-resume-files]')){const files=[...event.target.files];event.target.value='';void add(files,{resume:true});}});
+  host.addEventListener('input',event=>{if(event.target.matches('[data-bulk-search]')){search=event.target.value;render();}});
+  host.addEventListener('click',async event=>{const button=event.target.closest('button');if(!button)return;const d=button.dataset,g=generation,id=batchId;
+   try{if('bulkRefresh'in d)await refresh();if('bulkStart'in d)await start();if(d.bulkOpen)await api.openCandidate(d.bulkOpen);
+    if('bulkUpdate'in d){button.disabled=true;await api.data().selectScreeningFinalists(id,snapshot.ranking.top.map(c=>c.candidateId),snapshot.batch.source_version,snapshot.batch.selection_version);if(current(g)&&batchId===id)await refresh();}
+    if('bulkExclude'in d){button.disabled=true;await api.data().updateScreeningItem(id,Number(d.bulkExclude),'excluded');if(current(g)&&batchId===id)await refresh();}
+   }catch(e){if(current(g))status(e.message||'Could not save. Refresh and try again.');}finally{if(button.isConnected)button.disabled=false;}
   });
-  function clear(){generation++;clearTimeout(timer);enabled=false;jobId=null;batchId=null;snapshot=null;selected=[];list=[];uploads=null;resumeCleanup?.();resumeCleanup=null;mode.hidden=true;api.root.querySelector('#candidateCards').hidden=false;host.replaceChildren();host.hidden=true;}
-  return {init,open,openSaved,add,clear,isBulk:()=>enabled&&mode.value==='bulk',hasUnsaved:()=>Boolean(uploads?.running)};
+  function clear(){generation++;clearTimeout(timer);clearTimeout(reviewTimer);enabled=false;jobId=null;batchId=null;snapshot=null;list=[];uploads=null;loading=null;reviews.clear();reviewLoads.clear();api.root.querySelector('#candidateCards').hidden=false;host.replaceChildren();host.hidden=true;}
+  return {init,open,openSaved,add,clear,loadCandidate,renderCandidate,next,isBulk:()=>enabled,hasUnsaved:()=>Boolean(uploads?.running)};
  }
  global.BlumrBulkScreening={mount};
 })(window);

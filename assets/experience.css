@@ -132,3 +132,7 @@
 .rf-compare-builder[open]>.rf-compare-builder-summary>span::after{content:' −'}
 .rf-compare-builder[open]>.rf-compare-builder-summary{padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid var(--ui-panel-line)}
 .rf-compare-builder[open] .rf-compare-intro{display:none}
+
+/* The review actions wrap with the same assessment on narrow screens. */
+#rf-app .rf-intake-brief .rf-cardhead{flex-wrap:wrap}
+#rf-app .rf-intake-brief .rf-cardhead>.rf-actions{min-width:0;max-width:100%}
