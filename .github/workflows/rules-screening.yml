@@ -72,8 +72,8 @@ jobs:
         run: node scripts/recover-screening-fixture.mjs
       - name: Deploy experimental route to staging only
         run: |
-          supabase functions deploy analyze-patterns-beta --project-ref "$SUPABASE_PROJECT_REF"
-          supabase functions deploy reassess-job --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy analyze-patterns-beta --use-api --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy reassess-job --use-api --project-ref "$SUPABASE_PROJECT_REF"
           supabase secrets set RULES_FIRST_SCREENING=true --project-ref "$SUPABASE_PROJECT_REF"
       - name: Install exact browser import dependencies
         run: |
