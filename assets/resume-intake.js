@@ -272,7 +272,7 @@
     }
     function duplicates(c){return api.candidates().filter(x=>x.id!==c.id&&x.jobId===c.jobId&&normalize(x.name)===normalize(c.name)&&c.resumeIntake?.brief?.name!=='Candidate');}
     async function approve(c,{next=false}={}){
-      if(c?.screeningManaged){if(reviewing.has(c.id))return;reviewing.add(c.id);changed(c);try{await api.reviewScreening?.(c);if(next)api.next?.(c);}catch(e){api.toast(e.message||'Approval could not save. Try again.','error');}finally{reviewing.delete(c.id);changed(c);}return;}
+      if(c?.screeningManaged){if(reviewing.has(c.id))return;reviewing.add(c.id);changed(c);try{if(api.beforeReview&&!await api.beforeReview(c))return;await api.reviewScreening(c);api.reviewed?.(c);if(next)await api.next?.(c);}catch(e){api.toast(e.message||'Approval could not save. Try again.','error');}finally{reviewing.delete(c.id);const current=api.candidates().find(x=>x.id===c.id);if(current)changed(current);}return;}
       if(!valid(c)||reviewing.has(c.id)||c.resumeIntake.phase!=='ready'||!pending(c))return;
       if(c.resumeIntake.signature!==api.signature(context(c))){await retry(c);return;}
       reviewing.add(c.id);changed(c);

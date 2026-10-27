@@ -90,7 +90,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   const ready=batch.selected_ids[0];await page.locator(`[data-bulk-open="${ready}"]`).click();await page.locator('#page-detail.active').waitFor();
   await page.locator('[data-intake-approve]').waitFor();assert.equal(approvals,0,'Opening an assessment approved it');
   await page.locator('[data-view-resume]').click();await page.locator('#resumeEvidencePanel').waitFor();assert.ok((await page.locator('.rf-resume-document').textContent()).length>40);await page.keyboard.press('Escape');
-  await page.locator('[data-intake-approve]').click();await page.waitForFunction(()=>!document.querySelector('#workspaceIntake')||document.querySelector('#workspaceIntake').hidden);assert.equal(approvals,1);
+  await page.locator('[data-intake-next]').click();await page.waitForFunction(id=>document.querySelector('#candidateWorkspace').dataset.workspaceCandidate!==id,ready);await page.locator('[data-intake-approve]').waitFor();assert.equal(approvals,1);
   await page.locator('.rf-nav [data-page="candidates"]').click();await page.getByRole('heading',{name:'Ready for review',exact:true}).waitFor();
   const rules=[...candidates.values()].find(c=>batch.items.some(i=>i.candidate_id===c.candidateId&&i.status==='saved')&&!batch.selected_ids.includes(c.candidateId));
   await page.locator(`[data-bulk-open="${rules.candidateId}"]`).click();await page.getByRole('heading',{name:'Resume evidence',exact:true}).waitFor();

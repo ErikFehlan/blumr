@@ -554,7 +554,7 @@
       function advanceAfterReview(candidate){
         if(activeJobId!==candidate.jobId||!root.querySelector('#page-detail').classList.contains('active')||root.querySelector('#reviewCandidateId').value!==candidate.id)return;
         if(window.AncalagonWorkspace.hasPendingNotes(candidate.id))return;
-        const list=activeCandidates().filter(c=>c.id!==candidate.id&&activeJob()?.status!=='closed'&&(window.AncalagonIntake.pending(c)?c.resumeIntake.phase==='ready'&&c.resumeIntake.signature===window.AncalagonContext.signature(intakeContext(c)):jobReview.canReview(c)||candidateAutomation.canReview(c)));
+        const list=activeCandidates().filter(c=>c.id!==candidate.id&&activeJob()?.status!=='closed'&&(window.AncalagonIntake.pending(c)?c.resumeIntake?.phase==='ready'&&c.resumeIntake.signature===window.AncalagonContext.signature(intakeContext(c)):jobReview.canReview(c)||candidateAutomation.canReview(c)));
         if(list.length){openDetail(list[0].id);root.querySelector('#detailName').focus({preventScroll:true});}
         else{showPage('candidates');showToast('You’re all caught up on ready assessments for this job.');}
       }
@@ -589,7 +589,7 @@
         if(root.querySelector('#page-detail').classList.contains('active'))recordAssessmentView(c);window.AncalagonWorkspace?.refreshIntake();
       }
       const intake=window.AncalagonIntake.create({
-        root,bindLessons:wrap=>assessmentMemory.bind(wrap),beforeReview:prepareAssessmentReview,next:advanceAfterReview,reviewed:()=>{void guidance?.complete('assessment');void guidance?.complete('approval');},job:id=>id?jobs.find(j=>j.id===id):activeJob(),candidates:()=>candidates,
+        root,bindLessons:wrap=>assessmentMemory.bind(wrap),beforeReview:prepareAssessmentReview,next:c=>c.screeningManaged?bulk.next(c):advanceAfterReview(c),reviewed:()=>{void guidance?.complete('assessment');void guidance?.complete('approval');},job:id=>id?jobs.find(j=>j.id===id):activeJob(),candidates:()=>candidates,
         workspace:()=>window.ancalagonAuth.workspace.id,extract:extractLocalResume,
         findScreeningResume:(job,ids)=>dataService.findScreeningResume?.(job,ids),
         openScreeningResume:saved=>bulk.openSaved(saved),
@@ -609,7 +609,7 @@
           if(force||root.querySelector('#page-candidates').classList.contains('active')){openDetail(c.id);refreshIntakeCandidate(c);}}
       });
       const bulk=window.BlumrBulkScreening.mount({root,data:()=>dataService,job:activeJob,extract:extractLocalResume,toast:showToast,
-        changed:c=>refreshIntakeCandidate(c,true),renderAssessment:(c,wrap)=>intake.renderCandidate(c,wrap),prepareAssessment:async(c,value)=>{
+        showResults:()=>showPage('candidates'),changed:c=>refreshIntakeCandidate(c,true),renderAssessment:(c,wrap)=>intake.renderCandidate(c,wrap),prepareAssessment:async(c,value)=>{
           const brief=window.AncalagonIntake.validate(value.assessment.result,await dataService.loadResumeText(c));
           return {...(c.resumeIntake?.remoteRevision===value.assessment.revision?c.resumeIntake:{}),stored:value.stored,fileName:value.fileName,phase:'ready',brief,remoteRevision:value.assessment.revision};
         },isOpen:c=>root.querySelector('#page-detail').classList.contains('active')&&root.querySelector('#reviewCandidateId').value===c.id,
