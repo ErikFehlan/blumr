@@ -52,7 +52,7 @@ test('comparison overview preserves candidate identity, saved score separation a
 
 test('unselected bulk candidates have no saved fit scores or automatic processing state',()=>{
  const c={...candidate(),aiReview:null,resumeIntake:null,screeningManaged:true};
- assert.equal(d.reviewState(c).label,'Bulk screening');
+ assert.equal(d.reviewState(c).label,'Resume assessment');
  const summary=d.summary(job,[c]);assert.equal(summary.working.length,0);assert.equal(summary.needsReview.length,0);
- assert.doesNotMatch(d.shortlistHTML([c]),/8\.0/);assert.match(d.shortlistHTML([c]),/bulk screening/i);
+ assert.doesNotMatch(d.shortlistHTML([c]),/8\.0/);assert.match(d.shortlistHTML([c]),/Resume assessment/i);
 });

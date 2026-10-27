@@ -28,7 +28,7 @@
     'assets/quick-notes.js?v=20260914-focus',
     'assets/candidate-workspace.js?v=20261027-unified-resumes',
     'assets/criteria-automation.js?v=20261002-guided-experience',
-    'assets/decision-workspace.js?v=20261020-bulk-reload',
+    'assets/decision-workspace.js?v=20261027-unified-resumes',
     'assets/home.js?v=20261015-experience',
     'assets/focus-ui.js?v=20261014-decisions',
     'assets/recruiter-workflow.js?v=20261027-unified-resumes',
