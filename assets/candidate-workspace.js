@@ -204,6 +204,8 @@
     section.open=true;submissionMode(api.root.querySelector('#candidateWorkspace'),false);refreshDraft();section.scrollIntoView({block:'start'});api.root.querySelector('#submissionDraft')?.focus({preventScroll:true});
   }
   async function saveSubmission(candidate,wrap,{copyText=null}={}){
+    candidate=api.candidate(candidate.id);
+    if(!candidate){api.toast('This candidate is no longer available. Reopen the candidate before saving.','error');return false;}
     const area=wrap.querySelector('#submissionDraft'),raw=area.value,text=raw.trim(),id=candidate.id;
     if(!text){api.toast('Add a submittal before '+(copyText===null?'saving.':'copying.'),'error');return false;}
     if(submissionSaves.has(id))return false;
