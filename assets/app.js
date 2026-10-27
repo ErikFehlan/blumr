@@ -609,7 +609,7 @@
           if(force||root.querySelector('#page-candidates').classList.contains('active')){openDetail(c.id);refreshIntakeCandidate(c);}}
       });
       const bulk=window.BlumrBulkScreening.mount({root,data:()=>dataService,job:activeJob,extract:extractLocalResume,toast:showToast,
-        showResults:()=>showPage('candidates'),changed:c=>refreshIntakeCandidate(c,true),renderAssessment:(c,wrap)=>intake.renderCandidate(c,wrap),prepareAssessment:async(c,value)=>{
+        showResults:()=>showPage('candidates'),openCriteria:()=>showPage('criteria'),changed:c=>refreshIntakeCandidate(c,true),renderAssessment:(c,wrap)=>intake.renderCandidate(c,wrap),prepareAssessment:async(c,value)=>{
           const brief=window.AncalagonIntake.validate(value.assessment.result,await dataService.loadResumeText(c));
           return {...(c.resumeIntake?.remoteRevision===value.assessment.revision?c.resumeIntake:{}),stored:value.stored,fileName:value.fileName,phase:'ready',brief,remoteRevision:value.assessment.revision};
         },isOpen:c=>root.querySelector('#page-detail').classList.contains('active')&&root.querySelector('#reviewCandidateId').value===c.id,

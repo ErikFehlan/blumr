@@ -6,6 +6,27 @@ async function fixture({title='Implement Azure or AWS infrastructure',descriptio
  item.screening_rule=validateRuleSpec({groups:groups.map(alternatives=>({alternatives})),unavailable_reason:groups.length?'':'Needs review'},item);
  return {workspaceId:'w',job:{id:'j',workspace_id:'w',title:'Synthetic role',description,criteria:[],knockouts:[]},priorities:{source_title:'Synthetic role',source_description:description,items:[item]},...changes};
 }
+test('older jobs without saved priorities compile their current description without AI',async()=>{
+ const {buildJobIntelligence}=await import('../supabase/functions/_shared/job-intelligence.mjs');
+ const input=await fixture({description:'Requires 5 years of C# development experience. Experience with SQL databases. Maintain Entity Framework applications.',groups:[],priorities:null});
+ input.job.criteria=['Experience with event driven architecture'];
+ const result=await buildJobIntelligence(input);
+ assert.equal(result.status,'ready');assert.equal(result.aiCalls,0);
+ assert.equal(result.priorityBasis,'current_job_description');
+ assert.ok(result.rubric.rules.length>0);
+ assert.ok(result.rubric.rules.filter(r=>r.origin==='priority').every(r=>input.job.description.includes(r.sourceQuote)));
+ assert.match(JSON.stringify(result.rubric),/event driven architecture/);
+ assert.equal(input.priorities,null,'Derived priorities overwrote the saved source');
+ input.job.description='Different description without usable requirements.';
+ assert.equal((await buildJobIntelligence(input)).status,'needs_review');
+});
+test('an intentionally empty or stale saved priority list is not replaced by automatic defaults',async()=>{
+ const {buildJobIntelligence}=await import('../supabase/functions/_shared/job-intelligence.mjs');
+ const input=await fixture();input.priorities.review_status='edited';input.priorities.items=[];
+ assert.equal((await buildJobIntelligence(input)).status,'needs_review');
+ input.priorities.source_description='Previous description';
+ assert.equal((await buildJobIntelligence(input)).status,'needs_review');
+});
 test('canonical grounded OR/AND rules compile without a provider and preserve priority identity',async()=>{
  const {buildJobIntelligence}=await import('../supabase/functions/_shared/job-intelligence.mjs'),e=await import('../supabase/functions/_shared/screening-engine.mjs');
  const input=await fixture(),i=await buildJobIntelligence(input);
