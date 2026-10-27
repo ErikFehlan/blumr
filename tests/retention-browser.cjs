@@ -29,6 +29,8 @@ const dir=path.resolve(__dirname,'..');
   await page.evaluate(files=>window.fileBytes=files,{Alex:Array.from(pdf),Jamie:Array.from(word)});
   // Direct upload entry points retain the chosen job and its existing requirements.
   const [chooser]=await Promise.all([page.waitForEvent('filechooser'),page.getByRole('button',{name:'Add candidates to Engineer',exact:true}).click()]);await chooser.setFiles({name:'Second.txt',mimeType:'text/plain',buffer:Buffer.from('New Candidate\nOwned manual regression testing for billing systems and documented defects.')});
+  assert.equal(await page.evaluate(()=>window.lastUpload),undefined,'Choosing a resume must wait for Analyze');
+  await page.getByRole('button',{name:'Analyze 1 resume',exact:true}).click();
   await page.waitForFunction(()=>window.lastUpload?.jobId==='job-b');
   assert.equal(await page.evaluate(()=>window.testSaved.jobs.length),2);
   assert.deepEqual(await page.evaluate(()=>window.testSaved.jobs.find(j=>j.id==='job-b').criteria),['Must Have | manual testing']);
