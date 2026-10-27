@@ -169,6 +169,19 @@
         if(typeof extracted?.legacyText==='string'&&extracted.legacyText!==text)keys.push(await identity(workspace,jobId,extracted.legacyText));
         check();
         const existing=api.candidates().find(c=>c.jobId===jobId&&keys.some(k=>c.id===k.id||c.resumeIntake?.hash===k.hash));
+        if((!existing||existing.screeningManaged&&!existing.aiReview)&&api.findScreeningResume){
+          const saved=await api.findScreeningResume(jobId,keys.map(k=>k.id));
+          check();
+          if(saved){
+            if(saved.jobId!==jobId||!keys.some(k=>k.id===saved.id))throw Error('The saved resume did not match this job. Reload and try again.');
+            options.candidate?.(saved,true);
+            const open=()=>api.openScreeningResume?.(saved);
+            if(saved.uploadStatus!=='saved')throw Object.assign(Error('This resume already belongs to an unfinished or excluded import. Open that import to check its upload status and finish uploading the original file.'),{code:'SCREENING_UPLOAD_INCOMPLETE',openSavedImport:open});
+            uploadProblem('This resume is already in a saved import for this job. Open that import to review it or select it for a deep assessment.',{title:'This resume is already saved',label:'Open saved import',action:open});
+            if(options.open!==false)await open();
+            return saved;
+          }
+        }
         if(existing){
           options.candidate?.(existing,true);
           if(existing.resumeIntake&&pending(existing)&&(!existing.resumeIntake.preliminary||existing.resumeIntake.preliminary.job_signature!==preliminary.job_signature)){existing.resumeIntake.preliminary=preliminary;changed(existing);try{await api.persist();}catch{}}
@@ -188,16 +201,16 @@
         enqueue(candidate);return candidate;
       }catch(e){
         if(candidate&&valid(candidate)){set(candidate,'error',e.message||'Resume intake could not finish.');try{await api.persist();}catch{}}
-        uploadProblem((candidate?.resumeIntake?.stored?'Your resume is saved. ':'')+(e.message||'The resume could not be uploaded. Select it again to retry.'));if(options.silent)throw e;api.toast(e.message||'Resume intake could not finish.','error');
+        uploadProblem((candidate?.resumeIntake?.stored?'Your resume is saved. ':'')+(e.message||'The resume could not be uploaded. Select it again to retry.'),e.openSavedImport?{label:'Open saved import',action:e.openSavedImport}:{});if(options.silent)throw e;api.toast(e.message||'Resume intake could not finish.','error');
       }finally{extracting=false;status('Add the resumes. We’ll prepare the evidence and proposed scores for your review.');}
     }
-    function uploadProblem(message){
+    function uploadProblem(message,{title:heading='The upload needs another try',label='Choose a resume',action:onAction}={}){
       const note=api.root?.querySelector('#resumeUploadNote');if(!note)return;
       let panel=api.root.querySelector('#resumeUploadRecovery');
       if(!panel){panel=document.createElement('div');panel.id='resumeUploadRecovery';panel.className='rf-recovery';panel.setAttribute('role','alert');note.after(panel);}
       panel.hidden=!message;panel.replaceChildren();if(!message)return;
-      const title=document.createElement('strong');title.textContent='The upload needs another try';
-      const copy=document.createElement('p');copy.textContent=message;const action=document.createElement('button');action.type='button';action.className='rf-btn';action.textContent='Choose a resume';action.addEventListener('click',()=>api.root.querySelector('#resumeUpload').click());panel.append(title,copy,action);
+      const title=document.createElement('strong');title.textContent=heading;
+      const copy=document.createElement('p');copy.textContent=message;const action=document.createElement('button');action.type='button';action.className='rf-btn';action.textContent=label;action.addEventListener('click',()=>{if(onAction)Promise.resolve(onAction()).catch(e=>api.toast(e.message||'Could not open the saved import. Try again.','error'));else api.root.querySelector('#resumeUpload').click();});panel.append(title,copy,action);
     }
     function status(message){const el=api.root?.querySelector('#resumeUploadNote');if(el)el.textContent=message;}
     async function storeDocument(c){

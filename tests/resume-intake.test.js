@@ -150,3 +150,41 @@ test('rules-only candidates stay outside reviewed score rankings before approval
  assert.equal(pending({screeningManaged:true,role:'Candidate'}),true);
  assert.equal(pending({screeningManaged:true,role:'QA',aiReview:{source:'resume_intake'}}),false);
 });
+
+test('bulk-to-individual reupload opens the saved import without a candidate, document, or AI write',async()=>{
+ const f=fixture(),key=await intake.identity('workspace','a',text),opened=[],duplicates=[];
+ const saved={id:key.id,jobId:'a',batchId:'batch',name:'Alex.txt',short:'Alex.txt',screeningManaged:true,uploadStatus:'saved'};
+ f.api.findScreeningResume=async(job,ids)=>{assert.equal(job,'a');assert.ok(ids.includes(key.id));return saved;};
+ f.api.openScreeningResume=async c=>opened.push(c.id);
+ assert.equal(await f.flow.upload(f.file,{candidate:(c,duplicate)=>duplicates.push(duplicate)}),saved);
+ assert.deepEqual(opened,[key.id]);assert.deepEqual(duplicates,[true]);
+ assert.equal(f.candidates.length,0);assert.equal(f.saved.length,0);assert.equal(f.uploadCalls(),0);assert.equal(f.calls.length,0);assert.equal(f.flow.hasUnsavedFile(),false);
+ // Repeat after reload, when the bulk candidate is already in local state.
+ f.candidates.push({...saved,role:'Resume awaiting analysis'});
+ await f.flow.upload(f.file,{open:false});
+ assert.equal(f.candidates.length,1);assert.equal(opened.length,1);assert.equal(f.saved.length,0);
+});
+
+test('a failed or out-of-scope duplicate lookup cannot create a local candidate',async()=>{
+ const f=fixture();f.api.findScreeningResume=async()=>{throw Error('Lookup unavailable');};
+ await assert.rejects(f.flow.upload(f.file,{silent:true}),/Lookup unavailable/);
+ assert.equal(f.candidates.length,0);assert.equal(f.flow.hasUnsavedFile(),false);
+ f.api.findScreeningResume=async()=>({id:'other',jobId:'b',batchId:'private'});
+ await assert.rejects(f.flow.upload(f.file,{silent:true}),/did not match this job/);
+ assert.equal(f.candidates.length,0);assert.equal(f.saved.length,0);
+});
+
+test('account changes during duplicate lookup do not open another workspace import',async()=>{
+ const f=fixture(),key=await intake.identity('workspace','a',text);let opened=0;
+ f.api.openScreeningResume=async()=>opened++;
+ f.api.findScreeningResume=async()=>{f.api.workspace=()=> 'other';return {id:key.id,jobId:'a',batchId:'batch'};};
+ await assert.rejects(f.flow.upload(f.file,{silent:true}),/selected job/);
+ assert.equal(opened,0);assert.equal(f.candidates.length,0);
+});
+
+test('unfinished bulk imports retain the retry file instead of claiming it was saved',async()=>{
+ const f=fixture(),key=await intake.identity('workspace','a',text);
+ f.api.findScreeningResume=async()=>({id:key.id,jobId:'a',batchId:'batch',uploadStatus:'failed'});
+ await assert.rejects(f.flow.upload(f.file,{silent:true}),e=>e.code==='SCREENING_UPLOAD_INCOMPLETE'&&typeof e.openSavedImport==='function');
+ assert.equal(f.candidates.length,0);assert.equal(f.uploadCalls(),0);assert.equal(f.saved.length,0);
+});

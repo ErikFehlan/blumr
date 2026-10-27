@@ -513,6 +513,22 @@
 
     const bulkRPC=async(name,args={})=>{const {data,error}=await client.rpc(name,args);if(error)throw error;return data;};
     const screeningCapabilities=()=>bulkRPC('screening_capabilities');
+    async function findScreeningResume(jobId,candidateIds) {
+      const ids=[...new Set(candidateIds)].filter(Boolean);
+      if(!ids.length)return null;
+      // Bulk imports create candidates on the server without reloading this tab.
+      // Resolve only managed candidates in this job; never overwrite a collision.
+      const managed=await client.from('screening_managed_candidates').select('candidate_id')
+        .eq('workspace_id',workspaceId).eq('job_id',jobId).in('candidate_id',ids);
+      if(managed.error)throw managed.error;
+      if(!managed.data?.length)return null;
+      const items=await client.from('screening_batch_items').select('candidate_id,batch_id,file_name,status')
+        .eq('workspace_id',workspaceId).eq('job_id',jobId).in('candidate_id',managed.data.map(c=>c.candidate_id));
+      if(items.error)throw items.error;
+      const item=items.data?.find(i=>i.status==='saved')||items.data?.find(i=>i.status!=='excluded')||items.data?.[0];
+      if(!item)return null;
+      return {id:item.candidate_id,jobId,batchId:item.batch_id,name:item.file_name,short:item.file_name,screeningManaged:true,uploadStatus:item.status};
+    }
     async function listScreeningBatches(jobId){const {data,error}=await client.from('screening_batches').select('id,created_at,sealed,selected_ids').eq('workspace_id',workspaceId).eq('job_id',jobId).order('created_at',{ascending:false}).limit(50);if(error)throw error;return data||[];}
     const createScreeningBatch=(id,job,manifest,budget)=>bulkRPC('create_screening_batch',{p_id:id,p_job:job,p_manifest:manifest,p_budget:budget});
     const updateScreeningBudget=(batch,budget)=>bulkRPC('update_screening_budget',{p_batch:batch,p_budget:budget});
@@ -612,7 +628,7 @@
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { screeningCapabilities, listScreeningBatches, createScreeningBatch, updateScreeningBudget, prepareScreeningUpload, updateScreeningItem, sealScreeningBatch, selectScreeningFinalists, refreshScreeningBatch, loadRetentionSummary, saveRetentionCohort, recordComparison, loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, loadResumeDocument, workspaceId };
+    return { findScreeningResume, screeningCapabilities, listScreeningBatches, createScreeningBatch, updateScreeningBudget, prepareScreeningUpload, updateScreeningItem, sealScreeningBatch, selectScreeningFinalists, refreshScreeningBatch, loadRetentionSummary, saveRetentionCohort, recordComparison, loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, loadResumeDocument, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };

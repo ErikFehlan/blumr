@@ -24,6 +24,21 @@
     message='';render();
    }catch(e){if(current(g)&&batchId===id)status(e.message);}finally{loading=false;if(current(g))schedule();}
   }
+  async function openSaved(saved){
+   if(!enabled||saved.jobId!==api.job()?.id)return;
+   const g=generation,service=api.data();
+   const rows=await service.listScreeningBatches(saved.jobId);
+   if(!current(g)||saved.jobId!==api.job()?.id)return;
+   // Preserve an unsaved finalist selection when the target is already open.
+   if(jobId!==saved.jobId||batchId!==saved.batchId){snapshot=null;selected=[];dirty=false;search='';}
+   jobId=saved.jobId;batchId=saved.batchId;list=rows;
+   if(!list.some(b=>b.id===batchId))list.push({id:batchId});
+   mode.value='bulk';updateUploadLabel();render();await refresh();
+   if(current(g)&&batchId===saved.batchId){
+    status('This resume is already saved here. Review the results or select finalists for deep assessment.');
+    host.scrollIntoView({block:'start',behavior:'smooth'});
+   }
+  }
   async function add(files,{resume=false}={}){
    const job=api.job(),service=api.data(),g=generation,budget=Number(host.querySelector('[data-bulk-budget]')?.value||5);
    if(!job||job.status==='closed'){api.toast('Choose an open job.','error');return;}
@@ -82,7 +97,7 @@
    if(renderedBatch!==batchId)batchBudgetUsd=null;if(s&&batchBudgetUsd===null)batchBudgetUsd=s.cost.budget_usd;
    const all=s?[...s.ranking.top,...s.ranking.nearMiss,...s.ranking.remaining]:[],byId=new Map(all.map(c=>[c.candidateId,c]));
    const problems=s?.items.filter(i=>['pending','failed'].includes(i.status))||[];
-   const listHTML='<label>Saved import <select data-bulk-batch><option value="">Choose a batch</option>'+list.map(b=>'<option value="'+esc(b.id)+'" '+(batchId===b.id?'selected':'')+'>'+esc(new Date(b.created_at).toLocaleString())+'</option>').join('')+'</select></label>';
+   const listHTML='<label>Saved import <select data-bulk-batch><option value="">Choose a batch</option>'+list.map(b=>'<option value="'+esc(b.id)+'" '+(batchId===b.id?'selected':'')+'>'+esc(b.created_at?new Date(b.created_at).toLocaleString():'Earlier import')+'</option>').join('')+'</select></label>';
    api.root.querySelector('#candidateCards').hidden=mode.value==='bulk'&&Boolean(batchId);
    host.innerHTML='<div class="rf-cardhead"><div><span class="rf-kicker">Bulk screening</span><h3>Top 20 → Top 10 phone screens</h3><p class="rf-sub">Upload authorized exports or resume files. You decide whom to contact. No candidate is automatically rejected. Keep this tab open until files are saved; saved files continue screening in the background.</p></div></div>'+listHTML+
     '<label>New batch AI budget (USD) <input data-bulk-budget type="number" min="0.01" max="100" step="0.01" value="'+esc(budgetUsd)+'"></label>'+
@@ -119,7 +134,7 @@
    }catch(e){status(e.message||'Could not save. Refresh and try again.');}finally{if(button.isConnected)button.disabled=false;}
   });
   function clear(){generation++;clearTimeout(timer);enabled=false;jobId=null;batchId=null;snapshot=null;selected=[];list=[];uploads=null;resumeCleanup?.();resumeCleanup=null;mode.hidden=true;api.root.querySelector('#candidateCards').hidden=false;host.replaceChildren();host.hidden=true;}
-  return {init,open,add,clear,isBulk:()=>enabled&&mode.value==='bulk',hasUnsaved:()=>Boolean(uploads?.running)};
+  return {init,open,openSaved,add,clear,isBulk:()=>enabled&&mode.value==='bulk',hasUnsaved:()=>Boolean(uploads?.running)};
  }
  global.BlumrBulkScreening={mount};
 })(window);
