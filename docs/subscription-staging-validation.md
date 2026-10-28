@@ -29,22 +29,29 @@ success or a request for broader authority.
 
 ## Deployed functions and AI lock
 
-| Function | Staging version | State |
+| Function | Verified source version | State |
 | --- | --- | --- |
-| `billing-sandbox` | 3 | Current billing implementation; feature disabled |
-| `stripe-webhook` | 2 | Current billing implementation; feature disabled |
-| `billing-reconcile` | 2 | Current billing implementation; private authentication required |
-| `analyze-patterns-v2` | 469 | Subscription branch implementation plus AI network guard |
-| `analyze-patterns-beta` | 476 | Subscription branch implementation plus AI network guard |
-| `reassess-job` | 469 | Subscription branch implementation plus AI network guard |
-| `refine-job-criteria` | 468 | Subscription branch implementation plus AI network guard |
+| `billing-sandbox` | 5 | Current billing implementation; feature disabled |
+| `stripe-webhook` | 4 | Current billing implementation; feature disabled |
+| `billing-reconcile` | 4 | Current billing implementation; private authentication required |
+| `analyze-patterns-v2` | 472 | Subscription branch implementation plus AI network guard |
+| `analyze-patterns-beta` | 479 | Subscription branch implementation plus AI network guard |
+| `reassess-job` | 472 | Subscription branch implementation plus AI network guard |
+| `refine-job-criteria` | 471 | Subscription branch implementation plus AI network guard |
+
+Supabase increments function versions when runtime secrets are updated, even if
+source is unchanged; the table records the source-verification checkpoint.
 
 The guard is [billing-staging-guard.ts](../scripts/billing-staging-guard.ts). It is
 included alongside each AI handler's entrypoint and imported before that handler.
-It refuses any project other than staging, sets `AI_PROVIDER_CALLS_DISABLED=true`
-inside the function runtime, and permits fetch only to the staging Supabase HTTPS
+It refuses any project other than staging, requires the deployed
+`AI_PROVIDER_CALLS_DISABLED=true` lock, and permits fetch only to the staging Supabase HTTPS
 origin with redirects rejected. It is deliberately not imported by billing
 functions, which must eventually contact the Stripe sandbox.
+
+Hosted checks caught that `Deno.env.set` is unsupported in the Edge runtime. The
+guard was corrected to require the deployed lock without mutating the environment,
+then all four handlers were redeployed and their exact source reverified.
 
 The four AI handlers now match branch commit `acccfed` plus this guard. Every file
 in their dependency bundles was retrieved and compared after deployment (34, 34,
@@ -76,21 +83,27 @@ and no Management API credential is available in this workspace. A configuration
 `criteria-backend` deployment credential to transfer only the two named Vault
 secrets and the fixed sandbox settings directly to staging. It cannot deploy,
 migrate, activate billing or contact an AI provider. It rejects other projects,
-live Stripe keys, existing subscribers and running workers. Its simulated-request
-tests pass; hosted execution is pending at this source checkpoint.
+live Stripe keys, existing subscribers and running workers. Hosted execution
+[passed](https://github.com/ErikFehlan/blumr/actions/runs/40769897149): ten settings
+are installed, including both Vault credentials and the exact staging frontend
+URL. Both billing and foundation flags remain false; the AI disable flag is true.
+The first run reached the secret-setting API but mishandled its empty HTTP 201
+response; response handling was corrected before successful verification.
 
 Stripe's connector does not issue a restricted server API key. The workflow can
 install a sandbox key from the optional `STRIPE_BILLING_SANDBOX_KEY` environment
 secret; otherwise it preserves any existing runtime key and reports only whether
-one is present. It never logs credential values. Runtime activation remains pending.
+one is present. The successful run confirmed **no Stripe server key is installed**.
+It never logs credential values. Runtime activation remains pending.
 
 Complete the final migration before activation. Configure the variables listed in
 [the sandbox runbook](subscription-stripe-sandbox.md#hosted-staging-setup) through
 Supabase's secure secret store. Prefer a staging-only `rk_test_` key, granting only
 the customer/Checkout/portal writes and customer/price/subscription/invoice/portal
-reads used by the adapter. Transfer the two existing Vault secrets to the matching
-`STRIPE_WEBHOOK_SECRET` and `BILLING_RECONCILE_SECRET` environment variables without
-logging them. Keep `AI_PROVIDER_CALLS_DISABLED=true`. Verify configuration before
+reads used by the adapter. Add it as `STRIPE_BILLING_SANDBOX_KEY` in the GitHub
+`criteria-backend` environment secret store, then rerun the configuration job to
+transfer it as `STRIPE_SECRET_KEY`. The two existing Vault secrets have already
+been transferred without logging them. Keep `AI_PROVIDER_CALLS_DISABLED=true`. Verify configuration before
 enabling the webhook or cron. Do not paste keys into chat, repository files or logs.
 
 ## Checks completed
@@ -99,11 +112,14 @@ enabling the webhook or cron. Do not paste keys into chat, repository files or l
 - Hosted checkout: HTTP 404 while disabled.
 - Hosted webhook: HTTP 404 while disabled.
 - Hosted reconciliation: HTTP 401 without its private credential.
+- Guarded criteria/reassessment handlers: HTTP 401 without worker credentials.
+  Both analysis handlers boot successfully and reject a public-key-only request
+  for a nonexistent workspace with HTTP 403; no user session was impersonated.
 - Checkout rollback rehearsal: deployed maintenance handler, observed HTTP 503,
   restored the billing handler, observed HTTP 200 with `enabled:false`. Webhook,
   scheduler, ledger and AI lock were preserved. This was a handler rollback drill,
   not a paid-subscription recovery or database restore rehearsal.
-- 44 network-denied Deno tests passed across billing, the staging guard, tier
+- 45 network-denied Deno tests passed across billing, the staging guard, tier
   routing, workers, screening, feedback, offline and security boundaries.
   Restricted sandbox keys are accepted; live restricted keys are rejected before
   network access. Checkout uses a fixed integration identifier across retries.
@@ -123,8 +139,8 @@ enabling the webhook or cron. Do not paste keys into chat, repository files or l
 ## Still required before production consideration
 
 1. Resolve the migration connector handoff and apply the final billing migration.
-2. Verify the configuration-only workflow, supply a restricted sandbox key if
-   absent, and verify the deployed stable API contract before activation.
+2. Supply the missing restricted sandbox key through the secure environment store,
+   rerun the configuration-only job, and verify the stable API contract before activation.
 3. Enable the sandbox webhook and worker, then use disposable verified users for
    real hosted Checkout → test payment → webhook → correct plan/allowances.
 4. Verify all tiers, renewals, failed payments/recovery, period-end cancellation,

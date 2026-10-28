@@ -5,7 +5,7 @@ Deno.test('billing staging guard blocks every non-staging request before transpo
   const sent: string[] = [];
   try {
     Deno.env.set('SUPABASE_URL', 'https://momfzjmycveqginxmqib.supabase.co');
-    Deno.env.delete('AI_PROVIDER_CALLS_DISABLED');
+    Deno.env.set('AI_PROVIDER_CALLS_DISABLED', 'true');
     globalThis.fetch = (input, init) => { assert(init?.redirect === 'error', 'Redirect could escape the staging origin'); sent.push(String(input)); return Promise.resolve(new Response('synthetic')); };
     await import('../scripts/billing-staging-guard.ts?allowed');
     assert(Deno.env.get('AI_PROVIDER_CALLS_DISABLED') === 'true');
@@ -26,6 +26,23 @@ Deno.test('billing staging guard blocks every non-staging request before transpo
     assert(sent.length === 1, 'Own staging API was blocked');
   } finally {
     globalThis.fetch = previous.fetch;
+    for (const [name, value] of [['SUPABASE_URL', previous.url], ['AI_PROVIDER_CALLS_DISABLED', previous.disabled]]) {
+      if (value === undefined) Deno.env.delete(name!); else Deno.env.set(name!, value);
+    }
+  }
+});
+
+Deno.test('billing staging guard refuses to initialize without the deployed provider lock', async () => {
+  const previous = {url: Deno.env.get('SUPABASE_URL'), disabled: Deno.env.get('AI_PROVIDER_CALLS_DISABLED'), fetch: globalThis.fetch};
+  try {
+    Deno.env.set('SUPABASE_URL', 'https://momfzjmycveqginxmqib.supabase.co');
+    Deno.env.delete('AI_PROVIDER_CALLS_DISABLED');
+    let blocked = false;
+    try { await import('../scripts/billing-staging-guard.ts?missing-lock'); }
+    catch (error) { blocked = error instanceof Error && error.message === 'billing_staging_provider_lock_required'; }
+    assert(blocked);
+    assert(globalThis.fetch === previous.fetch, 'Transport changed before the lock was verified');
+  } finally {
     for (const [name, value] of [['SUPABASE_URL', previous.url], ['AI_PROVIDER_CALLS_DISABLED', previous.disabled]]) {
       if (value === undefined) Deno.env.delete(name!); else Deno.env.set(name!, value);
     }
