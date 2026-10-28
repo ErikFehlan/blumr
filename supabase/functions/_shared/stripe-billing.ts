@@ -159,7 +159,7 @@ export async function handleStripeWebhook(request:Request,io:IO=runtime){
 export async function reconcile(row:Obj,client:Client,cfg:Config){
  const customer=sandbox(await client.stripe('customers/'+id(row.customer_id,'cus')));if(customer.id!==row.customer_id||customer.deleted)fail();
  const list=await subscriptions(client,row.customer_id);
- const sub=list.open||list.all.find(s=>s.id===row.subscription_id);
+ const sub=list.open||list.all.find(s=>row.checkout_id&&s.metadata?.blumr_checkout===row.checkout_id)||list.all.find(s=>s.id===row.subscription_id);
  if(row.subscription_id&&!sub)fail('Subscription history needs review.');
  if(sub){
   const args:Obj={user:row.user_id,lease:row.lease_id,subscription:sub.id,status:sub.status,cancel_at_period_end:sub.cancel_at_period_end===true};

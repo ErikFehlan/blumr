@@ -107,3 +107,7 @@ Deno.test('wrong customer, unpaid period evidence, duplicate subscriptions and A
 Deno.test('cancellation is applied from canonical subscription and not stale invoice events',async()=>{
  const f=fixture();f.state.row.customer_id='cus_first';f.state.row.subscription_id='sub_first';f.state.subs=[{...subscription(),status:'canceled'}];assert((await worker(f)).status===200);assert(f.state.rpc.find((c:any)=>c.action==='apply').args.status==='canceled');assert(!f.state.requests.some((r:any)=>r.url.includes('/invoices/')));
 });
+
+Deno.test('canceled checkout is recoverable before its first paid event was reconciled',async()=>{
+ const f=fixture();f.state.row.customer_id='cus_first';f.state.row.checkout_id='operation';f.state.row.subscription_id=null;f.state.subs=[{...subscription(),status:'canceled'}];assert((await worker(f)).status===200);assert(f.state.rpc.find((c:any)=>c.action==='apply').args.status==='canceled');assert(f.state.rpc.some((c:any)=>c.action==='checkout_close'));assert(f.state.rpc.at(-1).action==='finish');
+});
