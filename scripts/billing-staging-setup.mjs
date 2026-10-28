@@ -14,18 +14,19 @@ export async function configureBillingStaging({env = process.env, fetchImpl = fe
   if (stripeKey && !/^[sr]k_test_[A-Za-z0-9]+$/.test(stripeKey)) {
     throw new Error('Only a sandbox Stripe server key can be installed.');
   }
-  async function request(url, options, label) {
+  async function request(url, options, label, allowEmpty = false) {
     let response;
     try { response = await fetchImpl(url, {...options, redirect: 'error', signal: AbortSignal.timeout(30000)}); }
     catch { throw new Error(label + ' could not be completed; no response or credential was logged.'); }
     if (!response.ok) throw new Error(label + ' failed (HTTP ' + response.status + '); no response or credential was logged.');
+    if (allowEmpty && (response.status === 201 || response.status === 204)) return null;
     try { return await response.json(); } catch { throw new Error(label + ' returned an invalid response.'); }
   }
   const api = (path, method = 'GET', body) => request(`https://api.supabase.com/v1/projects/${project}${path}`, {
     method,
     headers: {Authorization: 'Bearer ' + env.SUPABASE_ACCESS_TOKEN.trim(), 'Content-Type': 'application/json'},
     ...(body === undefined ? {} : {body: JSON.stringify(body)}),
-  }, 'Staging management operation');
+  }, 'Staging management ' + method + ' ' + path, path === '/secrets' && method === 'POST');
   const status = () => request(`https://${project}.supabase.co/functions/v1/billing-sandbox`, {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'status'}),
   }, 'Disabled billing check');

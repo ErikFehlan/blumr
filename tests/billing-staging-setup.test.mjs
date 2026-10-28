@@ -25,7 +25,7 @@ function fixture({accounts = 0, paused = true, enabled = false, missingVault = f
       if (vaultFailure) throw new Error(webhook + worker + env.SUPABASE_ACCESS_TOKEN);
       return Response.json(missingVault ? [] : [{name: 'billing_staging_webhook_secret', decrypted_secret: webhook}, {name: 'billing_staging_reconcile_secret', decrypted_secret: worker}]);
     }
-    if (url.endsWith('/secrets') && options.method === 'POST') { installed = body; return Response.json(body.map(({name}) => ({name})), {status: 201}); }
+    if (url.endsWith('/secrets') && options.method === 'POST') { installed = body; return new Response(null, {status: 201}); }
     if (url.endsWith('/secrets') && options.method === 'GET') return Response.json(installed.map(({name}) => ({name})));
     throw new Error('Unexpected operation');
   };
