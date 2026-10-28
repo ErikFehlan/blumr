@@ -182,7 +182,8 @@ Plan refreshes preserve clarification edits, and signout clears late responses.
 Basic reporting and the remaining client budget controls are now complete in
 this draft. Still open in M1/M2: migration parity and release sequencing. Sandbox checkout/portal, the webhook inbox and offline billing lifecycle tests
 are now implemented; see [sandbox setup and limitations](subscription-stripe-sandbox.md).
-Actual Stripe configuration/round trips, plan-change/add-on policy, hosted staging,
+Stripe sandbox prices/portal and a synthetic paid-invoice API smoke test are
+configured; a hosted application round trip, plan-change/add-on policy, staging,
 measured throughput and controlled rollout remain M3/M4. This is not
 release-ready billing.
 

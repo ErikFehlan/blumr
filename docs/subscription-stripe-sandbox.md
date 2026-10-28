@@ -40,15 +40,41 @@ All subscription migrations remain outside release scripts.
   checkout is pending or a subscription is nonterminal. Cancel, let the paid
   period end, and reconcile before deletion. Resolve ambiguous checkout first.
 
-## Isolated staging setup — not executed by this branch
+## Verified Stripe sandbox setup — October 28, 2026
+
+The connected `blumr.io sandbox` account was verified as test mode. Its initially
+empty catalog now contains the three monthly prices and a portal configuration
+matching the contract above. Nonsecret IDs are recorded in
+[stripe-sandbox-config.json](stripe-sandbox-config.json).
+
+A synthetic customer without an email used Stripe's `pm_card_visa` test method.
+Basic produced a paid $29 test invoice and an active subscription; the subscription
+was then canceled with no proration or final invoice. A portal session opened on
+`billing.stripe.com`, and a card-only hosted Checkout Session was created on
+`checkout.stripe.com` with a 31-minute automatic expiry. Checkout was not paid.
+No real charges, customer emails, application grants or hosted deployments occurred.
+
+The actual paid invoice/item/price snapshot is retained as a synthetic regression
+fixture and passes the adapter's canonical reconciliation logic with network access
+denied. Current Checkout creation uses `allowed_payment_method_types`, not the
+removed writable `payment_method_types`, and explicitly uses flexible billing.
+The connector describes the preview API schema; these API smoke checks do not
+replace a full application round trip against the pinned stable API version.
+
+Smoke evidence: customer `cus_VWee8yRTH5TsSh`, canceled subscription
+`sub_1UVbLGClb9pZVTfugvZCBlyo`, paid test invoice
+`in_1UVbLGClb9pZVTfury4fUbzn`. No webhook destination or reconciliation schedule
+has been registered. Hosted staging, secrets and full end-to-end verification
+remain the next release step.
+
+## Hosted staging setup — not executed by this branch
 
 Use the existing staging project, synthetic verified beta-approved users and a
 separate Stripe sandbox. Apply preceding subscription migrations in order, then
 `20261028174343_subscription_stripe_sandbox.sql`. Rehearse migration parity and
 run Supabase security/performance advisors before enabling the feature.
 
-Create three flat recurring monthly USD prices with the exact amounts above.
-Create a sandbox portal configuration with `subscription_update.enabled=false`,
+Reuse the recorded sandbox prices. The created portal configuration uses `subscription_update.enabled=false`,
 `subscription_cancel.enabled=true`, `subscription_cancel.mode=at_period_end`,
 `invoice_history.enabled=true`, and `payment_method_update.enabled=true`.
 

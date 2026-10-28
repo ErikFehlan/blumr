@@ -1,4 +1,5 @@
-import {handleBilling,handleStripeWebhook,handleBillingReconcile,verifySignature,STRIPE_VERSION,type IO} from '../supabase/functions/_shared/stripe-billing.ts';
+import {handleBilling,handleStripeWebhook,handleBillingReconcile,reconcile,verifySignature,STRIPE_VERSION,type IO} from '../supabase/functions/_shared/stripe-billing.ts';
+import captured from './fixtures/subscription-stripe-sandbox.json' with {type:'json'};
 function assert(value:unknown,message='Assertion failed'):asserts value{if(!value)throw Error(message);}
 const now=Date.parse('2026-10-28T12:00:00Z'),user='00000000-0000-0000-0000-000000000001';
 const price={id:'price_basic',livemode:false,active:true,currency:'usd',unit_amount:2900,type:'recurring',billing_scheme:'per_unit',recurring:{interval:'month',interval_count:1,usage_type:'licensed'}};
@@ -32,7 +33,7 @@ function fixture(){
   if(path.startsWith('prices/'))return Response.json(state.price);
   if(path==='checkout/sessions'){
    state.checkoutCreates.push({key:h.get('idempotency-key'),form:Object.fromEntries(form)});
-   assert(!form.has('user_id')&&!form.has('customer_email'));return Response.json({id:'cs_test_first',livemode:false,customer:'cus_first',mode:'subscription',status:state.sessionStatus,url:'https://checkout.stripe.com/c/pay/cs_test_first'});
+   assert(!form.has('user_id')&&!form.has('customer_email')&&!form.has('payment_method_types[0]'));assert(form.get('allowed_payment_method_types[0]')==='card'&&form.get('subscription_data[billing_mode][type]')==='flexible');return Response.json({id:'cs_test_first',livemode:false,customer:'cus_first',mode:'subscription',status:state.sessionStatus,url:'https://checkout.stripe.com/c/pay/cs_test_first'});
   }
   if(path==='checkout/sessions/cs_test_first')return Response.json({id:'cs_test_first',livemode:false,customer:'cus_first',status:state.sessionStatus,url:'https://checkout.stripe.com/c/pay/cs_test_first',subscription:'sub_first'});
   if(path==='billing_portal/configurations/bpc_test')return Response.json({id:'bpc_test',livemode:false,active:true,features:{subscription_update:{enabled:state.portalUpdates},subscription_cancel:{enabled:true,mode:'at_period_end'},payment_method_update:{enabled:true},invoice_history:{enabled:true}}});
@@ -110,4 +111,17 @@ Deno.test('cancellation is applied from canonical subscription and not stale inv
 
 Deno.test('canceled checkout is recoverable before its first paid event was reconciled',async()=>{
  const f=fixture();f.state.row.customer_id='cus_first';f.state.row.checkout_id='operation';f.state.row.subscription_id=null;f.state.subs=[{...subscription(),status:'canceled'}];assert((await worker(f)).status===200);assert(f.state.rpc.find((c:any)=>c.action==='apply').args.status==='canceled');assert(f.state.rpc.some((c:any)=>c.action==='checkout_close'));assert(f.state.rpc.at(-1).action==='finish');
+});
+
+Deno.test('captured Stripe sandbox paid invoice satisfies canonical reconciliation without network',async()=>{
+ const calls:{action:string,args:any}[]=[],s=captured.subscription;
+ const client={rpc:async(action:string,args:any={})=>{calls.push({action,args});return {};},stripe:async(path:string)=>{
+  if(path==='customers/'+s.customer)return {id:s.customer,livemode:false};
+  if(path.startsWith('subscriptions?'))return {data:[s],has_more:false};
+  if(path==='invoices/'+captured.invoice.id)return captured.invoice;
+  throw Error('Unexpected request '+path);
+ }};
+ const cfg={key:'sk_test_fixture',base:'https://example.test',service:'fixture',anon:'fixture',app:'https://example.test/',origin:'https://example.test',prices:{basic:s.items.data[0].price.id,advanced:'price_advanced',pro:'price_pro'},portal:'bpc_fixture'};
+ await reconcile({user_id:user,lease_id:'fixture',customer_id:s.customer,checkout_id:s.metadata.blumr_checkout},client,cfg);
+ const applied=calls.find(c=>c.action==='apply')?.args;assert(applied.paid===true&&applied.plan==='basic-v1');assert(applied.start===new Date(s.items.data[0].current_period_start*1000).toISOString());assert(calls.at(-1)?.action==='finish');
 });

@@ -83,7 +83,7 @@ async function checkout(row:Obj,tier:string,client:Client,cfg:Config,io:IO){
  if(io.now()-Date.parse(row.checkout_started_at)>23*3600000)fail('An earlier checkout needs recovery. Contact support.',409);
  const session=sandbox(await client.stripe('checkout/sessions',{
   mode:'subscription',customer:row.customer_id,'line_items[0][price]':cfg.prices[row.checkout_tier],'line_items[0][quantity]':'1',
-  'payment_method_types[0]':'card','subscription_data[metadata][blumr_checkout]':row.checkout_id,success_url:cfg.app+'?billing=return',cancel_url:cfg.app+'?billing=return',
+  'allowed_payment_method_types[0]':'card','subscription_data[billing_mode][type]':'flexible','subscription_data[metadata][blumr_checkout]':row.checkout_id,success_url:cfg.app+'?billing=return',cancel_url:cfg.app+'?billing=return',
   expires_at:String(Math.floor(Date.parse(row.checkout_expires_at)/1000)),
  },'blumr-checkout-'+row.checkout_id));
  if(objectId(session.customer)!==row.customer_id||session.mode!=='subscription')fail();

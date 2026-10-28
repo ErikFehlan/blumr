@@ -6,6 +6,7 @@ on:
       - 'supabase/functions/**'
       - 'supabase/migrations/*subscription*'
       - 'tests/*subscription*'
+      - 'tests/fixtures/subscription*'
       - 'assets/subscription*.js'
       - '.github/workflows/subscription-foundation.yml'
 permissions:
