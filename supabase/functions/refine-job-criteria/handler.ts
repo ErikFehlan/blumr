@@ -53,7 +53,7 @@ export async function handleCriteria(request:Request){
       if(!apiKey)throw Error('ai_unavailable');
       const model=analysisModel('reassessment',name=>Deno.env.get(name));
       const legacy=kind==='legacy';
-      await reserveModelCall(task.workspace_id,task.usage_actor_id||null,new TextEncoder().encode(JSON.stringify({job:task.input,criteria:legacy?source:undefined,job_description_sources:passages})).length+(legacy?20000:12000),legacy?8000:4000);
+      await reserveModelCall(task.workspace_id,task.usage_actor_id||null,new TextEncoder().encode(JSON.stringify({job:task.input,criteria:legacy?source:undefined,job_description_sources:passages})).length+(legacy?20000:12000),legacy?8000:4000,{operation:'job_setup'});
       const schema=legacy
         ? {type:'object',additionalProperties:false,required:['criteria','hiring_priorities'],properties:{hiring_priorities:prioritiesSchema(passages),criteria:{type:'array',items:{type:'object',additionalProperties:false,required:['index','label','question'],properties:{index:{type:'integer'},label:{type:'string'},question:{type:'string'}}}}}}
         : {type:'object',additionalProperties:false,required:['hiring_priorities'],properties:{hiring_priorities:prioritiesSchema(passages)}};
@@ -90,7 +90,7 @@ export async function handleCriteria(request:Request){
       const ai=await modelRequest('legacy');model=ai.model;
       result={...validate(ai.parsed,source),hiring_priorities:validatePriorities(ai.parsed.hiring_priorities,passages),engine:'legacy_ai',confidence:null,fallback_reason:'legacy_mode'};
     }else{
-      const ai=await generatePriorities(task.input,{requestId:`criteria-${task.usage_run_id||task.revision}-priorities`,beforeModel:(bytes,tokens)=>reserveModelCall(task.workspace_id,task.usage_actor_id||null,bytes,tokens),onUsage:body=>recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null)});
+      const ai=await generatePriorities(task.input,{requestId:`criteria-${task.usage_run_id||task.revision}-priorities`,beforeModel:(bytes,tokens)=>reserveModelCall(task.workspace_id,task.usage_actor_id||null,bytes,tokens,{operation:'job_setup'}),onUsage:body=>recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null)});
       model=ai.model;
       result={...personalizeCriteria(source),hiring_priorities:ai.hiring_priorities,engine:'role_analysis',confidence:null,fallback_reason:null};
     }

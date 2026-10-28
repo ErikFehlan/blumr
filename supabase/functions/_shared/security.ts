@@ -1,27 +1,31 @@
 import {subscriptionEntitlement,SubscriptionError} from './subscriptions.ts';
+import {assertProviderTrafficAllowed} from './provider-policy.ts';
 
 export class SecurityLimit extends Error {
   constructor(public code: string, public status = 429, public retryAfter = 60) { super(code); }
 }
 
-export async function reserveModelCall(workspace: string, actor: string | null, inputBytes: number, outputTokens: number) {
+export async function reserveModelCall(workspace: string, actor: string | null, inputBytes: number, outputTokens: number, context:{operation?:'job_setup'|'feedback'|'assessment';lease?:string}={}) {
+  try{assertProviderTrafficAllowed();}catch{throw new SecurityLimit('provider_calls_disabled',503);}
+  let subscribed=false;
   try{
     const entitlement=await subscriptionEntitlement(workspace,actor);
+    subscribed=!!entitlement;
     if(entitlement&&!entitlement.ai_allowed)throw new SecurityLimit('subscription_ai_unavailable',403);
   }catch(error){if(error instanceof SubscriptionError)throw new SecurityLimit(error.code,error.status);throw error;}
   const base = Deno.env.get('SUPABASE_URL'), key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!base || !key || !workspace) throw new SecurityLimit('usage_check_unavailable', 503);
   try {
-    const response = await fetch(base + '/rest/v1/rpc/reserve_ai_budget', {
+    const response = await fetch(base + '/rest/v1/rpc/'+(subscribed?'reserve_subscription_model_budget':'reserve_ai_budget'), {
       method: 'POST', headers: {apikey:key, Authorization:'Bearer '+key, 'Content-Type':'application/json'},
-      body: JSON.stringify({p_workspace:workspace,p_actor:actor,p_input_bytes:inputBytes,p_output_tokens:outputTokens}),
+      body: JSON.stringify({p_workspace:workspace,p_actor:actor,p_input_bytes:inputBytes,p_output_tokens:outputTokens,...(subscribed?{p_operation:context.operation||'unscoped',p_lease:context.lease||null}:{})}),
       signal: AbortSignal.timeout(10000),
     });
     if (!response.ok) throw new SecurityLimit('usage_check_unavailable', 503);
     const result = await response.json();
     if (result?.allowed !== true) {
-      const code = ['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large'].includes(result?.code) ? result.code : 'usage_check_unavailable';
-      throw new SecurityLimit(code, code==='beta_access_required'||code==='plan_inactive'?403:code==='input_too_large'?413:code==='usage_check_unavailable'?503:429, result?.retry_after||60);
+      const code = ['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large','subscription_admission_required','subscription_ai_unavailable','subscription_inactive','subscription_period_inactive','subscription_actor_required','subscription_required'].includes(result?.code) ? result.code : 'usage_check_unavailable';
+      throw new SecurityLimit(code, code.startsWith('subscription_')||code==='beta_access_required'||code==='plan_inactive'?403:code==='input_too_large'?413:code==='usage_check_unavailable'?503:429, result?.retry_after||60);
     }
   } catch (error) {
     if (error instanceof SecurityLimit) throw error;
@@ -30,7 +34,8 @@ export async function reserveModelCall(workspace: string, actor: string | null, 
 }
 
 export function securityMessage(code: string) {
-  return code==='subscription_ai_unavailable' ? 'Your plan includes rules-based screening. AI analysis requires an eligible plan.'
+  return code==='provider_calls_disabled' ? 'AI processing is disabled in this environment. Rules-based screening remains available.'
+    : code==='subscription_ai_unavailable' ? 'Your plan includes rules-based screening. AI analysis requires an eligible plan.'
     : code==='subscription_check_unavailable' ? 'Subscription access could not be checked. Please try again shortly.'
     : code.startsWith('subscription_') ? 'An active subscription and verified evaluation owner are required. Your saved work is unchanged.'
     : code==='beta_access_required' ? 'This account does not have active beta access. Verify your email or contact support.'

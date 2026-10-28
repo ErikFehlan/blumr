@@ -1,3 +1,4 @@
+import {assertProviderTrafficAllowed} from './provider-policy.ts';
 type Fetcher=(input:RequestInfo|URL,init?:RequestInit)=>Promise<Response>;
 type RetryOptions={
   maxRetries?:number;
@@ -26,11 +27,13 @@ function retryDelay(response:Response|undefined,attempt:number){
 }
 
 export async function fetchWithRetry(input:RequestInfo|URL,init:RequestInit={},options:RetryOptions={}){
+  assertProviderTrafficAllowed();
   const maxRetries=Math.max(0,Math.min(4,options.maxRetries??2));
   const fetcher=options.fetcher??fetch;
   const wait=options.wait??((ms:number)=>new Promise(resolve=>setTimeout(resolve,ms)));
   let lastError:unknown;
   for(let attempt=0;attempt<=maxRetries;attempt++){
+    assertProviderTrafficAllowed();
     const headers=new Headers(init.headers);
     if(options.requestId)headers.set('X-Client-Request-Id',`${options.requestId}-${attempt+1}`);
     const requestInit={...init,headers,signal:options.timeoutMs?AbortSignal.any([AbortSignal.timeout(options.timeoutMs),...(init.signal?[init.signal]:[])]):init.signal};

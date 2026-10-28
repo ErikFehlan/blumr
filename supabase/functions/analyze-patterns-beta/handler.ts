@@ -55,7 +55,7 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   if (!serviceKey) return json({ error: "Analysis service configuration incomplete" }, 503);
 
   if(payload.analysis_type==='hiring_priorities')return handlePriorityDraft(payload.job,{workspace:workspaceId,actor:user.id,base:supabaseUrl,serviceKey});
-  if(payload.analysis_type==='rules_screening')return handleRulesScreening(payload,{workspace:workspaceId,base:supabaseUrl,serviceKey,headers});
+  if(payload.analysis_type==='rules_screening')return handleRulesScreening(payload,{workspace:workspaceId,actor:user.id,base:supabaseUrl,serviceKey,headers});
   if(payload.analysis_type==='bulk_screening')return handleBulkScreening(payload,{workspace:workspaceId,base:supabaseUrl,serviceKey,headers});
   try{
     const entitlement=await subscriptionEntitlement(workspaceId,user.id);
@@ -126,7 +126,7 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   requestId=claimId;
   const analysisRequest=()=>new Request(request.url,{method:'POST',body:JSON.stringify(payload)});
   const beforeModel=async(bytes:number,tokens:number)=>{
-    await reserveModelCall(workspaceId,user.id,bytes,tokens);
+    await reserveModelCall(workspaceId,user.id,bytes,tokens,payload.analysis_type==='feedback'?{operation:'feedback'}:{});
     await markStarted();
     if(!admitted){admitted=true;started=recordUsage('started');}
   };

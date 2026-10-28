@@ -22,7 +22,7 @@ export async function handlePriorityDraft(raw:unknown,scope:{workspace:string;ac
   }catch{return json({error:'Priorities could not be loaded. Try again shortly.'},503);}
   const execute=async(claim:string,markStarted:()=>Promise<void>)=>{
     try{
-      const result=rulesOnly?rulesOnlyPriorities(input):await generatePriorities(input,{requestId:`priorities-${claim}`,retainAmbiguousFailures:true,beforeModel:async(bytes,tokens)=>{await reserveModelCall(scope.workspace,scope.actor,bytes,tokens);await markStarted();},onUsage:body=>recordProviderUsage(scope.workspace,'criteria_refinement',body,scope.actor)});
+      const result=rulesOnly?rulesOnlyPriorities(input):await generatePriorities(input,{requestId:`priorities-${claim}`,retainAmbiguousFailures:true,beforeModel:async(bytes,tokens)=>{await reserveModelCall(scope.workspace,scope.actor,bytes,tokens,{operation:'job_setup'});await markStarted();},onUsage:body=>recordProviderUsage(scope.workspace,'criteria_refinement',body,scope.actor)});
       const row={id:claim,workspace_id:scope.workspace,actor_id:scope.actor,fingerprint:key,input,items:result.hiring_priorities,model:result.model};
       const saved=await fetch(`${scope.base}/rest/v1/hiring_priority_drafts?on_conflict=workspace_id,actor_id,fingerprint`,{method:'POST',headers:{...headers,Prefer:'resolution=ignore-duplicates,return=representation'},body:JSON.stringify(row),signal:AbortSignal.timeout(10000)});
       if(!saved.ok)throw Error('priority_save_failed');

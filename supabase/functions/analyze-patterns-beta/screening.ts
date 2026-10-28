@@ -1,7 +1,7 @@
 import {buildJobIntelligence} from '../_shared/job-intelligence.mjs';
 import {compileScreeningRubric,parseScreeningEvidence,scoreScreeningCandidate,rankScreeningCandidates,fingerprint} from '../_shared/screening-engine.mjs';
 const uuid=(v:unknown):v is string=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-type Scope={workspace:string;base:string;serviceKey:string;headers:Record<string,string>};
+type Scope={workspace:string;base:string;serviceKey:string;headers:Record<string,string>;actor?:string};
 // Reuses the existing authenticated endpoint. Caller-supplied resumes, priorities,
 // scores, complete flags, identities and model settings are deliberately ignored.
 export async function handleRulesScreening(payload:Record<string,unknown>,scope:Scope){
@@ -10,6 +10,13 @@ export async function handleRulesScreening(payload:Record<string,unknown>,scope:
  const ids=payload.candidate_ids;
  if(!uuid(payload.job_id)||!Array.isArray(ids)||ids.length<1||ids.length>100||ids.some(id=>!uuid(id))||new Set(ids).size!==ids.length)return reply({code:'invalid_screening_request'},400);
  const start=performance.now(),jobId=payload.job_id;
+ const metered=Deno.env.get('SUBSCRIPTION_FOUNDATION_ENABLED')==='true';
+ if(metered&&!scope.actor)return reply({code:'subscription_actor_required'},403);
+ const serviceRPC=async(name:string,body:unknown)=>{
+  const r=await fetch(`${scope.base}/rest/v1/rpc/${name}`,{method:'POST',headers:{Authorization:'Bearer '+scope.serviceKey,apikey:scope.serviceKey,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
+  const data=await r.json().catch(()=>null);
+  if(!r.ok)throw Error(['evaluation_allowance_exhausted','screening_source_changed','subscription_inactive','subscription_period_inactive','subscription_required'].includes(data?.message)?data.message:'screening_unavailable');return data;
+ };
  const read=async(path:string,body?:unknown)=>{
   const r=await fetch(`${scope.base}/rest/v1/${path}`,{method:body?'POST':'GET',headers:{...scope.headers,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(15000)});
   if(!r.ok)throw Error(r.status===403?'screening_forbidden':'screening_unavailable');return r.json();
@@ -23,6 +30,7 @@ export async function handleRulesScreening(payload:Record<string,unknown>,scope:
   const jobs=await read(`jobs?select=id,workspace_id,title,description,criteria,knockouts,manager_feedback&id=eq.${jobId}&workspace_id=eq.${encodeURIComponent(scope.workspace)}`);
   if(!Array.isArray(jobs)||jobs.length!==1)return reply({code:'screening_forbidden'},403);
   const job=jobs[0];
+  const sourceVersion=metered?await serviceRPC('subscription_rules_source',{p_job:jobId,p_actor:scope.actor}):null;
   const [priorities,feedback,assessments,lessons,caches]=await Promise.all([
    read('rpc/get_job_hiring_priorities',{p_job:jobId}),
    read(`manager_feedback?select=id,workspace_id,job_id,candidate_id,updated_at&workspace_id=eq.${encodeURIComponent(scope.workspace)}&job_id=eq.${jobId}&order=id&limit=1000`),
@@ -34,7 +42,7 @@ export async function handleRulesScreening(payload:Record<string,unknown>,scope:
   const feedbackVersion=await fingerprint({feedback,assessments,lessons});
   const prepared=await buildJobIntelligence({workspaceId:scope.workspace,job,priorities,feedbackVersion,feedback,assessments,lessons});
   const cached=caches?.find((r:any)=>r.rubric_key===prepared.key);
-  const intelligence=cached?.intelligence||prepared;
+  const intelligence=cached?.intelligence?{...cached.intelligence,billingKey:prepared.billingKey}:prepared;
   if(!cached)await write('job_screening_rubrics?on_conflict=job_id',{job_id:jobId,workspace_id:scope.workspace,rubric_key:prepared.key,intelligence:prepared,updated_at:new Date().toISOString()});
   if(intelligence.status!=='ready')return reply({status:'needs_review',intelligence,ai_calls:0,provider_cost_usd:0});
   // Only current, approved job-scoped signals alter the shared rubric. Raw
@@ -49,13 +57,17 @@ export async function handleRulesScreening(payload:Record<string,unknown>,scope:
    results.push({...result,cacheHit:false});
    pending.push({candidate_id:row.candidate_id,job_id:jobId,workspace_id:scope.workspace,document_id:row.document_id,rubric_key:compiled.key,resume_hash:row.resume_hash,result,updated_at:new Date().toISOString()});
   }
-  if(pending.length)await write('candidate_screening_cache?on_conflict=candidate_id',pending);
+  if(pending.length){
+   if(metered)await serviceRPC('save_subscription_rules_results',{p_job:jobId,p_actor:scope.actor,p_source:sourceVersion,p_intelligence:intelligence,p_rows:pending});
+   else await write('candidate_screening_cache?on_conflict=candidate_id',pending);
+  }
   // A selected page is not proof that an entire applicant pool is complete.
   return reply({status:'provisional',scope:'requested_candidates',job_id:jobId,intelligence,
    ranking:rankScreeningCandidates(results),attention,feedback_requires_deep_review:feedback.length>0,
    metrics:{requested:ids.length,evaluated:results.length,cache_hits:cacheHits,duration_ms:Math.round((performance.now()-start)*100)/100,ai_calls:0,provider_cost_usd:0}});
  }catch(error){
   const code=error instanceof Error?error.message:'screening_unavailable';
-  return reply({code:code==='screening_forbidden'?code:'screening_unavailable',error:'Screening could not finish. Your candidates are saved.'},code==='screening_forbidden'?403:503);
+  const known=['screening_forbidden','evaluation_allowance_exhausted','screening_source_changed','subscription_inactive','subscription_period_inactive','subscription_required'].includes(code);
+  return reply({code:known?code:'screening_unavailable',error:code==='evaluation_allowance_exhausted'?'Your evaluation allowance has been reached. Your candidates are saved.':'Screening could not finish. Your candidates are saved.'},code==='evaluation_allowance_exhausted'?429:code==='screening_forbidden'||code.startsWith('subscription_')?403:503);
  }
 }

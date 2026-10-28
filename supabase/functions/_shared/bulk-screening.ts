@@ -40,7 +40,11 @@ export async function handleBulkScreening(payload:Record<string,unknown>,scope:{
  const rpc=async(name:string,body:Record<string,unknown>,service=false)=>{
   const headers=service?{apikey:scope.serviceKey,Authorization:'Bearer '+scope.serviceKey}:scope.headers;
   const r=await fetch(scope.base+'/rest/v1/rpc/'+name,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(25000)});
-  if(!r.ok)throw Error(r.status===403?'screening_forbidden':'screening_unavailable');return r.json();
+  if(!r.ok){
+   const failure=await r.json().catch(()=>null);
+   const code=['evaluation_allowance_exhausted','screening_source_changed','subscription_inactive','subscription_period_inactive','subscription_required','subscription_actor_required'].includes(failure?.message)?failure.message:r.status===403?'screening_forbidden':'screening_unavailable';
+   throw Error(code);
+  }return r.json();
  };
  try{
   const source=await rpc('bulk_screening_source',{p_batch:payload.batch_id});
@@ -48,5 +52,8 @@ export async function handleBulkScreening(payload:Record<string,unknown>,scope:{
   if(!(await rpc('screening_capabilities',{}))?.enabled)return reply({code:'screening_not_enabled'},404);
   if(payload.action==='refresh')await processBulkScreeningBatch(payload.batch_id,(name,body)=>rpc(name,body,['save_bulk_screening_page','auto_start_resume_analysis'].includes(name)));
   return reply(summarizeBulkScreening(await rpc('screening_batch_snapshot',{p_batch:payload.batch_id})));
- }catch(error){return reply({code:error instanceof Error?error.message:'screening_unavailable',error:'Screening could not finish. Saved files and assessments are retained.'},503);}
+ }catch(error){
+  const code=error instanceof Error?error.message:'screening_unavailable';
+  return reply({code,error:code==='evaluation_allowance_exhausted'?'Your evaluation allowance has been reached. Saved files and assessments are retained.':'Screening could not finish. Saved files and assessments are retained.'},code==='evaluation_allowance_exhausted'?429:code==='screening_forbidden'||code.startsWith('subscription_')?403:503);
+ }
 }

@@ -82,10 +82,12 @@ promise is implied. Each issue stays open until its full acceptance criteria pas
 - Keep provider-call/token/cost telemetry separate. A failed evaluation can cost
   blumr money without costing the recruiter an evaluation. Reconcile with #117;
   provider estimates are not invoices.
-- The foundation ledger does not yet verify shortlist membership or persist
-  candidate results. Integrate reservation and settlement into existing SQL
-  result transactions and durable leases before enabling paid access. Database
-  counts are indexed and serialized by account, not by a global lock.
+- Screening integration now verifies Advanced shortlist membership and binds AI
+  allowance reservations to durable worker leases. Rules results and usage commit
+  together; AI results and settlement share the existing finish transaction.
+  Unstarted worker expiry and verified admin recovery reconcile the same ledger.
+  Account counts are indexed and serialized by subscriber; existing worker locks
+  still protect the queue protocol. Hosted staging remains required before paid access.
 
 ## Safe migration and staging
 
@@ -129,11 +131,66 @@ Official references checked October 28, 2026:
 - https://supabase.com/docs/guides/database/postgres/row-level-security
 - https://supabase.com/changelog.md
 
-## Initial slice and its limits
+## Screening integration and its limits
 
-This branch starts catalog/account/period/ledger infrastructure, a backend
-entitlement lookup and Basic provider denial, and provider-free job-priority
-drafts/worker processing. It reuses existing parsing/scoring and the priority
-editor. It does not yet meter the actual screening queues, complete all Basic UX
-and feedback paths, route Advanced/Pro, implement billing or prove hosted scale.
-Do not enable the feature in staging/production as a sellable plan yet.
+The branch now connects the foundation ledger to the existing direct rules route,
+bulk result transactions, worker admission and durable result saves. Basic ends
+after rules. Advanced selects up to 20 finalists per batch and uses its monthly
+shortlist allowance. Pro selects up to 500 candidates and uses only deep capacity
+for their AI evaluations. Exhaustion preserves saved uploads and returns a
+specific allowance error; there is no automatic paid fallback.
+
+`analysis_actor_id` captures the authenticated person who starts a batch. A replay
+cannot transfer that ownership. The selected workers carry that same actor into
+subscription and provider-cost admission. Legacy unenrolled users retain their
+existing route; subscription accounts are still opt-in and are not provisioned
+by either migration. Old/raw AI admission is denied for enrolled accounts. The
+new admission RPC accepts only recognized operations and lease-bound assessments.
+
+Completed logical evaluations survive renewals. Daily cache refresh does not
+create another rules charge. Intake identity excludes document storage IDs and
+filenames, while retaining resume evidence, job context and model policy. Cached
+AI results can be persisted through a new lease without provider traffic. Failed
+results release capacity; uncertain calls hold it. A database trigger follows
+worker expiry and verified admin recovery so neither can strand a reservation.
+Source changes reject stale results and roll back their usage together.
+
+Both subscription migrations remain absent from deployment scripts. Keep
+`SUBSCRIPTION_FOUNDATION_ENABLED` off outside local fixtures. Applying SQL and
+provisioning accounts can activate database guards independently of that Edge
+Function flag; rollback must pause subscribed work and preserve its ledger,
+not merely switch the flag off.
+
+Still open in M1/M2: the administrative grant flow, complete Basic feedback and
+reporting UX, subscription-aware capacity indicators and retry controls, migration
+parity/release sequencing, and replacement of legacy user-facing budget controls.
+Stripe, pricing/settings, billing lifecycle tests, hosted staging, measured
+throughput and controlled rollout remain M3/M4. This is not release-ready billing.
+
+## Development without AI provider calls
+
+Set `AI_PROVIDER_CALLS_DISABLED=true` for local Edge Function development. The
+shared admission guard checks this before provider budgets; the transport checks
+again before every retry and before using a custom fetcher. Workers stop before
+reserving an AI evaluation. Rules processing and Basic job setup need no API key.
+This flag is local configuration, not a production setting changed by this PR.
+
+Run backend tests with network access explicitly denied:
+
+```sh
+deno test --no-prompt --deny-net --allow-env tests/*.test.ts
+node --test tests/*.test.js
+```
+
+Provider responses in tests are synthetic local fixtures. No live model or Stripe
+requests are needed. The subscription CI job has no provider/deployment secrets;
+it runs PostgreSQL 17 SQL fixtures and independent connections contending for the
+last allowances and identical result saves. Existing staging and deployment jobs
+remain restricted to main and are skipped for this draft PR.
+
+Local validation for the integration: 514 Node tests and 81 Deno tests passed.
+The SQL integration suite passed on PGlite, including Basic rules-only completion,
+Advanced's 20/Pro's 500 selection boundaries, atomic exhaustion, renewals and cache
+reuse, actor attribution, role permissions, definitive and ambiguous failures,
+worker expiry, and verified recovery. Native CI is the concurrency authority;
+local PGlite does not establish concurrent behavior or hosted throughput.
