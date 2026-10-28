@@ -95,7 +95,7 @@ No backfill enrolls existing users or assigns a Stripe customer. Existing
 `workspace_plans`, access triggers, jobs, candidates, assessments, feedback,
 benchmarks, lessons and auth remain intact. Explicit non-billable beta/trial/
 complimentary accounts can be provisioned through the trusted backend; the admin
-UI and audited grant operation remain M1 work. With the feature disabled, current
+UI and audited grant operations are now implemented in this draft. With the feature disabled, current
 behavior is unchanged. With it enabled, missing/inactive entitlements and missing
 worker actors fail closed; there is no paid-plan default.
 
@@ -179,7 +179,7 @@ and usage refresh failures offer retry. Missing pre-rollout RPCs preserve legacy
 behavior; authorization, network and internal failures do not silently grant AI.
 Plan refreshes preserve clarification edits, and signout clears late responses.
 
-Still open in M1/M2: the administrative grant flow, remaining Basic reporting UX,
+Still open in M1/M2: remaining Basic reporting UX,
 migration parity/release sequencing, and removal of remaining legacy budget
 controls. Stripe pricing, checkout/portal, billing lifecycle tests, hosted staging,
 measured throughput and controlled rollout remain M3/M4. This is not
@@ -222,3 +222,40 @@ failed-save retry, input retention during refresh, all three tiers, exhausted an
 expired access, unavailable usage/recovery, mobile layouts (390/320px), and late
 responses after signout. Existing recruiter, quick-start, review, bulk upload and
 settings journeys also pass. CI includes the new browser and native SQL suites.
+
+## Manual subscription administration
+
+Admin tools now includes a Subscriptions area for an exact registered-email
+lookup, review, and application of non-billable Basic/Advanced/Pro grants. Access
+types are beta, trial, or complimentary, with an explicit future end time no more
+than 366 days away. Verified account approval remains a separate prerequisite.
+The form labels the browser time zone and sends an unambiguous UTC instant.
+No accounts are created, approved, enrolled, or emailed by this migration.
+
+Updating or extending an active grant preserves the period ID and its completed
+and pending usage. Plan limits come from the server catalog; there are no custom
+allowance inputs. Pausing blocks new evaluations and retains historical work.
+Renewal is a separate explicit operation, permitted only after the current
+allowance period expires. It creates a new period and preserves previous usage
+and late settlement. Manual grants do not auto-renew monthly. Stripe-managed
+accounts cannot be changed through these controls.
+
+Every change records the authenticated administrator, target account, reason,
+before/after state, time, and request identity. Audit rows have RLS and no direct
+client writes. Public RPCs are invoker wrappers; their private implementations
+check current app-admin authorization on lookup, mutation, and idempotent replay.
+Stale versions are rejected; request and subscriber locks protect concurrent
+first grants, while account/period locks coordinate with evaluation admission.
+Retries after lost responses reuse the same request instead of granting again.
+Revocation and signout clear the UI and fence late results.
+
+Validation: 525 Node tests, the new browser journey, existing admin/subscription
+journeys, and the SQL suite pass locally. SQL coverage includes repeat migration
+application, authorization, exact lookup, invalid grants, response-loss replay,
+stale edits, updates/downgrades, explicit renewal, historical settlement, billing
+protection and audit permissions. Native PostgreSQL CI also exercises concurrent
+initial grants, duplicate retries and grants alongside allowance reservations.
+The local Supabase advisor could not connect because no Supabase database is
+running on port 54322; native SQL privilege checks remain part of CI, and a hosted
+advisor run remains part of staging. This migration is excluded from deployment
+scripts, and no live grants, billing, emails or provider calls were performed.

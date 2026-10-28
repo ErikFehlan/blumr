@@ -42,3 +42,6 @@ jobs:
           node tests/subscription-screening-concurrency.mjs
           createdb -h localhost -U postgres subscription_feedback
           psql -h localhost -U postgres -d subscription_feedback -f tests/subscription-feedback.sql
+          createdb -h localhost -U postgres subscription_admin
+          psql -h localhost -U postgres -d subscription_admin -f tests/subscription-admin.sql
+          node tests/subscription-admin-concurrency.mjs

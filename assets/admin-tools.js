@@ -1,9 +1,9 @@
 (function(global){
  'use strict';
- function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,reminderLoad,reminderSave,reminderSend,planLoad,planSave,ratesLoad,ratesSave,costLoad,healthLoad,recoveryLoad,recoveryRetry}){
-  let allowed=false,version=0,loading=null;
+ function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,reminderLoad,reminderSave,reminderSend,planLoad,planSave,ratesLoad,ratesSave,costLoad,healthLoad,recoveryLoad,recoveryRetry,subscriptionFind,subscriptionChange,subscriptionChanged}){
+  let allowed=false,version=0,loading=null,subscriptions=null;
   const files={downloadServer:'server',downloadSchema:'schema',downloadPrompt:'prompt',downloadPackage:'pkg',downloadEnv:'env'};
-  function clear(){version++;loading=null;host.replaceChildren();}
+  function clear(){version++;loading=null;subscriptions?.clear();subscriptions=null;host.replaceChildren();}
   function setAllowed(value){allowed=value===true;if(!allowed)clear();}
   function deny(){setAllowed(false);onDenied();}
   function message(text,retry=false){
@@ -13,7 +13,7 @@
   async function open(){
    if(!allowed){clear();return;}
    if(loading)return loading;
-   const request=++version;message('Loading admin tools…');
+   const request=++version;subscriptions?.clear();subscriptions=null;message('Loading admin tools…');
    loading=(async()=>{
     try{
      const payload=await load();
@@ -25,7 +25,7 @@
      host.replaceChildren();
      const tabs=document.createElement('nav');tabs.className='rf-admin-tabs';tabs.setAttribute('aria-label','Admin areas');host.append(tabs);
      const areas={};
-     for(const [key,label] of [['overview','Overview'],['health','System'],['users','Users'],['emails','Communications'],['usage','Usage'],['rewards','Rewards'],['advanced','Technical setup']]){
+     for(const [key,label] of [['overview','Overview'],['health','System'],['users','Users'],['subscriptions','Subscriptions'],['emails','Communications'],['usage','Usage'],['rewards','Rewards'],['advanced','Technical setup']]){
       const button=document.createElement('button');button.type='button';button.className='rf-admin-tab';button.textContent=label;button.dataset.adminArea=key;button.setAttribute('aria-pressed',key==='overview'?'true':'false');tabs.append(button);
       const area=document.createElement('div');area.className='rf-admin-area';area.dataset.adminPanel=key;area.hidden=key!=='overview';host.append(area);areas[key]=area;
      }
@@ -37,10 +37,11 @@
       const card=document.createElement('button');card.type='button';card.className='rf-admin-summary-card';card.dataset.adminJump=key==='support'?'users':key;card.innerHTML=`<strong data-admin-count="${key}">—</strong><span>${label}</span>`;card.addEventListener('click',()=>showArea(card.dataset.adminJump));summary.append(card);
      }
      areas.overview.append(summary);
-     const intro=document.createElement('p');intro.className='rf-sub';intro.textContent='Review users, communications, usage, system health, and rewards. Technical configuration is available separately.';areas.overview.append(intro);
+     const intro=document.createElement('p');intro.className='rf-sub';intro.textContent='Review users, subscriptions, communications, usage, system health, and rewards. Technical configuration is available separately.';areas.overview.append(intro);
      if(healthLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='systemHealthPanel';areas.health.append(panel);void loadHealth(request);}
      const setup=document.createElement('details');setup.innerHTML='<summary>Advanced configuration and downloads</summary>';setup.append(technical);areas.advanced.append(setup);
      const rewards=document.createElement('section');rewards.className='rf-card';rewards.id='adminRewardsPanel';rewards.innerHTML='<div class="rf-cardhead"><h3>Referral rewards</h3><span class="rf-pill rf-gray">Coming soon</span></div><p>Referral tracking and free-month credits are not active yet. The draft below is ready to review; it cannot be sent from this screen.</p>';areas.rewards.append(rewards);
+     if(subscriptionFind&&subscriptionChange){const panel=document.createElement('section');panel.className='rf-card subscription-admin';panel.id='subscriptionAdminPanel';areas.subscriptions.append(panel);subscriptions=global.BlumrSubscriptionAdmin.mount(panel,{find:subscriptionFind,change:subscriptionChange,allowed:()=>allowed&&request===version,denied:deny,saved:subscriptionChanged});}
      if(securityLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='betaSecurityPanel';areas.users.append(panel);void loadSecurity(request);}
      if(reminderLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='onboardingRemindersPanel';areas.emails.append(panel);void loadReminders(request);}
      if(planLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminPlansPanel';areas.usage.append(panel);void loadPlans(request);}

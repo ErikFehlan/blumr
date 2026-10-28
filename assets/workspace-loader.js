@@ -5,7 +5,7 @@
     'assets/job-intake-code.js?v=20261002-guided-experience',
     'assets/job-wizard.js?v=20261016-priorities',
     'assets/hiring-priorities.js?v=20261016-priorities',
-    'assets/data.js?v=20261028-subscriptions',
+    'assets/data.js?v=20261028-admin',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20261014-decisions',
     'assets/evidence.js?v=20260911-quick-feedback',
@@ -34,7 +34,8 @@
     'assets/recruiter-workflow.js?v=20261027-unified-resumes',
     'assets/tutorial.js?v=20260915-tutorial',
     'assets/tutorial-ui.js?v=20260915-settings',
-    'assets/admin-tools.js?v=20261002-guided-experience',
+    'assets/subscription-admin.js?v=20261028-admin',
+    'assets/admin-tools.js?v=20261028-admin',
     'assets/subscriptions.js?v=20261028',
     'assets/subscription-ui.js?v=20261028',
     'assets/settings.js?v=20261014-feedback',
@@ -46,7 +47,7 @@
     'assets/bulk-files.js?v=20261020-bulk',
     'assets/candidate-list.js?v=20261027-all-candidates',
     'assets/bulk-screening.js?v=20261028-subscriptions',
-    'assets/app.js?v=20261028-subscriptions'
+    'assets/app.js?v=20261028-admin'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;
