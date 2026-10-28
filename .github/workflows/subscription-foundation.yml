@@ -6,6 +6,7 @@ on:
       - 'supabase/functions/**'
       - 'supabase/migrations/*subscription*'
       - 'tests/*subscription*'
+      - 'assets/subscription*.js'
       - '.github/workflows/subscription-foundation.yml'
 permissions:
   contents: read
@@ -28,7 +29,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: Validate with simulated providers and denied network access
-        run: deno test --no-prompt --deny-net --allow-env tests/subscription-routing.test.ts tests/subscription-offline.test.ts tests/subscription-workers.test.ts tests/subscription-screening.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
+        run: deno test --no-prompt --deny-net --allow-env tests/subscription-routing.test.ts tests/subscription-offline.test.ts tests/subscription-workers.test.ts tests/subscription-screening.test.ts tests/subscription-feedback.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
       - name: Verify native SQL and simultaneous allowance reservations
         env:
           PGPASSWORD: postgres
@@ -39,3 +40,5 @@ jobs:
           createdb -h localhost -U postgres subscription_screening
           psql -h localhost -U postgres -d subscription_screening -f tests/subscription-screening.sql
           node tests/subscription-screening-concurrency.mjs
+          createdb -h localhost -U postgres subscription_feedback
+          psql -h localhost -U postgres -d subscription_feedback -f tests/subscription-feedback.sql

@@ -155,17 +155,35 @@ results release capacity; uncertain calls hold it. A database trigger follows
 worker expiry and verified admin recovery so neither can strand a reservation.
 Source changes reject stale results and roll back their usage together.
 
-Both subscription migrations remain absent from deployment scripts. Keep
+All subscription migrations remain absent from deployment scripts. Keep
 `SUBSCRIPTION_FOUNDATION_ENABLED` off outside local fixtures. Applying SQL and
 provisioning accounts can activate database guards independently of that Edge
 Function flag; rollback must pause subscribed work and preserve its ledger,
 not merely switch the flag off.
 
-Still open in M1/M2: the administrative grant flow, complete Basic feedback and
-reporting UX, subscription-aware capacity indicators and retry controls, migration
-parity/release sequencing, and replacement of legacy user-facing budget controls.
-Stripe, pricing/settings, billing lifecycle tests, hosted staging, measured
-throughput and controlled rollout remain M3/M4. This is not release-ready billing.
+The Basic feedback path now saves original notes and recruiter-written
+clarifications without interpretation or reassessment requests. Failed writes
+retain the wording and support retry. Database queue guards also cancel newly
+queued Basic intake/reassessment work while preserving already owned attempts.
+Selected Advanced workers retain the batch initiator even when a Basic colleague
+uploaded the resumes. Candidate-only feedback invalidates rules freshness without
+charging the whole pool again; changed approved preferences still change the
+billing identity.
+
+Settings now shows the account's plan, active period, completed and pending
+usage, and remaining evaluation capacity. The upload area carries the same
+capacity summary. Basic shows rules; Advanced shows rules and shortlist AI; Pro
+shows rules and deep AI. Subscribed users no longer see the legacy workspace
+provider-call meter. Expired access and exhausted allowances retain saved work,
+and usage refresh failures offer retry. Missing pre-rollout RPCs preserve legacy
+behavior; authorization, network and internal failures do not silently grant AI.
+Plan refreshes preserve clarification edits, and signout clears late responses.
+
+Still open in M1/M2: the administrative grant flow, remaining Basic reporting UX,
+migration parity/release sequencing, and removal of remaining legacy budget
+controls. Stripe pricing, checkout/portal, billing lifecycle tests, hosted staging,
+measured throughput and controlled rollout remain M3/M4. This is not
+release-ready billing.
 
 ## Development without AI provider calls
 
@@ -188,9 +206,19 @@ it runs PostgreSQL 17 SQL fixtures and independent connections contending for th
 last allowances and identical result saves. Existing staging and deployment jobs
 remain restricted to main and are skipped for this draft PR.
 
-Local validation for the integration: 514 Node tests and 81 Deno tests passed.
+Local validation through feedback/usage UI: 520 Node tests and 82 Deno tests passed.
 The SQL integration suite passed on PGlite, including Basic rules-only completion,
 Advanced's 20/Pro's 500 selection boundaries, atomic exhaustion, renewals and cache
 reuse, actor attribution, role permissions, definitive and ambiguous failures,
 worker expiry, and verified recovery. Native CI is the concurrency authority;
 local PGlite does not establish concurrent behavior or hosted throughput.
+
+The feedback SQL suite reapplies its additive migration, saves raw notes and
+manual clarifications through the existing evidence tables, checks Basic queue
+suppression, preserves active lease recovery, tests mixed-plan initiator
+attribution, and verifies subscriber dates/usage and function permissions. The
+provider-blocked browser suite covers Basic note and clarification persistence,
+failed-save retry, input retention during refresh, all three tiers, exhausted and
+expired access, unavailable usage/recovery, mobile layouts (390/320px), and late
+responses after signout. Existing recruiter, quick-start, review, bulk upload and
+settings journeys also pass. CI includes the new browser and native SQL suites.

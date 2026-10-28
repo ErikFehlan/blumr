@@ -5,7 +5,7 @@
     'assets/job-intake-code.js?v=20261002-guided-experience',
     'assets/job-wizard.js?v=20261016-priorities',
     'assets/hiring-priorities.js?v=20261016-priorities',
-    'assets/data.js?v=20261027-unified-resumes',
+    'assets/data.js?v=20261028-subscriptions',
     'assets/select.js?v=20260910-dark-dropdowns',
     'assets/presentation.js?v=20261014-decisions',
     'assets/evidence.js?v=20260911-quick-feedback',
@@ -14,7 +14,7 @@
     'assets/scoring.js?v=20260911-quick-feedback',
     'assets/quality.js?v=20260915-core',
     'assets/quality-ui.js?v=20260918-blumr',
-    'assets/feedback.js?v=20260916-learning',
+    'assets/feedback.js?v=20261028-subscriptions',
     'assets/idempotency.js?v=20260930-idempotency',
     'assets/upload-validation.js?v=20261005-upload-guards',
     'assets/pdf-text.js?v=20260915-intake',
@@ -35,6 +35,8 @@
     'assets/tutorial.js?v=20260915-tutorial',
     'assets/tutorial-ui.js?v=20260915-settings',
     'assets/admin-tools.js?v=20261002-guided-experience',
+    'assets/subscriptions.js?v=20261028',
+    'assets/subscription-ui.js?v=20261028',
     'assets/settings.js?v=20261014-feedback',
     'assets/settings-ui.js?v=20261014-feedback',
     'assets/guidance.js?v=20260916-polish',
@@ -43,8 +45,8 @@
     'assets/vendor/jszip-3.10.1.min.js',
     'assets/bulk-files.js?v=20261020-bulk',
     'assets/candidate-list.js?v=20261027-all-candidates',
-    'assets/bulk-screening.js?v=20261027-all-candidates',
-    'assets/app.js?v=20261027-all-candidates'
+    'assets/bulk-screening.js?v=20261028-subscriptions',
+    'assets/app.js?v=20261028-subscriptions'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;

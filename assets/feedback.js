@@ -25,5 +25,9 @@
     const text=String(correction).trim();if(!text||text.length>2000)throw Error('Enter a clarification of up to 2,000 characters.');
     return {...interpretation,text,source:'recruiter',updatedAt:now,reviewStatus:'corrected',reviewedAt:now};
   }
-  const api={buildPayload,fromResult,review};if(typeof module!=='undefined')module.exports=api;global.AncalagonFeedback=api;
+  function clarify(value,now=Date.now()){
+    const text=String(value??'').trim();if(!text||text.length>2000)throw Error('Enter a clarification of up to 2,000 characters.');
+    return {text,source:'recruiter',updatedAt:now,reviewStatus:'corrected',reviewedAt:now};
+  }
+  const api={buildPayload,fromResult,review,clarify};if(typeof module!=='undefined')module.exports=api;global.AncalagonFeedback=api;
 })(typeof window!=='undefined'?window:globalThis);

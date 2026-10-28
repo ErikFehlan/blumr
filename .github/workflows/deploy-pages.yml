@@ -43,6 +43,8 @@ jobs:
           node --check assets/guidance.js
           node --check assets/settings.js
           node --check assets/settings-ui.js
+          node --check assets/subscriptions.js
+          node --check assets/subscription-ui.js
           node --check assets/admin-tools.js
           node --check assets/home.js
           node --check assets/tutorial.js
@@ -96,6 +98,7 @@ jobs:
           node tests/landing-browser.cjs
           node tests/demo-analytics-browser.cjs
           node tests/settings-browser.cjs
+          CAPTURE_UI=test-results/subscriptions node tests/subscription-browser.cjs
           node tests/browser-journey.cjs
           node tests/job-review-browser.cjs
           node tests/hiring-priorities-browser.cjs
@@ -126,6 +129,7 @@ jobs:
             test-results/assessment-memory/*.png
             test-results/hiring-priorities/*.png
             test-results/bulk-screening/*.png
+            test-results/subscriptions/*.png
           if-no-files-found: ignore
 
   prepare-home:

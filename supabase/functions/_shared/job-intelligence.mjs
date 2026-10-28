@@ -26,9 +26,10 @@ export async function buildJobIntelligence({workspaceId,job,priorities,feedbackV
  const manager=approvedManagerSources({feedback,assessments,lessons,job});
  const source={version:jobIntelligenceVersion,engineVersion:screeningVersion,ruleSpecVersion,requirementsVersion,vocabularyVersion,relationships,workflowRelationships,equivalentCapabilities,titleFamilies,credentialFamilies,capabilityWorkflows,workspaceId,jobId:job.id,title:job.title,description:job.description||'',criteria:job.criteria||[],knockouts:job.knockouts||[],managerContext:job.manager_feedback||'',priorities,feedbackVersion,managerSources:manager.sources,asOf:day};
  const key=await fingerprint(source);
- // Usage identity excludes the cache's daily freshness timestamp. Evidence,
- // requirements, approved feedback and engine policy still invalidate usage.
- const billingKey=await fingerprint({...source,asOf:undefined});
+ // Freshness changes for new notes and dates; usage follows compiled requirements.
+ // Approved manager sources and engine policy still invalidate usage, while
+ // candidate-only notes do not charge a new rules pass across the whole pool.
+ const billingKey=await fingerprint({...source,asOf:undefined,feedbackVersion:undefined});
  if(priorities?.source_title!==job.title||priorities?.source_description!==(job.description||''))issues.push({code:'stale_priorities'});
  if(!priorities?.items?.length)issues.push({code:'missing_priorities'});
  if(issues.length)return {version:jobIntelligenceVersion,key,status:'needs_review',issues,weights:[],weightPolicy:'priority_order_with_explicit_manager_emphasis_v1',rubric:null,aiCalls:0};

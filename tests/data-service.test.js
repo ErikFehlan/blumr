@@ -27,6 +27,13 @@ function fixture() {
   const service=context.window.AncalagonData.create({client,workspace:{id:'workspace'},session:{user:{id:'user'}}});
   return {service,rows,calls,downloads,setRpc(handler){rpcHandler=handler},failNext(){fail=true},loseNextInsert(){lose=true}};
 }
+test('subscription reads allow a missing rollout RPC but never hide authorization or internal failures',async()=>{
+ const f=fixture();
+ for(const code of ['PGRST202','42883']){f.setRpc(async name=>{assert.equal(name,'get_my_subscription');return {error:{code,message:'Could not find function public.get_my_subscription'}}});assert.equal(await f.service.loadSubscription(),null);}
+ for(const error of [{code:'42501',message:'Forbidden'},{code:'42883',message:'Internal helper is missing'},{code:'503',message:'Unavailable'}]){f.setRpc(async()=>({error}));await assert.rejects(f.service.loadSubscription(),e=>e.code===error.code);}
+ f.setRpc(async()=>({data:null}));assert.equal(await f.service.loadSubscription(),null);
+ f.setRpc(async()=>({data:{tier:'basic'}}));assert.equal((await f.service.loadSubscription()).tier,'basic');
+});
 test('resume originals resolve only within the workspace, job and candidate; newest upload wins',async()=>{
  const f=fixture(),row={workspace_id:'workspace',job_id:'job',candidate_id:'candidate',file_name:'Resume.pdf',mime_type:'application/pdf'};
  f.rows.candidate_documents=[{...row,storage_path:'workspace/job/candidate/old.pdf',created_at:'2026-01-01'},
