@@ -24,3 +24,5 @@
 
 .rf-rules-report button{text-align:left;max-width:18rem;overflow-wrap:anywhere}.rf-rules-report td{vertical-align:top}
 @media(max-width:600px){.rf-rules-report-wrap{overflow:visible;margin:0}.rf-rules-report-wrap:after{display:none}.rf-rules-report{min-width:0;display:block}.rf-rules-report thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.rf-rules-report tbody,.rf-rules-report tr{display:block}.rf-rules-report tr{padding:14px 0;border-bottom:1px solid var(--ui-line)}.rf-rules-report td{display:flex;justify-content:space-between;gap:14px;padding:5px 0;border:0;text-align:right}.rf-rules-report td:first-child{display:block;text-align:left;margin-bottom:8px}.rf-rules-report td[data-label]:before{content:attr(data-label);font-size:11px;text-align:left;color:var(--rf-muted);flex:0 0 42%}.rf-rules-report button{padding:0;max-width:100%;font-size:14px}}
+
+#subscriptionBilling select{box-sizing:border-box;max-width:100%;min-width:0;padding:12px;margin:10px 0;display:block}#subscriptionBilling button{margin:8px 8px 0 0}#subscriptionBilling [data-billing-status]{overflow-wrap:anywhere}

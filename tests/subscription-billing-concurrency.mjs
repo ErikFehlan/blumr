@@ -1,0 +1,22 @@
+import {spawn} from 'node:child_process';
+import assert from 'node:assert/strict';
+function sql(query){return new Promise((resolve,reject)=>{const p=spawn('psql',['-h','localhost','-U','postgres','-d','subscription_billing','-v','ON_ERROR_STOP=1','-At','-c',query],{env:process.env});let out='',err='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>err+=b);p.on('error',reject);p.on('exit',code=>code?reject(Error(err)):resolve(out.trim().split('\n').at(-1)));});}
+const user='00000000-0000-0000-0000-000000000006',workspace='10000000-0000-0000-0000-000000000002';
+await sql(`insert into auth.users(id) values('${user}');insert into workspace_members values('${workspace}','${user}');
+create function test_billing_claim() returns text language plpgsql as $$begin return subscription_billing_command('claim','{"user":"${user}","purpose":"checkout"}')->>'lease_id';exception when sqlstate 'PT409' then return 'conflict';end$$;`);
+const claims=await Promise.all(Array.from({length:12},()=>sql('set role service_role;select test_billing_claim()')));
+const winners=claims.filter(x=>x!=='conflict');assert.equal(winners.length,1,'Two tabs obtained billing ownership');const lease=winners[0];
+const command=(action,args)=>`set role service_role;select subscription_billing_command('${action}','${JSON.stringify({user,lease,...args})}');`;
+await sql(command('customer',{customer:'cus_concurrent'}));
+const starts=await Promise.all(Array.from({length:12},()=>sql(command('checkout_start',{tier:'basic'}))));assert.equal(new Set(starts.map(s=>JSON.parse(s).checkout_id)).size,1,'Concurrent retries duplicated checkout');
+const args={subscription:'sub_concurrent',status:'active',paid:true,plan:'basic-v1',start:new Date(Date.now()-60000).toISOString(),end:new Date(Date.now()+30*86400000).toISOString()};
+await sql(command('apply',args));
+const reserve=i=>sql(`set role service_role;select reserve_subscription_evaluation('${workspace}','${user}','rules','${i.toString(16).padStart(64,'0')}',gen_random_uuid())->>'allowed';`);
+await Promise.all([sql(command('apply',{...args,plan:'pro-v1'})),...Array.from({length:12},(_,i)=>reserve(i+1))]);
+assert.equal(await sql(`select count(*) from subscription_periods where account_id=(select id from subscription_accounts where user_id='${user}')`),'1','Paid plan update reset period');
+assert.equal(await sql(`select count(*) from subscription_evaluations where account_id=(select id from subscription_accounts where user_id='${user}') and state='reserved'`),'12','Billing update lost reservations');
+await sql(command('finish',{}));
+await sql(`update blumr_billing_private.customers set next_reconcile_at=now()-interval '1 second' where user_id='${user}'`);
+const workers=await Promise.all(Array.from({length:12},()=>sql("set role service_role;select coalesce(subscription_billing_command('claim_next')->>'customer_id','empty');")));
+assert.equal(workers.filter(x=>x==='cus_concurrent').length,1,'Two workers reconciled the same customer');
+console.log('PASS: concurrent checkout claims/replays, reconciliation workers and paid plan changes alongside allowance reservations');

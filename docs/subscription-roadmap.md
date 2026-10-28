@@ -180,7 +180,9 @@ behavior; authorization, network and internal failures do not silently grant AI.
 Plan refreshes preserve clarification edits, and signout clears late responses.
 
 Basic reporting and the remaining client budget controls are now complete in
-this draft. Still open in M1/M2: migration parity and release sequencing. Stripe pricing, checkout/portal, billing lifecycle tests, hosted staging,
+this draft. Still open in M1/M2: migration parity and release sequencing. Sandbox checkout/portal, the webhook inbox and offline billing lifecycle tests
+are now implemented; see [sandbox setup and limitations](subscription-stripe-sandbox.md).
+Actual Stripe configuration/round trips, plan-change/add-on policy, hosted staging,
 measured throughput and controlled rollout remain M3/M4. This is not
 release-ready billing.
 

@@ -44,6 +44,7 @@ jobs:
           node --check assets/settings.js
           node --check assets/settings-ui.js
           node --check assets/subscriptions.js
+          node --check assets/subscription-billing.js
           node --check assets/subscription-ui.js
           node --check assets/subscription-admin.js
           node --check assets/screening-report.js
@@ -101,6 +102,7 @@ jobs:
           node tests/demo-analytics-browser.cjs
           node tests/settings-browser.cjs
           CAPTURE_UI=test-results/subscriptions node tests/subscription-browser.cjs
+          node tests/subscription-billing-browser.cjs
           CAPTURE_UI=test-results/subscriptions node tests/subscription-admin-browser.cjs
           CAPTURE_UI=test-results/subscriptions node tests/screening-report-browser.cjs
           node tests/browser-journey.cjs

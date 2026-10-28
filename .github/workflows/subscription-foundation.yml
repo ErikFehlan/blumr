@@ -29,7 +29,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: Validate with simulated providers and denied network access
-        run: deno test --no-prompt --deny-net --allow-env tests/subscription-routing.test.ts tests/subscription-offline.test.ts tests/subscription-workers.test.ts tests/subscription-screening.test.ts tests/subscription-feedback.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
+        run: deno test --no-prompt --deny-net --allow-env tests/subscription-billing.test.ts tests/subscription-routing.test.ts tests/subscription-offline.test.ts tests/subscription-workers.test.ts tests/subscription-screening.test.ts tests/subscription-feedback.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
       - name: Verify native SQL and simultaneous allowance reservations
         env:
           PGPASSWORD: postgres
@@ -45,3 +45,6 @@ jobs:
           createdb -h localhost -U postgres subscription_admin
           psql -h localhost -U postgres -d subscription_admin -f tests/subscription-admin.sql
           node tests/subscription-admin-concurrency.mjs
+          createdb -h localhost -U postgres subscription_billing
+          psql -h localhost -U postgres -d subscription_billing -f tests/subscription-billing.sql
+          node tests/subscription-billing-concurrency.mjs

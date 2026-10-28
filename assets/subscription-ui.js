@@ -4,6 +4,7 @@
  function mount(root,api){
   const panel=root.querySelector('#subscriptionPanel'),content=root.querySelector('#subscriptionContent'),refresh=root.querySelector('#subscriptionRefresh'),capacity=root.querySelector('#subscriptionCapacity');
   const session=global.BlumrSubscriptions.createSession({load:()=>api.service()?.loadSubscription?.()??Promise.resolve(null),changed:render});
+  const billing=global.BlumrSubscriptionBilling?.mount(root,{service:api.service,navigate:url=>global.location.assign(url),openSettings:()=>api.navigate('backend'),refresh:()=>session.load()});
   function render(view){
    const {phase,plan,refreshing}=view,legacy=phase==='legacy',ready=phase==='ready';
    panel.hidden=legacy||phase==='idle'&&!refreshing;refresh.disabled=refreshing;
@@ -27,7 +28,7 @@
   }
   refresh.addEventListener('click',()=>void session.load());
   capacity.addEventListener('click',e=>{if(e.target.closest('[data-plan-refresh]'))void session.load();if(e.target.closest('[data-plan-open]')){api.navigate('backend');panel.scrollIntoView({block:'start'});root.querySelector('#subscriptionHeading').focus({preventScroll:true});void session.load();}});
-  return session;
+  return {...session,load:()=>Promise.all([session.load(),billing?.load()]).then(([view])=>view),clear:()=>{session.clear();billing?.clear();}};
  }
  global.BlumrSubscriptionUI={mount};
 })(window);
