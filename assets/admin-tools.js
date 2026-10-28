@@ -1,6 +1,6 @@
 (function(global){
  'use strict';
- function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,reminderLoad,reminderSave,reminderSend,planLoad,planSave,ratesLoad,ratesSave,costLoad,healthLoad,recoveryLoad,recoveryRetry,subscriptionFind,subscriptionChange,subscriptionChanged}){
+ function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,reminderLoad,reminderSave,reminderSend,planLoad,ratesLoad,ratesSave,costLoad,healthLoad,recoveryLoad,recoveryRetry,subscriptionFind,subscriptionChange,subscriptionChanged}){
   let allowed=false,version=0,loading=null,subscriptions=null;
   const files={downloadServer:'server',downloadSchema:'schema',downloadPrompt:'prompt',downloadPackage:'pkg',downloadEnv:'env'};
   function clear(){version++;loading=null;subscriptions?.clear();subscriptions=null;host.replaceChildren();}
@@ -204,21 +204,11 @@
    const panel=host.querySelector('#adminPlansPanel');if(!panel)return;panel.textContent='Loading team plans…';
    try{
     const plans=await planLoad();if(!allowed||request!==version)return;panel.replaceChildren();
-    const title=document.createElement('h3');title.textContent='Paid pilot access';panel.append(title);
-    const note=document.createElement('p');note.className='rf-sub';note.textContent='Set pilot access after confirming payment outside blumr. This does not charge a customer.';panel.append(note);
-    const form=document.createElement('form');form.className='rf-form';
-    const label=(text,control)=>{const wrap=document.createElement('label');wrap.textContent=text;wrap.append(control);return wrap;};
-    const team=document.createElement('select');team.required=true;
-    for(const item of plans||[]){const option=document.createElement('option');option.value=item.id;option.textContent=item.name+' · '+item.owner_email+' · '+item.plan+' ('+item.status+')';team.append(option);}
-    const plan=document.createElement('select');for(const value of ['beta','pilot']){const option=document.createElement('option');option.value=value;option.textContent=value==='beta'?'Beta':'Paid pilot';plan.append(option);}
-    const status=document.createElement('select');for(const value of ['active','paused','expired']){const option=document.createElement('option');option.value=value;option.textContent=value;status.append(option);}
-    const allowance=document.createElement('input');allowance.type='number';allowance.min='1';allowance.max='100000';allowance.value='200';
-    const end=document.createElement('input');end.type='date';
-    const sync=()=>{const selected=plans.find(item=>item.id===team.value);if(!selected)return;plan.value=selected.plan;status.value=selected.status;allowance.value=selected.monthly_ai_calls||200;end.value=selected.period_ends_at?.slice(0,10)||'';};team.addEventListener('change',sync);sync();
-    const button=document.createElement('button');button.className='rf-btn primary';button.type='submit';button.textContent='Save plan';const feedback=document.createElement('p');feedback.setAttribute('role','status');
-    form.append(label('Team ',team),label('Plan ',plan),label('Access ',status),label('AI calls per month ',allowance),label('Access end date (optional) ',end),button,feedback);
-    form.addEventListener('submit',async event=>{event.preventDefault();button.disabled=true;feedback.textContent='Saving plan…';try{await planSave(team.value,plan.value,status.value,plan.value==='pilot'?Number(allowance.value):null,end.value?new Date(end.value+'T23:59:59Z').toISOString():null);if(allowed&&request===version)await loadPlans(request);}catch(error){feedback.textContent=error.message||'Could not save plan.';}finally{button.disabled=false;}});
-    panel.append(form);
+    const title=document.createElement('h3');title.textContent='Legacy workspace access';panel.append(title);
+    const note=document.createElement('p');note.className='rf-sub';note.textContent='Existing beta and pilot access is retained. Manage individual evaluation allowances in Subscriptions. Provider spending limits are managed by the service.';panel.append(note);
+    const list=document.createElement('ul');
+    for(const item of plans||[]){const row=document.createElement('li');row.textContent=item.name+' · '+item.owner_email+' · '+item.plan+' ('+item.status+')';list.append(row);}panel.append(list);
+
    }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='Team plans could not be loaded. Reopen Admin to retry.';}
   }
   async function loadSupport(request=version){

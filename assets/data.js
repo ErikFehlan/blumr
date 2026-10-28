@@ -530,12 +530,30 @@
       return {id:item.candidate_id,jobId,batchId:item.batch_id,name:item.file_name,short:item.file_name,screeningManaged:true,uploadStatus:item.status};
     }
     async function listScreeningBatches(jobId){const {data,error}=await client.from('screening_batches').select('id,created_at,sealed,selected_ids').eq('workspace_id',workspaceId).eq('job_id',jobId).order('created_at',{ascending:false}).limit(50);if(error)throw error;return data||[];}
+    async function loadScreeningReport(jobId) {
+      // Read every saved batch, including earlier uploads. Never trigger processing
+      // or evaluation reservations while viewing/exporting a report.
+      const batches=[],snapshots=[],size=100;
+      for(let offset=0;;offset+=size){
+        const {data,error}=await client.from('screening_batches').select('id,created_at')
+          .eq('workspace_id',workspaceId).eq('job_id',jobId)
+          .order('created_at',{ascending:false}).order('id',{ascending:false}).range(offset,offset+size-1);
+        if(error)throw error;if(!Array.isArray(data))throw Error('Screening report unavailable');
+        batches.push(...data);if(data.length<size)break;
+      }
+      for(let i=0;i<batches.length;i+=4){
+        const group=await Promise.all(batches.slice(i,i+4).map(async batch=>{
+          const value=await bulkRPC('screening_batch_snapshot',{p_batch:batch.id});
+          if(value?.batch?.workspace_id!==workspaceId||value.batch.job_id!==jobId||value.batch.id!==batch.id||!Array.isArray(value.candidates))throw Error('Screening report unavailable');
+          return {batch:value.batch,source_current:value.source_current,candidates:value.candidates};
+        }));snapshots.push(...group);
+      }
+      return snapshots;
+    }
     const createResumeUpload=(id,job,manifest)=>bulkRPC('create_resume_upload',{p_id:id,p_job:job,p_manifest:manifest});
     const appendResumeUpload=(batch,offset,manifest)=>bulkRPC('append_resume_upload',{p_batch:batch,p_offset:offset,p_manifest:manifest});
     const startResumeAnalysis=batch=>bulkRPC('start_resume_analysis',{p_batch:batch});
     const getResumeAnalysis=candidate=>bulkRPC('get_resume_analysis',{p_candidate:candidate});
-    const createScreeningBatch=(id,job,manifest,budget)=>bulkRPC('create_screening_batch',{p_id:id,p_job:job,p_manifest:manifest,p_budget:budget});
-    const updateScreeningBudget=(batch,budget)=>bulkRPC('update_screening_budget',{p_batch:batch,p_budget:budget});
     const prepareScreeningUpload=(batch,ordinal,text)=>bulkRPC('prepare_screening_upload',{p_batch:batch,p_ordinal:ordinal,p_text:text});
     const updateScreeningItem=(batch,ordinal,status)=>bulkRPC('update_screening_item',{p_batch:batch,p_ordinal:ordinal,p_status:status});
     const sealScreeningBatch=batch=>bulkRPC('seal_screening_batch',{p_batch:batch});
@@ -631,14 +649,13 @@
     const loadModelRates=()=>settingsRPC('admin_list_model_rates');
     const loadAICostReport=()=>settingsRPC('admin_ai_cost_report',{p_days:30});
     const saveModelRate=(model,input,cached,output)=>settingsRPC('admin_set_model_rate',{p_model:model,p_input:input,p_cached:cached,p_output:output});
-    const setTeamPlan=(id,plan,status,allowance,ends)=>settingsRPC('admin_set_workspace_plan',{p_workspace:id,p_plan:plan,p_status:status,p_monthly_ai_calls:allowance,p_period_ends_at:ends});
     const addTeammate=(email,role)=>settingsRPC('team_add_member',{p_workspace:workspaceId,p_email:email,p_role:role});
     const removeTeammate=id=>settingsRPC('team_remove_member',{p_workspace:workspaceId,p_user:id});
     const renameTeam=name=>settingsRPC('team_rename',{p_workspace:workspaceId,p_name:name});
     async function downloadResume(path){const {data,error}=await client.storage.from('resumes').download(path);if(error)throw error;return data;}
     async function deleteAccount(password){const {data,error}=await client.functions.invoke('account-controls',{body:{action:'delete_account',password,confirmation:'DELETE'}});if(error){let details;try{details=await error.context?.json();}catch{}throw Error(details?.error||'Could not confirm deletion status. If your account is still available, try again.');}if(!['complete','pending'].includes(data?.status))throw Error('Deletion was not confirmed. Try again.');return data;}
 
-    return { adminGetSubscription, adminChangeSubscription, loadSubscription, createResumeUpload, appendResumeUpload, startResumeAnalysis, getResumeAnalysis, findScreeningResume, screeningCapabilities, listScreeningBatches, createScreeningBatch, updateScreeningBudget, prepareScreeningUpload, updateScreeningItem, sealScreeningBatch, selectScreeningFinalists, refreshScreeningBatch, loadRetentionSummary, saveRetentionCohort, recordComparison, loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, setTeamPlan, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, loadResumeDocument, workspaceId };
+    return { adminGetSubscription, adminChangeSubscription, loadSubscription, createResumeUpload, appendResumeUpload, startResumeAnalysis, getResumeAnalysis, findScreeningResume, screeningCapabilities, listScreeningBatches, loadScreeningReport, prepareScreeningUpload, updateScreeningItem, sealScreeningBatch, selectScreeningFinalists, refreshScreeningBatch, loadRetentionSummary, saveRetentionCohort, recordComparison, loadDemoAnalytics, recordActivation, loadActivationSummary, loadInferenceQuality, loadAutomaticKnowledge, excludeAutomaticKnowledge, loadTeam, loadTeamPlans, loadModelRates, loadAICostReport, saveModelRate, addTeammate, removeTeammate, renameTeam, requestHiringPriorities, reviewHiringPriorities, loadAssessmentLessons, saveAssessmentLesson, updateAssessmentLesson, loadBetaSecurity, loadReminderRecipients, setReminderRecipient, sendOnboardingReminder, optOutOnboardingReminders, manageBetaAccess, pauseAI, loadGuidance, saveGuidance, loadSettings, saveSettings, loadNotifications, markNotificationsRead, loadSupportRequests, submitSupportRequest, reviewSupportRequest, exportAccountData, loadPersonalUsage, downloadResume, deleteAccount, requestResumeIntake, loadResumeIntake, loadResumeIntakes, reviewResumeIntake, load, schedule, flush, loadHome, visitHome, saveHome, loadTutorial, saveTutorial, loadHomeReviews, loadJobReassessments, requestCandidateReassessment, reviewJobReassessment, loadCriteriaTask, retryCriteriaTask, toggleCriteriaOriginal, hasPendingChanges, markPending, logUsage, trackEvent, loadAdminAnalytics, loadSystemHealth, loadDirectAIRecovery, recoverDirectAIRequest, recordReliabilityEvent, isAppAdmin, loadAdminTools, loadAdminStarterFile, uploadResume, loadResumeText, loadResumeDocument, workspaceId };
   }
 
   window.AncalagonData = { create: createDataService };

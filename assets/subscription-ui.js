@@ -8,7 +8,7 @@
    const {phase,plan,refreshing}=view,legacy=phase==='legacy',ready=phase==='ready';
    panel.hidden=legacy||phase==='idle'&&!refreshing;refresh.disabled=refreshing;
    root.querySelector('#teamPlan').hidden=!legacy;
-   root.querySelector('#teamSettingsHeading').textContent=legacy?'Team & plan':'Team';
+   root.querySelector('#teamSettingsHeading').textContent='Team';
    capacity.hidden=legacy||phase==='idle'&&!refreshing;
    if(!ready){
     content.innerHTML=`<p role="status">${phase==='error'?'Your plan and usage could not be loaded. Refresh to try again.':'Loading your plan and usage…'}</p>`;

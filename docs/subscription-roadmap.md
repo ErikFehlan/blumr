@@ -179,9 +179,8 @@ and usage refresh failures offer retry. Missing pre-rollout RPCs preserve legacy
 behavior; authorization, network and internal failures do not silently grant AI.
 Plan refreshes preserve clarification edits, and signout clears late responses.
 
-Still open in M1/M2: remaining Basic reporting UX,
-migration parity/release sequencing, and removal of remaining legacy budget
-controls. Stripe pricing, checkout/portal, billing lifecycle tests, hosted staging,
+Basic reporting and the remaining client budget controls are now complete in
+this draft. Still open in M1/M2: migration parity and release sequencing. Stripe pricing, checkout/portal, billing lifecycle tests, hosted staging,
 measured throughput and controlled rollout remain M3/M4. This is not
 release-ready billing.
 
@@ -259,3 +258,42 @@ The local Supabase advisor could not connect because no Supabase database is
 running on port 54322; native SQL privilege checks remain part of CI, and a hosted
 advisor run remains part of staging. This migration is excluded from deployment
 scripts, and no live grants, billing, emails or provider calls were performed.
+
+## Rules reporting and legacy control cleanup
+
+Rankings and CSV/text exports now read saved screening snapshots across all of a
+job's upload batches, with workspace/job validation and paginated batch reads.
+These are existing authenticated, membership-checked database reads; opening or
+exporting a report never dispatches AI or reserves an evaluation. No schema or
+production configuration change is included in this slice.
+
+Basic reports show rules evidence out of 100, required-evidence checks and result
+status. Dashboard counts and averages use current rules results, excluding missing
+or stale results rather than treating them as zero. The newest saved upload wins
+for duplicate candidates; an outdated newer result cannot expose an older score
+as current. The database's existing daily/source/document freshness checks apply.
+A refresh reads saved work; stale rules still require analysis from the upload
+workflow. Advanced and Pro add separate reviewed JD/manager scores out of 10 and
+assessment status; unapproved AI proposals never become reviewed fit scores.
+Original candidate scores and approval records are untouched.
+
+Failed reads clear the current report and offer retry; exports require a complete
+successful refresh. Job/account changes fence late results. CSV values are quoted
+and spreadsheet formulas neutralized. Phone layouts show labeled result cards.
+Basic's guide and candidate labels refer to evidence review and manual feedback;
+previously prepared assessments remain accessible without promising new AI work.
+
+The old editable workspace provider-call allowance is replaced by a read-only
+legacy access summary pointing administrators to Subscriptions. Recruiter settings
+no longer expose provider token/cost/call meters, and unused client methods for
+changing batch budgets and workspace allowances are removed. Existing backend
+spending guards, historical workspace access and admin-only cost diagnostics remain.
+
+Validation for this slice: 532 Node tests; provider-blocked browser coverage for
+Basic/Advanced/Pro reports, CSV/text downloads, earlier uploads, stale results,
+retry, job switches, signout and 390/320px layouts; existing subscription, admin,
+settings, bulk upload and assessment-review journeys. Unit fixtures cover 1,000
+candidate rows and 205 upload batches. These are correctness fixtures, not hosted
+throughput measurements. Native database/concurrency and the full browser suite
+continue to run in CI. Stripe sandbox integration is the next implementation step;
+hosted staging, advisor checks, release parity and controlled rollout remain open.

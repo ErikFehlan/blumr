@@ -27,3 +27,5 @@ test('selected reviewed candidate is used for the submittal, pending reviews tak
  assert.equal(next({job,candidates:[first,second],selected:second}).candidateId,'second');
  assert.equal(next({job,candidates:[first,{...candidate,id:'pending'}],selected:first}).action,'review');
 });
+
+test('Basic guides evidence review without prompting AI assessment approval',()=>{const step=next({job,candidates:[candidate],basic:true});assert.equal(step.action,'review');assert.match(step.text,/rules evidence/);assert.doesNotMatch(step.text,/approve|correct/);});

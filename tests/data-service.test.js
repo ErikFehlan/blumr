@@ -7,12 +7,14 @@ function fixture() {
   const rows = {jobs:[{id:'job',workspace_id:'workspace',title:'QA Analyst',criteria:[],created_at:'2026-01-01',updated_at:'2026-01-01'}]};
   const calls=[]; let fail=false,lose=false,rpcHandler;
   const downloads=[];
-  const client={storage:{from(bucket){return {download:async path=>{downloads.push({bucket,path});return {data:'original-bytes',error:null};}};}},rpc:(name,args)=>rpcHandler(name,args),from(table){let operation='select',payload,filters=[],columns='*';const q={
+  const client={storage:{from(bucket){return {download:async path=>{downloads.push({bucket,path});return {data:'original-bytes',error:null};}};}},rpc:(name,args)=>rpcHandler(name,args),from(table){let operation='select',payload,filters=[],columns='*',range=null;const q={
+    order(){return q},range(start,end){range=[start,end];return q},
     select(value='*'){columns=value;return q},eq(k,v){filters.push([k,v]);return q},is(k,v){return q.eq(k,v)},in(k,v){filters.push([k,v,'in']);return q},
     insert(v){operation='insert';payload=v;return q},update(v){operation='update';payload=v;return q},delete(){operation='delete';return q},
     then(resolve,reject){return Promise.resolve().then(()=>{
       rows[table] ||= [];
-      const matching=rows[table].filter(row=>filters.every(([k,v,op])=>op==='in'?v.includes(row[k]):typeof row[k]==='object'&&row[k]!==null?JSON.stringify(row[k])===v:row[k]===v));
+      let matching=rows[table].filter(row=>filters.every(([k,v,op])=>op==='in'?v.includes(row[k]):typeof row[k]==='object'&&row[k]!==null?JSON.stringify(row[k])===v:row[k]===v));
+      if(range)matching=matching.slice(range[0],range[1]+1);
       if(operation==='select')return {data:clone(columns==='*'?matching:matching.map(row=>Object.fromEntries(columns.split(',').filter(k=>k in row).map(k=>[k,row[k]])))),error:null};
       calls.push({table,operation,payload,filters});
       if(fail){fail=false;return {data:null,error:new Error('network unavailable')}}
@@ -247,4 +249,15 @@ test('individual uploads find server-created bulk resumes without changing the s
  assert.equal(await f.service.findScreeningResume('other-job',['bulk-candidate']),null);
  assert.equal(await f.service.findScreeningResume('job',[]),null);
  await f.service.flush(state);assert.equal(f.calls.length,0,'lookup must not write or cause deletion on the next save');
+});
+
+test('screening reports page all batches with workspace/job scope and read-only snapshots',async()=>{
+ const f=fixture(),rpc=[];
+ f.rows.screening_batches=Array.from({length:205},(_,i)=>({id:'batch-'+i,workspace_id:'workspace',job_id:'job',created_at:'2026-10-01'}));
+ f.rows.screening_batches.push({id:'foreign',workspace_id:'other',job_id:'job'},{id:'other-job',workspace_id:'workspace',job_id:'other'});
+ f.setRpc(async(name,args)=>{rpc.push(name);assert.equal(name,'screening_batch_snapshot');return {data:{batch:{id:args.p_batch,workspace_id:'workspace',job_id:'job'},source_current:true,candidates:[],cost:{private:'not returned'}}};});
+ const rows=await f.service.loadScreeningReport('job');assert.equal(rows.length,205);assert.equal(rpc.length,205);assert.equal(rows.some(r=>r.cost),false);assert.equal(f.calls.length,0);
+ for(const batch of [{id:'batch-0',workspace_id:'foreign',job_id:'job'},{id:'batch-0',workspace_id:'workspace',job_id:'wrong'}]){f.setRpc(async()=>({data:{batch,candidates:[]}}));await assert.rejects(f.service.loadScreeningReport('job'),/unavailable/);}
+ f.setRpc(async()=>({error:{code:'42501'}}));await assert.rejects(f.service.loadScreeningReport('job'),e=>e.code==='42501');
+ assert.equal(f.service.updateScreeningBudget,undefined);assert.equal(f.service.setTeamPlan,undefined);
 });
