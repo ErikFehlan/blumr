@@ -52,7 +52,9 @@ Basic produced a paid $29 test invoice and an active subscription; the subscript
 was then canceled with no proration or final invoice. A portal session opened on
 `billing.stripe.com`, and a card-only hosted Checkout Session was created on
 `checkout.stripe.com` with a 31-minute automatic expiry. Checkout was not paid.
-No real charges, customer emails, application grants or hosted deployments occurred.
+No real charges, customer emails or application grants occurred during that smoke test.
+Subsequent staging deployment progress is recorded in
+[subscription-staging-validation.md](subscription-staging-validation.md).
 
 The actual paid invoice/item/price snapshot is retained as a synthetic regression
 fixture and passes the adapter's canonical reconciliation logic with network access
@@ -63,11 +65,11 @@ replace a full application round trip against the pinned stable API version.
 
 Smoke evidence: customer `cus_VWee8yRTH5TsSh`, canceled subscription
 `sub_1UVbLGClb9pZVTfugvZCBlyo`, paid test invoice
-`in_1UVbLGClb9pZVTfury4fUbzn`. No webhook destination or reconciliation schedule
-has been registered. Hosted staging, secrets and full end-to-end verification
-remain the next release step.
+`in_1UVbLGClb9pZVTfury4fUbzn`. A staging webhook and reconciliation schedule have
+since been registered in an inactive state. Runtime secrets and the complete
+hosted round trip remain pending; see the checkpoint above.
 
-## Hosted staging setup — not executed by this branch
+## Hosted staging setup
 
 Use the existing staging project, synthetic verified beta-approved users and a
 separate Stripe sandbox. Apply preceding subscription migrations in order, then
@@ -86,7 +88,7 @@ code, tracked files, tool output or PR comments:
 | `STRIPE_BILLING_SANDBOX_ENABLED` | `true` only in the isolated test environment |
 | `SUBSCRIPTION_FOUNDATION_ENABLED` | `true` after staging admission checks; otherwise off |
 | `AI_PROVIDER_CALLS_DISABLED` | `true` throughout billing tests |
-| `STRIPE_SECRET_KEY` | Sandbox secret beginning `sk_test_`; live keys are rejected |
+| `STRIPE_SECRET_KEY` | Restricted sandbox key beginning `rk_test_` (preferred), or sandbox `sk_test_`; live keys are rejected |
 | `STRIPE_PRICE_BASIC`, `STRIPE_PRICE_ADVANCED`, `STRIPE_PRICE_PRO` | Three distinct sandbox Price IDs |
 | `STRIPE_PORTAL_CONFIGURATION_ID` | Checked sandbox portal configuration ID |
 | `BILLING_APP_URL` | Exact HTTPS app URL, without query or fragment |
@@ -107,7 +109,7 @@ uses current parent/pricing fields. Register the event types in
 `_shared/stripe-billing.ts`'s `eventTypes` set.
 
 Schedule a private POST to `billing-reconcile` at least once per minute, storing
-its bearer in the scheduler's secret store. No schedule is installed here. One
+its bearer in the scheduler's secret store. The staged schedule remains inactive. One
 invocation processes one customer; parallel workers use `SKIP LOCKED`. Pending
 receipts and mapped subscriptions are polled with five-minute backoff; failures
 retry after one minute. Increase throughput for the intended cohort before

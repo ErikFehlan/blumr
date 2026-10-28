@@ -25,7 +25,7 @@ function fixture(){
    return Response.json(result);
   }
   assert(url.startsWith('https://api.stripe.com/v1/'),'Unexpected external transport');
-  const h=new Headers(init?.headers);assert(h.get('stripe-version')===STRIPE_VERSION,'Version not pinned');assert(h.get('authorization')==='Bearer sk_test_synthetic');
+  const h=new Headers(init?.headers);assert(h.get('stripe-version')===STRIPE_VERSION,'Version not pinned');assert(h.get('authorization')==='Bearer '+env.STRIPE_SECRET_KEY);
   const path=url.split('/v1/')[1],form=new URLSearchParams(String(init?.body||''));
   if(path==='customers'){state.customerCreates.push(h.get('idempotency-key'));return Response.json({id:'cus_first',livemode:false});}
   if(path==='customers/cus_first')return Response.json({id:'cus_first',livemode:state.liveCustomer||false});
@@ -33,7 +33,7 @@ function fixture(){
   if(path.startsWith('prices/'))return Response.json(state.price);
   if(path==='checkout/sessions'){
    state.checkoutCreates.push({key:h.get('idempotency-key'),form:Object.fromEntries(form)});
-   assert(!form.has('user_id')&&!form.has('customer_email')&&!form.has('payment_method_types[0]'));assert(form.get('allowed_payment_method_types[0]')==='card'&&form.get('subscription_data[billing_mode][type]')==='flexible');return Response.json({id:'cs_test_first',livemode:false,customer:'cus_first',mode:'subscription',status:state.sessionStatus,url:'https://checkout.stripe.com/c/pay/cs_test_first'});
+   assert(/^blumr_sandbox_[a-z]{8}$/.test(form.get('integration_identifier')||''));assert(!form.has('user_id')&&!form.has('customer_email')&&!form.has('payment_method_types[0]'));assert(form.get('allowed_payment_method_types[0]')==='card'&&form.get('subscription_data[billing_mode][type]')==='flexible');return Response.json({id:'cs_test_first',livemode:false,customer:'cus_first',mode:'subscription',status:state.sessionStatus,url:'https://checkout.stripe.com/c/pay/cs_test_first'});
   }
   if(path==='checkout/sessions/cs_test_first')return Response.json({id:'cs_test_first',livemode:false,customer:'cus_first',status:state.sessionStatus,url:'https://checkout.stripe.com/c/pay/cs_test_first',subscription:'sub_first'});
   if(path==='billing_portal/configurations/bpc_test')return Response.json({id:'bpc_test',livemode:false,active:true,features:{subscription_update:{enabled:state.portalUpdates},subscription_cancel:{enabled:true,mode:'at_period_end'},payment_method_update:{enabled:true},invoice_history:{enabled:true}}});
@@ -124,4 +124,9 @@ Deno.test('captured Stripe sandbox paid invoice satisfies canonical reconciliati
  const cfg={key:'sk_test_fixture',base:'https://example.test',service:'fixture',anon:'fixture',app:'https://example.test/',origin:'https://example.test',prices:{basic:s.items.data[0].price.id,advanced:'price_advanced',pro:'price_pro'},portal:'bpc_fixture'};
  await reconcile({user_id:user,lease_id:'fixture',customer_id:s.customer,checkout_id:s.metadata.blumr_checkout},client,cfg);
  const applied=calls.find(c=>c.action==='apply')?.args;assert(applied.paid===true&&applied.plan==='basic-v1');assert(applied.start===new Date(s.items.data[0].current_period_start*1000).toISOString());assert(calls.at(-1)?.action==='finish');
+});
+
+Deno.test('restricted sandbox keys work and live restricted keys fail before network access',async()=>{
+ const f=fixture();f.env.STRIPE_SECRET_KEY='rk_test_synthetic';assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===200);
+ const live=fixture();live.env.STRIPE_SECRET_KEY='rk_live_forbidden';assert((await handleBilling(request({action:'checkout',tier:'basic'}),live.io)).status===503);assert(live.state.requests.length===0);
 });

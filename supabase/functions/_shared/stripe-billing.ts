@@ -18,7 +18,7 @@ function config(io:IO){
  if(io.env('STRIPE_BILLING_SANDBOX_ENABLED')!=='true')fail('Sandbox billing is not enabled.',404);
  const key=io.env('STRIPE_SECRET_KEY')||'',base=io.env('SUPABASE_URL')||'',service=io.env('SUPABASE_SERVICE_ROLE_KEY')||'',anon=io.env('SUPABASE_ANON_KEY')||'';
  const app=new URL(io.env('BILLING_APP_URL')||'https://invalid.invalid');
- if(io.env('SUBSCRIPTION_FOUNDATION_ENABLED')!=='true'||!key.startsWith('sk_test_')||!service||!anon||!base.startsWith('https://')||app.protocol!=='https:'||app.username||app.password||app.search||app.hash||app.hostname==='invalid.invalid')fail();
+ if(io.env('SUBSCRIPTION_FOUNDATION_ENABLED')!=='true'||!/^[sr]k_test_[A-Za-z0-9]+$/.test(key)||!service||!anon||!base.startsWith('https://')||app.protocol!=='https:'||app.username||app.password||app.search||app.hash||app.hostname==='invalid.invalid')fail();
  const prices=Object.fromEntries(Object.keys(tiers).map(tier=>[tier,id(io.env('STRIPE_PRICE_'+tier.toUpperCase()),'price')]));
  if(new Set(Object.values(prices)).size!==3)fail();
  return {key,base,service,anon,app:app.href,origin:app.origin,prices,portal:id(io.env('STRIPE_PORTAL_CONFIGURATION_ID'),'bpc')};
@@ -82,7 +82,7 @@ async function checkout(row:Obj,tier:string,client:Client,cfg:Config,io:IO){
  // Never re-create an ambiguous request after Stripe's idempotency retention window.
  if(io.now()-Date.parse(row.checkout_started_at)>23*3600000)fail('An earlier checkout needs recovery. Contact support.',409);
  const session=sandbox(await client.stripe('checkout/sessions',{
-  mode:'subscription',customer:row.customer_id,'line_items[0][price]':cfg.prices[row.checkout_tier],'line_items[0][quantity]':'1',
+  integration_identifier:'blumr_sandbox_scmgehri',mode:'subscription',customer:row.customer_id,'line_items[0][price]':cfg.prices[row.checkout_tier],'line_items[0][quantity]':'1',
   'allowed_payment_method_types[0]':'card','subscription_data[billing_mode][type]':'flexible','subscription_data[metadata][blumr_checkout]':row.checkout_id,success_url:cfg.app+'?billing=return',cancel_url:cfg.app+'?billing=return',
   expires_at:String(Math.floor(Date.parse(row.checkout_expires_at)/1000)),
  },'blumr-checkout-'+row.checkout_id));

@@ -1,0 +1,123 @@
+# Billing staging checkpoint — October 28, 2026
+
+Staging validation has started but has **not passed the release gate**. Production
+has not changed. All work below targets Supabase project `momfzjmycveqginxmqib`
+(`blumr-staging`) and Stripe sandbox `acct_1UVYzGClb9pZVTfu`.
+
+## Database
+
+| Repository migration | Hosted state |
+| --- | --- |
+| `20261028134006_subscription_foundation` | Applied; stored SQL matches repository |
+| `20261028142020_subscription_screening_enforcement` | Applied; stored SQL matches repository |
+| `20261028151317_subscription_feedback_usage` | Applied; stored SQL matches repository |
+| `20261028155821_subscription_admin_grants` | Pending |
+| `20261028174343_subscription_stripe_sandbox` | Pending |
+
+The migration connector assigned execution timestamps to the first three records.
+After comparing exact SQL lengths and MD5 checksums, those three history versions
+were aligned to the repository filenames in a transaction that required all three
+matches. No unapplied migration was marked applied.
+
+The remaining migration calls repeatedly failed with `Invalid or expired
+requestState` and expired approval notices. Supabase's app permission was checked
+and is already **Allow all actions**. The latest failed call did not create either
+remaining table; further retries were stopped. This is an unresolved connector
+approval handoff, not an SQL validation success or a request for broader authority.
+
+## Deployed functions and AI lock
+
+| Function | Staging version | State |
+| --- | --- | --- |
+| `billing-sandbox` | 3 | Current billing implementation; feature disabled |
+| `stripe-webhook` | 2 | Current billing implementation; feature disabled |
+| `billing-reconcile` | 2 | Current billing implementation; private authentication required |
+| `analyze-patterns-v2` | 468 | Existing staging implementation plus AI network guard |
+| `analyze-patterns-beta` | 475 | Existing staging implementation plus AI network guard |
+| `reassess-job` | 468 | Existing staging implementation plus AI network guard |
+| `refine-job-criteria` | 467 | Existing staging implementation plus AI network guard |
+
+The guard is [billing-staging-guard.ts](../scripts/billing-staging-guard.ts). It is
+included alongside each AI handler's entrypoint and imported before that handler.
+It refuses any project other than staging, sets `AI_PROVIDER_CALLS_DISABLED=true`
+inside the function runtime, and permits fetch only to the staging Supabase HTTPS
+origin with redirects rejected. It is deliberately not imported by billing
+functions, which must eventually contact the Stripe sandbox.
+
+Existing AI handler source was otherwise preserved. Deploying the branch's updated
+AI handlers remains part of full application parity, retaining this guard. Do not
+run the existing paid staging workflow during this billing validation: it could
+replace guarded handlers, reactivate workers and make real provider calls.
+
+`ancalagon-criteria-worker` and `ancalagon-job-reassessment` are paused. The
+non-provider `blumr-direct-ai-cleanup` job remains active. Two pre-existing uncertain
+AI attempts were preserved; no provider work was retried. Recorded provider usage
+remained at eight rows throughout this checkpoint. Subscription accounts and
+periods remain empty; no real or synthetic user access has been granted yet.
+
+## Stripe and scheduler configuration
+
+- Webhook endpoint: `we_1UVcpoClb9pZVTfu2SsTnj7W`, **disabled**, test mode only.
+- Destination: `https://momfzjmycveqginxmqib.supabase.co/functions/v1/stripe-webhook`.
+- Snapshot API version: `2026-09-30.endive`; the 15 event types match the handler.
+- Signing secret stored encrypted in staging Vault as `billing_staging_webhook_secret`.
+- Random 256-bit worker bearer stored encrypted as `billing_staging_reconcile_secret`.
+- Cron job `blumr-billing-reconcile`: every minute, **inactive**. It reads the worker
+  bearer from Vault at execution; its command does not contain a plaintext secret.
+- Catalog and portal IDs remain in [stripe-sandbox-config.json](stripe-sandbox-config.json).
+
+Vault storage does not automatically populate Edge Function environment variables.
+The connected Supabase tools do not expose the runtime secret-setting operation,
+and no Management API credential is available in this workspace. Stripe's connector
+does not issue a restricted server API key. Runtime activation is therefore pending.
+
+Complete both migrations first. Then configure the variables listed in
+[the sandbox runbook](subscription-stripe-sandbox.md#hosted-staging-setup) through
+Supabase's secure secret store. Prefer a staging-only `rk_test_` key, granting only
+the customer/Checkout/portal writes and customer/price/subscription/invoice/portal
+reads used by the adapter. Transfer the two existing Vault secrets to the matching
+`STRIPE_WEBHOOK_SECRET` and `BILLING_RECONCILE_SECRET` environment variables without
+logging them. Keep `AI_PROVIDER_CALLS_DISABLED=true`. Verify configuration before
+enabling the webhook or cron. Do not paste keys into chat, repository files or logs.
+
+## Checks completed
+
+- Hosted billing status: HTTP 200 with `enabled:false`.
+- Hosted checkout: HTTP 404 while disabled.
+- Hosted webhook: HTTP 404 while disabled.
+- Hosted reconciliation: HTTP 401 without its private credential.
+- Checkout rollback rehearsal: deployed maintenance handler, observed HTTP 503,
+  restored the billing handler, observed HTTP 200 with `enabled:false`. Webhook,
+  scheduler, ledger and AI lock were preserved. This was a handler rollback drill,
+  not a paid-subscription recovery or database restore rehearsal.
+- 19 network-denied Deno tests passed: 17 billing tests and two staging guard tests.
+  Restricted sandbox keys are accepted; live restricted keys are rejected before
+  network access. Checkout uses a fixed integration identifier across retries.
+- Security advisors: all seven applied subscription tables have RLS; zero exposed
+  subscription definer functions are executable by browser roles. Two new
+  no-policy notices are expected for service-only output/reservation tables.
+- Existing project advisories remain: 73 authenticated definer notices and leaked
+  password protection warning. They predate these changes; the whole project has
+  not been declared security-clean. [Definer guidance](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+- Performance advisors: new informational missing-FK-index notices for plan-code
+  and current-period references, plus unused new indexes. The catalog is immutable
+  and small; current-period lookup has the account primary key. Reassess with
+  staging workload evidence before adding redundant indexes.
+
+## Still required before production consideration
+
+1. Resolve the migration connector handoff and apply the two pending migrations.
+2. Set runtime secrets and the exact staging frontend return URL; verify the
+   deployed stable API contract and guarded branch-handler parity.
+3. Enable the sandbox webhook and worker, then use disposable verified users for
+   real hosted Checkout → test payment → webhook → correct plan/allowances.
+4. Verify all tiers, renewals, failed payments/recovery, period-end cancellation,
+   duplicate/out-of-order receipts, expiry and temporary outages. Align test-clock
+   scenarios with application time; never weaken the future-period guard.
+5. Repeat advisors against the complete schema, verify no added provider usage,
+   rehearse recovery with paid test subscriptions, and clean up synthetic fixtures.
+
+Do not drop billing tables or erase usage to roll back. After accepting any test
+subscription, retain webhook/reconciliation processing during a checkout shutdown
+so cancellations and payment state can still settle. Production remains a separate
+approval after the complete staging evidence passes.
