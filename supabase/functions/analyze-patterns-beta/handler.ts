@@ -4,6 +4,7 @@ import {handleBulkScreening} from '../_shared/bulk-screening.ts';
 import {boundedJSON, reserveModelCall, recordProviderUsage, SecurityLimit, securityMessage} from '../_shared/security.ts';
 import {withDirectIdempotency} from '../_shared/direct-idempotency.ts';
 import { handleAnalysis } from "../analyze-patterns-v2/analysis.ts";
+import {subscriptionEntitlement,SubscriptionError} from '../_shared/subscriptions.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,6 +57,10 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   if(payload.analysis_type==='hiring_priorities')return handlePriorityDraft(payload.job,{workspace:workspaceId,actor:user.id,base:supabaseUrl,serviceKey});
   if(payload.analysis_type==='rules_screening')return handleRulesScreening(payload,{workspace:workspaceId,base:supabaseUrl,serviceKey,headers});
   if(payload.analysis_type==='bulk_screening')return handleBulkScreening(payload,{workspace:workspaceId,base:supabaseUrl,serviceKey,headers});
+  try{
+    const entitlement=await subscriptionEntitlement(workspaceId,user.id);
+    if(entitlement&&!entitlement.ai_allowed)return json({code:'subscription_ai_unavailable',error:securityMessage('subscription_ai_unavailable')},403);
+  }catch(error){const failure=error as SubscriptionError;return json({code:failure.code,error:securityMessage(failure.code)},failure.status||503);}
 
   // Memory is resolved from reviewed server records, never trusted from the
   // browser's claimed approval status. The caller JWT enforces workspace access.
@@ -121,14 +126,14 @@ export async function handleAuthenticatedAnalysis(request: Request) {
   requestId=claimId;
   const analysisRequest=()=>new Request(request.url,{method:'POST',body:JSON.stringify(payload)});
   const beforeModel=async(bytes:number,tokens:number)=>{
-    await markStarted();
     await reserveModelCall(workspaceId,user.id,bytes,tokens);
+    await markStarted();
     if(!admitted){admitted=true;started=recordUsage('started');}
   };
   const onUsage=(result:unknown)=>recordProviderUsage(workspaceId,operation,result,user.id);
   let response = await handleAnalysis(analysisRequest(), {feedbackModel,beforeModel,onUsage,retainAmbiguousFailures:true,providerRequestId:`direct-${requestId}-primary`});
   const failure=response.ok?null:await response.clone().json().catch(()=>null);
-  if (feedbackModel && !response.ok && !['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large','usage_check_unavailable','provider_outcome_uncertain'].includes(failure?.code)) response = await handleAnalysis(analysisRequest(), {beforeModel,onUsage,retainAmbiguousFailures:true,providerRequestId:`direct-${requestId}-fallback`});
+  if (feedbackModel && !response.ok && !String(failure?.code||'').startsWith('subscription_') && !['usage_limit','plan_inactive','ai_paused','beta_access_required','input_too_large','usage_check_unavailable','provider_outcome_uncertain'].includes(failure?.code)) response = await handleAnalysis(analysisRequest(), {beforeModel,onUsage,retainAmbiguousFailures:true,providerRequestId:`direct-${requestId}-fallback`});
 
   const telemetry = admitted ? started.then(() => recordUsage(response.ok ? "succeeded" : "failed")) : Promise.resolve();
   const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;

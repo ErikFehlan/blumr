@@ -1,8 +1,14 @@
+import {subscriptionEntitlement,SubscriptionError} from './subscriptions.ts';
+
 export class SecurityLimit extends Error {
   constructor(public code: string, public status = 429, public retryAfter = 60) { super(code); }
 }
 
 export async function reserveModelCall(workspace: string, actor: string | null, inputBytes: number, outputTokens: number) {
+  try{
+    const entitlement=await subscriptionEntitlement(workspace,actor);
+    if(entitlement&&!entitlement.ai_allowed)throw new SecurityLimit('subscription_ai_unavailable',403);
+  }catch(error){if(error instanceof SubscriptionError)throw new SecurityLimit(error.code,error.status);throw error;}
   const base = Deno.env.get('SUPABASE_URL'), key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!base || !key || !workspace) throw new SecurityLimit('usage_check_unavailable', 503);
   try {
@@ -24,7 +30,10 @@ export async function reserveModelCall(workspace: string, actor: string | null, 
 }
 
 export function securityMessage(code: string) {
-  return code==='beta_access_required' ? 'This account does not have active beta access. Verify your email or contact support.'
+  return code==='subscription_ai_unavailable' ? 'Your plan includes rules-based screening. AI analysis requires an eligible plan.'
+    : code==='subscription_check_unavailable' ? 'Subscription access could not be checked. Please try again shortly.'
+    : code.startsWith('subscription_') ? 'An active subscription and verified evaluation owner are required. Your saved work is unchanged.'
+    : code==='beta_access_required' ? 'This account does not have active beta access. Verify your email or contact support.'
     : code==='plan_inactive' ? 'AI processing is unavailable for this team. Contact the team owner.'
     : code==='ai_paused' ? 'AI processing is temporarily paused by the administrator. Your saved work is unchanged.'
     : code==='usage_limit' ? 'The beta AI usage limit has been reached. Try later or contact the administrator. Your saved work is unchanged.'

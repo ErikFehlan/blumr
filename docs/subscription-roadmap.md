@@ -1,0 +1,139 @@
+# Three-tier subscriptions
+
+Audit date: October 28, 2026. Source baseline: `32854a0` on main.
+Tracking: [#142](https://github.com/ErikFehlan/blumr/issues/142).
+
+This is an initial development slice, not a release-ready billing system. No
+production pricing, billing, database, worker configuration or deployment changes
+are authorized by this branch. The new migration is deliberately absent from
+deployment scripts. `SUBSCRIPTION_FOUNDATION_ENABLED` defaults off and must remain
+off outside local tests until M1/M2 integration and staging checks are complete.
+
+## Audit and reuse
+
+| Area | Evidence in existing code | Decision |
+| --- | --- | --- |
+| Authentication and tenancy | `assets/auth.js`, workspace membership RLS, authenticated analysis handler | Retain; derive actor from verified JWT or durable task attribution, never request JSON. |
+| Existing plans | `20260928130000_phase3_team_plans.sql`, beta/pilot grants and backer seat controls | Keep intact. These are workspace access and provider-call controls, not completed candidate allowances. |
+| Resume intake | `assets/bulk-files.js`, `assets/bulk-screening.js`, unified resume migration | Reuse PDF/DOCX/TXT/OCR/ZIP ingestion, deduplication, candidate/document persistence and unified Analyze action. |
+| Rules and evidence | `_shared/job-intelligence.mjs`, `screening-engine.mjs`, `screening-requirements.mjs`, cache and bulk migrations | Reuse one engine, source-bound requirements, equivalents, approved manager evidence, ranking, near-miss review and source/version invalidation. #118/#119 are already released. |
+| Job priorities | `refine-job-criteria/code-first.mjs`, `drafts.ts`, `generate.ts`, existing editable priority UI | Reuse deterministic extraction and draft persistence. Basic must never fall back to AI when extraction is weak; retain source text and request recruiter review. |
+| AI | Shared `reserveModelCall`, model routing, direct request idempotency and durable assessment leases | Reuse. Add subscription checks before provider admission; do not create a second AI engine. |
+| Background attribution | Criteria and reassessment tasks have `usage_actor_id`, but some reservations pass `null` | Must propagate the durable actor; never assume the workspace owner paid for work initiated by another seat. |
+| Automatic deep work | `auto_start_resume_analysis` and finalist selection/worker fences | Requires plan-aware selection and atomic allowance reservations. Current automatic behavior is not a subscription gate. |
+| Costs and usage | Provider metadata, budget counters, product usage events and screening charges | Retain provider-cost protection separately from customer allowances. Coordinate unmerged #117; never reset counters to implement subscription renewal. |
+| Candidate visibility | #134/#135/#140/#141 on audited main | Preserve recent deduplication, legacy-job and full-list fixes; regression-test single and bulk flows. |
+| Billing | No Stripe/checkout/webhook implementation in audited source | Build new provider adapter, webhook inbox/reconciliation and settings/pricing UI. |
+| In-flight work | #132 backend budgets, #133 parity baseline, #125 measurement | Reconcile against current main; do not merge or duplicate their work implicitly. |
+
+The live production audit queried schema metadata only. Staging table inventory
+and production columns confirm existing workspace plans, worker attribution and
+unified upload fields. No candidate data or credentials were copied into this
+document; runtime parity beyond those schema checks is not claimed.
+
+## Milestones and implementation sequence
+
+1. **M1 — Foundation, [#143](https://github.com/ErikFehlan/blumr/issues/143).**
+   Versioned plan catalog; individual subscription accounts; explicit allowance
+   periods; atomic reserve/settle/release; scoped reads and service-only mutations.
+   Then wire durable actor attribution, result commits and all admission paths.
+2. **M2 — Unified tier routing, [#144](https://github.com/ErikFehlan/blumr/issues/144).**
+   Complete Basic job setup, parsing, rules, reporting and feedback without AI.
+   Advanced runs AI only on server-verified finalists. Pro queues deep work for
+   each eligible candidate, up to 500; never silently falls back or overspends.
+   Reuse #132's backend budget governance and remove token/budget controls.
+3. **M3 — Billing and UX, [#145](https://github.com/ErikFehlan/blumr/issues/145).**
+   Stripe sandbox Checkout/Portal, webhook reconciliation, plan changes, payment
+   failures, invoices, renewals and approved add-on purchases; pricing/settings
+   and compact remaining-capacity indicators in the existing UI.
+4. **M4 — Release evidence, [#146](https://github.com/ErikFehlan/blumr/issues/146).**
+   Native PostgreSQL concurrency, API bypass/isolation, real document imports,
+   1/20/100/500/1,000 candidate scenarios, billing lifecycle, migration/rollback,
+   recruiter-reviewed quality and controlled rollout with explicit approval.
+
+These milestones are tracked by the linked GitHub issues; no dated delivery
+promise is implied. Each issue stays open until its full acceptance criteria pass.
+
+## Accounting contract
+
+- Prices are catalog data in development: Basic 2900, Advanced 7900, Pro 15000
+  USD cents per user/month. No Stripe Price or public pricing change is created.
+- One subscription account per user spans their workspaces, so creating a new
+  workspace cannot multiply allowances. Membership is still required for each
+  reservation. Future organizations can assign seats/accounts without changing
+  evaluation identity or the reservation protocol.
+- Periods carry explicit UTC start/end timestamps supplied by verified billing
+  reconciliation or authorized manual grants. Renewals create a new period, never
+  erase history. No calendar-month guessing or destructive counter reset.
+- Basic: 1,000 rules, zero AI. Advanced: 1,000 rules and 100 shortlist AI. Pro's
+  automatic evaluation route uses 500 deep evaluations. The initial catalog
+  retains the brief's inherited 1,000 rules/100 shortlist capacity for Pro, but
+  routing must not silently spend those as extra deep evaluations after 500.
+  Clarify public allowance copy before checkout ships.
+- A server-created evaluation key must include workspace/job/candidate identity,
+  resume content hash, job requirements, approved feedback, and evaluation/model
+  logic versions. The key excludes request ID, upload batch and billing period.
+  Do not use a new random key on retry. Cached historical successes do not consume
+  a new month's allowance; changed evidence/logic creates a different key.
+- Reserve before work; reserved and uncertain work holds capacity. Only a
+  persisted usable result consumes capacity. Definitive failure/cancellation
+  releases it. Retries use a new attempt token; old attempts cannot settle new
+  work. An uncertain provider outcome is never automatically released on timeout.
+- Keep provider-call/token/cost telemetry separate. A failed evaluation can cost
+  blumr money without costing the recruiter an evaluation. Reconcile with #117;
+  provider estimates are not invoices.
+- The foundation ledger does not yet verify shortlist membership or persist
+  candidate results. Integrate reservation and settlement into existing SQL
+  result transactions and durable leases before enabling paid access. Database
+  counts are indexed and serialized by account, not by a global lock.
+
+## Safe migration and staging
+
+No backfill enrolls existing users or assigns a Stripe customer. Existing
+`workspace_plans`, access triggers, jobs, candidates, assessments, feedback,
+benchmarks, lessons and auth remain intact. Explicit non-billable beta/trial/
+complimentary accounts can be provisioned through the trusted backend; the admin
+UI and audited grant operation remain M1 work. With the feature disabled, current
+behavior is unchanged. With it enabled, missing/inactive entitlements and missing
+worker actors fail closed; there is no paid-plan default.
+
+Develop on `feat/subscription-foundation`, based directly on audited main. Run
+provider-free unit/route tests and local SQL first. A dedicated PR workflow uses
+native PostgreSQL and contains no deployment or provider secrets. Do not invoke
+main release workflows. Stage only after task attribution, complete tier routing,
+atomic result settlement and migration parity checks exist; use the established
+staging project, with disposable synthetic users and an isolated Stripe sandbox.
+
+Before production: inventory beta/backer grants and active queues, preserve a
+verified backup, rehearse additive migrations and rollback, explicitly map opt-in
+users, then enable a small cohort. Rollback disables new enrollment/dispatch and
+preserves the ledger, unsettled attempts and historical results. Disabling a gate
+for paying users must not restore unrestricted AI; a controlled pause is required.
+
+## Stripe recommendation and dependencies
+
+Prefer hosted Checkout and Customer Portal, with server-owned price IDs and
+customer mapping. Portal supports payment details, subscription management and
+invoices. Verify raw-body webhook signatures; persist event IDs before async
+processing, handle duplicates and reconcile current subscription state because
+delivery ordering is not guaranteed. Use isolated sandboxes and test clocks for
+renewal/failure/cancellation tests. Pin the stable API and SDK version at the
+integration step. Account setup, tax treatment, fees, proration, upgrade capacity,
+downgrade timing and add-on pricing need concrete sandbox configuration before
+live approval; this branch does not claim those decisions are implemented.
+
+Official references checked October 28, 2026:
+- https://docs.stripe.com/webhooks
+- https://docs.stripe.com/customer-management
+- https://docs.stripe.com/billing/testing
+- https://supabase.com/docs/guides/database/postgres/row-level-security
+- https://supabase.com/changelog.md
+
+## Initial slice and its limits
+
+This branch starts catalog/account/period/ledger infrastructure, a backend
+entitlement lookup and Basic provider denial, and provider-free job-priority
+drafts/worker processing. It reuses existing parsing/scoring and the priority
+editor. It does not yet meter the actual screening queues, complete all Basic UX
+and feedback paths, route Advanced/Pro, implement billing or prove hosted scale.
+Do not enable the feature in staging/production as a sellable plan yet.

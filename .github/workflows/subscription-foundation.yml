@@ -1,0 +1,37 @@
+name: Validate subscription foundation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/migrations/*subscription*'
+      - 'tests/*subscription*'
+      - '.github/workflows/subscription-foundation.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno test --allow-env tests/subscription-routing.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
+      - name: Verify native SQL and simultaneous allowance reservations
+        env:
+          PGPASSWORD: postgres
+        run: |
+          createdb -h localhost -U postgres subscription_foundation
+          psql -h localhost -U postgres -d subscription_foundation -f tests/subscription-foundation.sql
+          node tests/subscription-concurrency.mjs
