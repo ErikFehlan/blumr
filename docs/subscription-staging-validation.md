@@ -11,19 +11,21 @@ has not changed. All work below targets Supabase project `momfzjmycveqginxmqib`
 | `20261028134006_subscription_foundation` | Applied; stored SQL matches repository |
 | `20261028142020_subscription_screening_enforcement` | Applied; stored SQL matches repository |
 | `20261028151317_subscription_feedback_usage` | Applied; stored SQL matches repository |
-| `20261028155821_subscription_admin_grants` | Pending |
+| `20261028155821_subscription_admin_grants` | Applied; stored SQL matches repository |
 | `20261028174343_subscription_stripe_sandbox` | Pending |
 
-The migration connector assigned execution timestamps to the first three records.
-After comparing exact SQL lengths and MD5 checksums, those three history versions
-were aligned to the repository filenames in a transaction that required all three
-matches. No unapplied migration was marked applied.
+The migration connector assigned execution timestamps to the applied records.
+After comparing exact SQL lengths and MD5 checksums, history versions were aligned
+to the repository filenames using guarded updates. The admin migration's original
+version was `20261028203658`; its exact SQL MD5 is
+`f93009578bafaf61d4fee52039f248ea`. No unapplied migration was marked applied.
 
-The remaining migration calls repeatedly failed with `Invalid or expired
-requestState` and expired approval notices. Supabase's app permission was checked
-and is already **Allow all actions**. The latest failed call did not create either
-remaining table; further retries were stopped. This is an unresolved connector
-approval handoff, not an SQL validation success or a request for broader authority.
+The final billing migration calls failed with `Invalid or expired requestState`
+and expired approval notices. A later call was interrupted after roughly 14 minutes;
+read-only checks afterward confirmed no billing schema/history was installed.
+Supabase's app permission is already **Allow all actions**. Further repeated calls
+were stopped. This is an unresolved connector handoff, not an SQL validation
+success or a request for broader authority.
 
 ## Deployed functions and AI lock
 
@@ -32,10 +34,10 @@ approval handoff, not an SQL validation success or a request for broader authori
 | `billing-sandbox` | 3 | Current billing implementation; feature disabled |
 | `stripe-webhook` | 2 | Current billing implementation; feature disabled |
 | `billing-reconcile` | 2 | Current billing implementation; private authentication required |
-| `analyze-patterns-v2` | 468 | Existing staging implementation plus AI network guard |
-| `analyze-patterns-beta` | 475 | Existing staging implementation plus AI network guard |
-| `reassess-job` | 468 | Existing staging implementation plus AI network guard |
-| `refine-job-criteria` | 467 | Existing staging implementation plus AI network guard |
+| `analyze-patterns-v2` | 469 | Subscription branch implementation plus AI network guard |
+| `analyze-patterns-beta` | 476 | Subscription branch implementation plus AI network guard |
+| `reassess-job` | 469 | Subscription branch implementation plus AI network guard |
+| `refine-job-criteria` | 468 | Subscription branch implementation plus AI network guard |
 
 The guard is [billing-staging-guard.ts](../scripts/billing-staging-guard.ts). It is
 included alongside each AI handler's entrypoint and imported before that handler.
@@ -44,8 +46,9 @@ inside the function runtime, and permits fetch only to the staging Supabase HTTP
 origin with redirects rejected. It is deliberately not imported by billing
 functions, which must eventually contact the Stripe sandbox.
 
-Existing AI handler source was otherwise preserved. Deploying the branch's updated
-AI handlers remains part of full application parity, retaining this guard. Do not
+The four AI handlers now match branch commit `acccfed` plus this guard. Every file
+in their dependency bundles was retrieved and compared after deployment (34, 34,
+33 and 17 files respectively). Foundation enforcement remains disabled. Do not
 run the existing paid staging workflow during this billing validation: it could
 replace guarded handlers, reactivate workers and make real provider calls.
 
@@ -68,10 +71,20 @@ periods remain empty; no real or synthetic user access has been granted yet.
 
 Vault storage does not automatically populate Edge Function environment variables.
 The connected Supabase tools do not expose the runtime secret-setting operation,
-and no Management API credential is available in this workspace. Stripe's connector
-does not issue a restricted server API key. Runtime activation is therefore pending.
+and no Management API credential is available in this workspace. A configuration-only
+[workflow](../.github/workflows/billing-staging-setup.yml) uses the existing
+`criteria-backend` deployment credential to transfer only the two named Vault
+secrets and the fixed sandbox settings directly to staging. It cannot deploy,
+migrate, activate billing or contact an AI provider. It rejects other projects,
+live Stripe keys, existing subscribers and running workers. Its simulated-request
+tests pass; hosted execution is pending at this source checkpoint.
 
-Complete both migrations first. Then configure the variables listed in
+Stripe's connector does not issue a restricted server API key. The workflow can
+install a sandbox key from the optional `STRIPE_BILLING_SANDBOX_KEY` environment
+secret; otherwise it preserves any existing runtime key and reports only whether
+one is present. It never logs credential values. Runtime activation remains pending.
+
+Complete the final migration before activation. Configure the variables listed in
 [the sandbox runbook](subscription-stripe-sandbox.md#hosted-staging-setup) through
 Supabase's secure secret store. Prefer a staging-only `rk_test_` key, granting only
 the customer/Checkout/portal writes and customer/price/subscription/invoice/portal
@@ -90,12 +103,15 @@ enabling the webhook or cron. Do not paste keys into chat, repository files or l
   restored the billing handler, observed HTTP 200 with `enabled:false`. Webhook,
   scheduler, ledger and AI lock were preserved. This was a handler rollback drill,
   not a paid-subscription recovery or database restore rehearsal.
-- 19 network-denied Deno tests passed: 17 billing tests and two staging guard tests.
+- 44 network-denied Deno tests passed across billing, the staging guard, tier
+  routing, workers, screening, feedback, offline and security boundaries.
   Restricted sandbox keys are accepted; live restricted keys are rejected before
   network access. Checkout uses a fixed integration identifier across retries.
-- Security advisors: all seven applied subscription tables have RLS; zero exposed
-  subscription definer functions are executable by browser roles. Two new
-  no-policy notices are expected for service-only output/reservation tables.
+- Four configuration tests cover project/key isolation, secret transfer and
+  redaction, and refusal to mutate active subscription/worker state.
+- Security advisors: all eight applied subscription tables have RLS; zero exposed
+  subscription definer functions are executable by browser roles. Three new
+  no-policy notices are expected for service-only output/reservation/audit tables.
 - Existing project advisories remain: 73 authenticated definer notices and leaked
   password protection warning. They predate these changes; the whole project has
   not been declared security-clean. [Definer guidance](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
@@ -106,9 +122,9 @@ enabling the webhook or cron. Do not paste keys into chat, repository files or l
 
 ## Still required before production consideration
 
-1. Resolve the migration connector handoff and apply the two pending migrations.
-2. Set runtime secrets and the exact staging frontend return URL; verify the
-   deployed stable API contract and guarded branch-handler parity.
+1. Resolve the migration connector handoff and apply the final billing migration.
+2. Verify the configuration-only workflow, supply a restricted sandbox key if
+   absent, and verify the deployed stable API contract before activation.
 3. Enable the sandbox webhook and worker, then use disposable verified users for
    real hosted Checkout → test payment → webhook → correct plan/allowances.
 4. Verify all tiers, renewals, failed payments/recovery, period-end cancellation,
