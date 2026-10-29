@@ -4,7 +4,7 @@ function sql(query) {
  return new Promise((resolve,reject)=>{
   const p=spawn('psql',['-h','localhost','-U','postgres','-d','assessment_capacity','-v','ON_ERROR_STOP=1','-At','-c',query],{env:process.env});
   let out='',err='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>err+=b);
-  p.on('error',reject);p.on('exit',code=>code?reject(Error(err)):resolve(out.trim()));
+  p.on('error',reject);p.on('close',code=>code?reject(Error(err)):resolve(out.trim()));
  });
 }
 const reset=()=>sql("truncate direct_ai_requests;update resume_intake_tasks set status='queued',attempts=0,lease_id=null,lease_until=null;update job_reassessment_tasks set status='queued',attempts=0,lease_id=null,lease_until=null;");

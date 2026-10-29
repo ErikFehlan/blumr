@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
 function sql(query){return new Promise((resolve,reject)=>{
  const p=spawn('psql',['-h','localhost','-U','postgres','-d','durable_worker_recovery','-v','ON_ERROR_STOP=1','-At','-c',query],{env:process.env});
- let out='',err='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>err+=b);p.on('error',reject);p.on('exit',code=>code?reject(Error(err)):resolve(out.trim()));
+ let out='',err='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>err+=b);p.on('error',reject);p.on('close',code=>code?reject(Error(err)):resolve(out.trim()));
 });}
 const reset=()=>sql("truncate assessment_worker_attempts,direct_ai_requests;update resume_intake_tasks set status='queued',attempts=0,lease_id=null,lease_until=null,next_run_at=now();update job_reassessment_tasks set status='queued',attempts=0,lease_id=null,lease_until=null,next_run_at=now();");
 function claim(i,n){return sql(i%3===2?`select claim_direct_ai_request(w,a,repeat(md5('${i}'),2),gen_random_uuid())->>'state' from capacity_fixtures where n=${n};`:`select jsonb_array_length(claim_assessment_work('${i%3===0?'intake':'reassessment'}',(select j from capacity_fixtures where n=${n})));`);}
