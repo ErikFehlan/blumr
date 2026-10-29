@@ -188,7 +188,9 @@ jobs:
 
   closed-site:
     needs: closed-billing
-    if: github.ref == 'refs/heads/main' && vars.PAID_AI_RELEASE_ENABLED != 'true'
+    if: >-
+      always() && !cancelled() && github.ref == 'refs/heads/main' &&
+      vars.PAID_AI_RELEASE_ENABLED != 'true' && needs.closed-billing.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
