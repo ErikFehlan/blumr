@@ -1,10 +1,12 @@
-name: Prepare disabled billing staging configuration
+name: Prepare disabled billing staging
 on:
   pull_request:
     branches: [main]
     paths:
       - 'scripts/billing-staging-setup.mjs'
       - 'tests/billing-staging-setup.test.mjs'
+      - 'scripts/billing-staging-migration.mjs'
+      - 'tests/billing-staging-migration.test.mjs'
       - '.github/workflows/billing-staging-setup.yml'
   workflow_dispatch:
 permissions:
@@ -32,10 +34,15 @@ jobs:
         with:
           node-version: 22
       - name: Verify staging boundaries with simulated management requests
-        run: node --test tests/billing-staging-setup.test.mjs
+        run: node --test tests/billing-staging-setup.test.mjs tests/billing-staging-migration.test.mjs
       - name: Transfer existing staging credentials and keep billing disabled
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
           STRIPE_BILLING_SANDBOX_KEY: ${{ secrets.STRIPE_BILLING_SANDBOX_KEY }}
         run: node scripts/billing-staging-setup.mjs
+      - name: Apply and verify the reviewed final staging billing migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
+        run: node scripts/billing-staging-migration.mjs
