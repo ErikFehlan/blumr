@@ -149,8 +149,9 @@ export async function validateBillingStaging({mode, env = process.env, fetchImpl
       await sql("select cron.alter_job(jobid,active:=false) from cron.job where jobname='blumr-billing-reconcile'");
       await runtime(false);
     } else {
+      // Reconciliation updates the optimistic admin revision even when paid state is unchanged.
       const snapshot = async () => (await sql(`select jsonb_build_object(
-        'accounts',(select jsonb_agg(to_jsonb(a) order by a.id) from public.subscription_accounts a),
+        'accounts',(select jsonb_agg(to_jsonb(a)-'admin_revision' order by a.id) from public.subscription_accounts a),
         'periods',(select jsonb_agg(to_jsonb(p) order by p.id) from public.subscription_periods p),
         'evaluations',(select jsonb_agg(to_jsonb(e) order by e.id) from public.subscription_evaluations e)
       ) as state`))[0].state;
