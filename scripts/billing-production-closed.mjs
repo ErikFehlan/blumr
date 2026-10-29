@@ -47,7 +47,8 @@ export async function configureClosedProduction({env=process.env,fetchImpl=fetch
  const metadata=await api('/secrets');
  for(const [name,value] of Object.entries(closedConfiguration)){
   const expected=createHash('sha256').update(value).digest('hex');
-  if(metadata.filter(s=>s.name===name&&s.digest===expected).length!==1)throw Error('Production closed configuration digest did not match: '+name);
+  // GET /secrets returns the SHA-256 digest in its `value` field.
+  if(metadata.filter(s=>s.name===name&&s.value===expected).length!==1)throw Error('Production closed configuration digest did not match: '+name);
  }
  const after=await checkpoint();
  if(JSON.stringify(after)!==JSON.stringify(before))throw Error('Production state changed during configuration; release stopped.');

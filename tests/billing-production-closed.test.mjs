@@ -17,7 +17,7 @@ function fixture({paused=true,accounts=0,wrongDigest=false,usageDrift=false}={})
   if(url.endsWith('/secrets')&&options.method==='POST'){
    writes++;assert.deepEqual(Object.fromEntries(body.map(s=>[s.name,s.value])),closedConfiguration);return new Response(null,{status:201});
   }
-  if(url.endsWith('/secrets'))return Response.json(Object.entries(closedConfiguration).map(([name,value])=>({name,digest:wrongDigest?'invalid':createHash('sha256').update(value).digest('hex')})));
+  if(url.endsWith('/secrets'))return Response.json(Object.entries(closedConfiguration).map(([name,value])=>({name,value:wrongDigest?'invalid':createHash('sha256').update(value).digest('hex')})));
   throw Error('Unexpected request');
  }};
 }
