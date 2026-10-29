@@ -1,4 +1,4 @@
-# Billing staging checkpoint — October 28, 2026
+# Billing staging checkpoint — October 29, 2026
 
 Staging validation has started but has **not passed the release gate**. Production
 has not changed. All work below targets Supabase project `momfzjmycveqginxmqib`
@@ -26,6 +26,19 @@ read-only checks afterward confirmed no billing schema/history was installed.
 Supabase's app permission is already **Allow all actions**. Further repeated calls
 were stopped. This is an unresolved connector handoff, not an SQL validation
 success or a request for broader authority.
+
+On October 29 the connector again returned the same expired-request error. A
+staging-only deployment runner was prepared to use Supabase's documented
+`POST /v1/projects/{ref}/database/migrations` endpoint with the existing
+`criteria-backend` credential. It pins the reviewed SQL checksum, verifies all
+four prerequisites, requires zero subscribers and paused workers, uses a stable
+idempotency key, and verifies RLS/access boundaries and migration history afterward.
+Its five simulated tests passed. The [hosted run](https://github.com/ErikFehlan/blumr/actions/runs/40873532035)
+was denied with HTTP 403; a fresh database read confirmed that neither billing
+table nor the migration record exists. No alternate SQL write was attempted after
+that denial. Migration execution is now an explicit workflow-dispatch option,
+disabled by default, so PR updates do not repeatedly retry the denied write.
+The default CLI invocation and PR migration step perform read-only preflight checks.
 
 ## Deployed functions and AI lock
 
@@ -79,7 +92,7 @@ periods remain empty; no real or synthetic user access has been granted yet.
 Vault storage does not automatically populate Edge Function environment variables.
 The connected Supabase tools do not expose the runtime secret-setting operation,
 and no Management API credential is available in this workspace. A configuration-only
-[workflow](../.github/workflows/billing-staging-setup.yml) uses the existing
+[configuration step](../scripts/billing-staging-setup.mjs) uses the existing
 `criteria-backend` deployment credential to transfer only the two named Vault
 secrets and the fixed sandbox settings directly to staging. It cannot deploy,
 migrate, activate billing or contact an AI provider. It rejects other projects,
@@ -95,6 +108,10 @@ install a sandbox key from the optional `STRIPE_BILLING_SANDBOX_KEY` environment
 secret; otherwise it preserves any existing runtime key and reports only whether
 one is present. The successful run confirmed **no Stripe server key is installed**.
 It never logs credential values. Runtime activation remains pending.
+
+The October 29 setup run again confirmed that no Stripe key is installed. The
+Stripe connector exposes no API-key creation operation; its dashboard was opened
+for this task and requires authentication. No key has been created or copied.
 
 Complete the final migration before activation. Configure the variables listed in
 [the sandbox runbook](subscription-stripe-sandbox.md#hosted-staging-setup) through
@@ -125,6 +142,8 @@ enabling the webhook or cron. Do not paste keys into chat, repository files or l
   network access. Checkout uses a fixed integration identifier across retries.
 - Four configuration tests cover project/key isolation, secret transfer and
   redaction, and refusal to mutate active subscription/worker state.
+- Five additional migration-runner tests verify project/source isolation,
+  prerequisite checks, idempotency, recovery from a lost response and read-only mode.
 - Security advisors: all eight applied subscription tables have RLS; zero exposed
   subscription definer functions are executable by browser roles. Three new
   no-policy notices are expected for service-only output/reservation/audit tables.
@@ -138,7 +157,8 @@ enabling the webhook or cron. Do not paste keys into chat, repository files or l
 
 ## Still required before production consideration
 
-1. Resolve the migration connector handoff and apply the final billing migration.
+1. Restore a working authorized migration path (connector request-state repair or
+   Management migration access), then apply and verify the final migration.
 2. Supply the missing restricted sandbox key through the secure environment store,
    rerun the configuration-only job, and verify the stable API contract before activation.
 3. Enable the sandbox webhook and worker, then use disposable verified users for

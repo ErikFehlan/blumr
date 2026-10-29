@@ -71,3 +71,12 @@ test('a successful earlier migration is verified without replay after response l
   assert.equal(result.version, '20261028174343');
   assert.ok(f.calls.every(c => !c.url.endsWith('/database/migrations')));
 });
+
+test('read-only preflight never sends a migration or history write', async () => {
+  const f = fixture();
+  const result = await applyBillingStagingMigration({...f, env, checkOnly: true});
+  assert.equal(result.read_only, true);
+  assert.equal(result.migration_record_present, false);
+  assert.equal(f.calls.length, 1);
+  assert.ok(f.calls[0].body.query.startsWith('select '));
+});

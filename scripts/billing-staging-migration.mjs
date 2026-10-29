@@ -25,7 +25,7 @@ const checkpointQuery = `select jsonb_build_object(
 
 // Uses the documented Management migration endpoint with the existing deployment
 // credential. Only this exact reviewed migration and staging project are allowed.
-export async function applyBillingStagingMigration({env = process.env, fetchImpl = fetch, readFileImpl = readFile, report = console.log} = {}) {
+export async function applyBillingStagingMigration({env = process.env, fetchImpl = fetch, readFileImpl = readFile, report = console.log, checkOnly = false} = {}) {
   if (env.SUPABASE_PROJECT_REF !== project || !env.SUPABASE_ACCESS_TOKEN?.trim()) throw new Error('The owned staging project and existing deployment credential are required.');
   const sql = await readFileImpl(new URL(`../supabase/migrations/${version}_${name}.sql`, import.meta.url), 'utf8');
   if (createHash('md5').update(sql).digest('hex') !== expectedHash) throw new Error('The reviewed billing migration checksum changed; deployment stopped.');
@@ -38,7 +38,7 @@ export async function applyBillingStagingMigration({env = process.env, fetchImpl
         body: JSON.stringify(body),
       });
     } catch { throw new Error('Staging migration request did not complete. Inspect migration history before retrying; no credential or response was logged.'); }
-    if (!response.ok) throw new Error('Staging migration operation failed (HTTP ' + response.status + '); no credential or response was logged.');
+    if (!response.ok) throw new Error('Staging migration ' + path + ' failed (HTTP ' + response.status + '); no credential or response was logged.');
     if (path === '/database/migrations') return;
     try { return await response.json(); } catch { throw new Error('Staging migration verification returned an invalid response.'); }
   }
@@ -55,8 +55,13 @@ export async function applyBillingStagingMigration({env = process.env, fetchImpl
   }
   const before = await checkpoint();
   const existing = validateState(before);
+  if (!existing && (before.customers || before.events)) throw new Error('Billing tables exist without matching migration history; deployment stopped for inspection.');
+  if (checkOnly) {
+    const result = {project, read_only: true, prerequisites_verified: true, migration_record_present: Boolean(existing), workers_paused: true, provider_usage: before.provider_usage};
+    report(JSON.stringify(result));
+    return result;
+  }
   if (!existing) {
-    if (before.customers || before.events) throw new Error('Billing tables exist without matching migration history; deployment stopped for inspection.');
     await api('/database/migrations', {name, query: sql}, `blumr-staging-${version}-${expectedHash}`);
   }
   let after = await checkpoint();
@@ -77,5 +82,5 @@ export async function applyBillingStagingMigration({env = process.env, fetchImpl
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  applyBillingStagingMigration().catch(error => { console.error(error.message); process.exitCode = 1; });
+  applyBillingStagingMigration({checkOnly: !process.argv.includes('--apply')}).catch(error => { console.error(error.message); process.exitCode = 1; });
 }
