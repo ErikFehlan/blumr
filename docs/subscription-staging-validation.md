@@ -1,5 +1,9 @@
 # Billing staging checkpoint — October 29, 2026
 
+**Historical installation checkpoint.** See [the completed hosted results](subscription-staging-results.md)
+for current state, successful lifecycle evidence and remaining production gates.
+The pending tasks and empty-fixture state below describe the earlier installation.
+
 Staging validation has started but has **not passed the release gate**. Production
 has not changed. All work below targets Supabase project `momfzjmycveqginxmqib`
 (`blumr-staging`) and Stripe sandbox `acct_1UVYzGClb9pZVTfu`.

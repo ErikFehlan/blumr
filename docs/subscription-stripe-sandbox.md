@@ -66,8 +66,9 @@ replace a full application round trip against the pinned stable API version.
 Smoke evidence: customer `cus_VWee8yRTH5TsSh`, canceled subscription
 `sub_1UVbLGClb9pZVTfugvZCBlyo`, paid test invoice
 `in_1UVbLGClb9pZVTfury4fUbzn`. A staging webhook and reconciliation schedule have
-since been registered in an inactive state. Runtime secrets and the complete
-hosted round trip remain pending; see the checkpoint above.
+since been registered. Runtime secrets and core hosted lifecycle tests are now
+complete; see [the results](subscription-staging-results.md) for the final disabled
+state and remaining production gates.
 
 ## Hosted staging setup
 
@@ -86,6 +87,7 @@ code, tracked files, tool output or PR comments:
 | Variable | Value |
 | --- | --- |
 | `STRIPE_BILLING_SANDBOX_ENABLED` | `true` only in the isolated test environment |
+| `STRIPE_CHECKOUT_PAUSED` | `true` rejects new checkout with 503 while preserving status, portal and reconciliation |
 | `SUBSCRIPTION_FOUNDATION_ENABLED` | `true` after staging admission checks; otherwise off |
 | `AI_PROVIDER_CALLS_DISABLED` | `true` throughout billing tests |
 | `STRIPE_SECRET_KEY` | Restricted sandbox key beginning `rk_test_` (preferred), or sandbox `sk_test_`; live keys are rejected |
@@ -144,6 +146,21 @@ deletion. Browser checks cover disabled visibility, mobile, safe navigation and
 session isolation. PostgreSQL 17 CI adds concurrent checkout claims/replays,
 competing workers and reservations alongside paid plan changes. These simulations
 are not an actual Stripe sandbox or hosted Supabase advisor run.
+
+Set `STRIPE_CHECKOUT_PAUSED=true` to pause checkout while leaving billing and
+foundation enabled for existing subscribers. Hosted validation confirmed portal,
+reconciliation and ledger preservation. Flexible portal cancellations may use
+`cancel_at` equal to the item period end while `cancel_at_period_end` is false;
+the adapter recognizes that exact boundary.
+
+PR #147 supports `billing-staging-prepare`, `billing-staging-clockprepare`,
+`billing-staging-inspect`, `billing-staging-verify`, `billing-staging-security`,
+`billing-staging-rollback` and `billing-staging-stop` labels. Remove after each
+run. The runner is pinned to the recorded disposable staging fixtures. Stop
+refuses nonterminal subscriptions; after cancellation/reconciliation it pauses
+billing cron and disables billing/foundation while retaining the AI lock.
+Disable the sandbox webhook after the queue drains. This is not a production
+deployment workflow.
 
 Rollback must stop new checkout and pause subscribed dispatch while retaining
 portal cancellation, reconciliation, pending receipts and ledger history. Do not
