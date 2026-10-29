@@ -294,6 +294,17 @@
       40959255924
     ],
     "source_readback_verified": true,
-    "closed_controls_preserved": true
+    "closed_controls_preserved": true,
+    "merged_release_sha": "14466c9c7c8bfe3bd06d187f3fe3cbdd95d91d4b",
+    "post_merge_validation_runs": [
+      40960666582,
+      40960666613,
+      40960666420,
+      40960666446
+    ],
+    "closed_verification_job": 123754970050,
+    "public_verification_job": 123755056092,
+    "public_assets_verified": 70,
+    "cloudflare_deployment": "dc60c36c-65ea-44e3-829d-2229b8cd4890"
   }
 }

@@ -151,3 +151,12 @@ objects are modified by these corrections. Exact patch source and deployed bundl
 fingerprints are recorded in `subscription-production-deployment.json`.
 Policy drafts and the activation package are review documents, not approved legal
 terms or an activation decision. Live Stripe configuration awaits connection.
+
+
+Post-merge application release `14466c9c7c8bfe3bd06d187f3fe3cbdd95d91d4b` passed all four required workflows.
+Closed verification job `123754970050` in run `40960666446` verified the patched
+bundles, migration checksums, permission isolation, runtime/Vault credential
+matching and closed controls. Public job `123755056092` matched 70 served files
+and passed the browser probe. Cloudflare deployment
+`dc60c36c-65ea-44e3-829d-2229b8cd4890` serves that release. No paid provider call,
+charge, refund, enrollment, beta access change or invitation was made.
