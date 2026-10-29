@@ -17,11 +17,11 @@ on:
         default: false
 permissions:
   contents: read
-concurrency:
-  group: billing-staging-setup
-  cancel-in-progress: false
 jobs:
   configure:
+    concurrency:
+      group: billing-staging-setup
+      cancel-in-progress: false
     if: >-
       github.repository == 'ErikFehlan/blumr' &&
       ((github.event_name == 'pull_request' && github.event.pull_request.number == 147 &&

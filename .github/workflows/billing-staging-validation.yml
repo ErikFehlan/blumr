@@ -5,11 +5,11 @@ on:
     types: [labeled]
 permissions:
   contents: read
-concurrency:
-  group: billing-staging-setup
-  cancel-in-progress: false
 jobs:
   validate:
+    concurrency:
+      group: billing-staging-setup
+      cancel-in-progress: false
     if: >-
       github.repository == 'ErikFehlan/blumr' && github.event.pull_request.number == 147 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
