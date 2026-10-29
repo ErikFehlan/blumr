@@ -12,7 +12,7 @@ const plans = {
   pro: {price: 'price_1UVbJDClb9pZVTfuIimgv6ad', amount: 15000, limits: [1000, 100, 500]},
 };
 const portal = 'bpc_1UVbJJClb9pZVTfuAtCZMMrU';
-const modes = new Set(['prepare', 'inspect', 'verify', 'stop']);
+const modes = new Set(['prepare', 'inspect', 'verify', 'stop', 'clockprepare', 'security', 'rollback']);
 const ensure = (condition, message) => { if (!condition) throw new Error(message); };
 const emailFor = tier => `blumr-billing-${RUN}-${tier}@example.invalid`;
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
@@ -82,13 +82,16 @@ export async function validateBillingStaging({mode, env = process.env, fetchImpl
   ]);
   const users = [];
   try {
-    for (const tier of Object.keys(plans)) {
-      const email = emailFor(tier);
+    const clockExists = (await sql('select id from auth.users where email=$1', [emailFor('lifecycle')])).length === 1;
+    const fixtures = [...Object.keys(plans), ...(clockExists || mode === 'clockprepare' ? ['lifecycle'] : [])];
+    for (const fixture of fixtures) {
+      const tier = fixture === 'lifecycle' ? 'pro' : fixture;
+      const email = emailFor(fixture);
       let rows = await sql('select id,raw_app_meta_data->>\'billing_validation\' as fixture from auth.users where email=$1', [email]);
       ensure(rows.length <= 1 && rows.every(row => row.fixture === RUN && uuid(row.id)), 'Fixture identity conflict; refusing to use an existing user.');
       const password = createHmac('sha256', key).update(`blumr-billing-fixture:${PROJECT}:${email}`).digest('base64url');
       if (!rows.length) {
-        ensure(mode === 'prepare', 'Prepare staging fixtures first.');
+        ensure(mode === 'prepare' || (mode === 'clockprepare' && fixture === 'lifecycle'), 'Prepare staging fixtures first.');
         await sql('insert into public.beta_access(email) values($1) on conflict do nothing', [email]);
         const created = await request('/auth/v1/admin/users', service, {email, password, email_confirm: true, app_metadata: {billing_validation: RUN}, user_metadata: {display_name: 'Disposable billing validation'}}, [200, 201]);
         ensure(uuid(created.id) && created.email === email && created.app_metadata?.billing_validation === RUN, 'Unexpected created fixture identity.');
@@ -96,7 +99,7 @@ export async function validateBillingStaging({mode, env = process.env, fetchImpl
       }
       const session = await request('/auth/v1/token?grant_type=password', anon, {email, password});
       ensure(session.user?.id === rows[0].id && session.user?.email_confirmed_at && session.access_token, 'Fixture session mismatch.');
-      const user = {tier, id: rows[0].id, access: session.access_token};
+      const user = {tier, fixture, id: rows[0].id, access: session.access_token};
       sessions.push(user.access);
       ensure(await request('/rest/v1/rpc/is_app_admin', user.access, {}) === false, 'Fixture unexpectedly has admin access.');
       const memberships = await request(`/rest/v1/workspace_members?select=workspace_id&user_id=eq.${user.id}`, user.access, undefined, 200, 'GET');
@@ -104,7 +107,18 @@ export async function validateBillingStaging({mode, env = process.env, fetchImpl
       user.workspace = memberships[0].workspace_id;
       users.push(user);
     }
-    if (mode === 'prepare') {
+    if (mode === 'clockprepare') {
+      const customer = await stripe('customers/cus_VWzIFSxAUnfCza');
+      ensure(customer.id === 'cus_VWzIFSxAUnfCza' && customer.livemode === false && customer.test_clock === 'clock_1UVvJQClb9pZVTfuZS1cHhtM' && customer.metadata?.billing_validation === RUN && !customer.email, 'Unexpected historical fixture.');
+      const user = users.find(u => u.fixture === 'lifecycle');
+      const rpc = (p_action, p_args) => request('/rest/v1/rpc/subscription_billing_command', service, {p_action, p_args});
+      const lease = await rpc('claim', {user: user.id, purpose: 'portal'});
+      try {
+        ensure(!lease.customer_id || lease.customer_id === customer.id, 'Historical fixture already mapped elsewhere.');
+        await rpc('customer', {user: user.id, lease: lease.lease_id, customer: customer.id});
+      } finally { await rpc('release', {user: user.id, lease: lease.lease_id}); }
+      report(JSON.stringify({case: 'clock_fixture_mapped', user: user.id, customer: customer.id, clock: customer.test_clock}));
+    } else if (mode === 'prepare') {
       // Global database pause backs up the deployed network guard and env lock.
       await sql('update public.security_limits set ai_paused=true where id=true');
       await runtime(true);
@@ -135,6 +149,38 @@ export async function validateBillingStaging({mode, env = process.env, fetchImpl
       await sql("select cron.alter_job(jobid,active:=false) from cron.job where jobname='blumr-billing-reconcile'");
       await runtime(false);
     } else {
+      const snapshot = async () => (await sql(`select jsonb_build_object(
+        'accounts',(select jsonb_agg(to_jsonb(a) order by a.id) from public.subscription_accounts a),
+        'periods',(select jsonb_agg(to_jsonb(p) order by p.id) from public.subscription_periods p),
+        'evaluations',(select jsonb_agg(to_jsonb(e) order by e.id) from public.subscription_evaluations e)
+      ) as state`))[0].state;
+      const initialState = await snapshot();
+      if (mode === 'security') {
+        const [secret] = await sql("select decrypted_secret from vault.decrypted_secrets where name='billing_staging_webhook_secret'");
+        ensure(/^whsec_[A-Za-z0-9]+$/.test(secret?.decrypted_secret), 'Webhook credential missing.');
+        const event = {id: 'evt_blumrValidation20261029', api_version: version, livemode: false, type: 'customer.subscription.updated', data: {object: {customer: 'cus_VWz64PllM8UJOK', status: 'canceled', metadata: {user_id: users[2].id}}}};
+        const deliver = async (value, expected, age = 0, invalid = false) => {
+          const raw = JSON.stringify(value), t = Math.floor(Date.now()/1000) - age;
+          const signature = createHmac('sha256', invalid ? 'invalid-signature-fixture' : secret.decrypted_secret).update(t + '.' + raw).digest('hex');
+          return send(base + '/functions/v1/stripe-webhook', {method: 'POST', headers: {'Content-Type': 'application/json', 'stripe-signature': `t=${t},v1=${signature}`}, body: raw}, 'Hosted webhook security case', expected);
+        };
+        await deliver(event, 400, 301);
+        await deliver(event, 400, 0, true);
+        await deliver({...event, livemode: true}, 400);
+        await deliver({...event, account: 'acct_foreign'}, 400);
+        await deliver({...event, api_version: '2020-01-01'}, 400);
+        await deliver(event, 200);
+        await deliver(event, 200);
+        await deliver({...event, type: 'customer.subscription.deleted'}, 409);
+        const [receipt] = await sql('select count(*)::int as count from blumr_billing_private.events where id=$1', [event.id]);
+        ensure(receipt.count === 1, 'Duplicate event created another receipt.');
+        await request('/functions/v1/billing-reconcile', users[0].access, {}, 401);
+        report(JSON.stringify({case: 'webhook_security', invalid_signature_rejected: true, stale_rejected: true, wrong_mode_version_account_rejected: true, duplicate_receipts: 1, conflicting_payload_rejected: true, public_worker_denied: true}));
+      }
+      if (mode === 'rollback') {
+        await management('/secrets', 'POST', [{name: 'STRIPE_CHECKOUT_PAUSED', value: 'true'}]);
+      }
+      try {
       const [worker] = await sql("select decrypted_secret from vault.decrypted_secrets where name='billing_staging_reconcile_secret'");
       ensure(/^[a-f0-9]{64}$/.test(worker?.decrypted_secret), 'Worker credential missing.');
       // Only schedule our fixture mappings sooner; do not modify paid evidence.
@@ -145,6 +191,10 @@ export async function validateBillingStaging({mode, env = process.env, fetchImpl
         const other = users.find(u => u.id !== user.id);
         ensure((await request(`/rest/v1/subscription_accounts?select=id&user_id=eq.${other.id}`, user.access, undefined, 200, 'GET')).length === 0, 'Cross-user subscription data was exposed.');
         await request('/rest/v1/rpc/subscription_billing_command', user.access, {p_action: 'status', p_args: {user: user.id}}, [401, 403, 404]);
+        if (mode === 'rollback') {
+          await billing(user.access, {action: 'checkout', tier: user.tier}, 503);
+          ensure(new URL((await billing(user.access, {action: 'portal'})).url).origin === 'https://billing.stripe.com', 'Rollback stranded billing management.');
+        }
         if (mode === 'verify') {
           ensure(rows.length === 1 && rows[0].source === 'stripe' && rows[0].status === 'active' && rows[0].plan_code === `${user.tier}-v1`, 'Expected paid fixture plan is not active.');
           const periods = await request(`/rest/v1/subscription_periods?select=rules_limit,shortlist_ai_limit,deep_ai_limit&id=eq.${rows[0].current_period_id}`, user.access, undefined, 200, 'GET');
@@ -153,7 +203,14 @@ export async function validateBillingStaging({mode, env = process.env, fetchImpl
           ensure(new URL(portalSession.url).origin === 'https://billing.stripe.com', 'Unexpected portal destination.');
           await billing(user.access, {action: 'checkout', tier: user.tier}, 409);
         }
-        report(JSON.stringify({case: 'fixture_state', tier: user.tier, accounts: rows.map(({plan_code, status, source, current_period_id}) => ({plan_code, status, source, current_period_id})), cross_user_isolated: true}));
+        report(JSON.stringify({case: 'fixture_state', fixture: user.fixture, tier: user.tier, accounts: rows.map(({plan_code, status, source, current_period_id}) => ({plan_code, status, source, current_period_id})), cross_user_isolated: true}));
+      }
+      if (mode === 'security' || mode === 'rollback') {
+        ensure(JSON.stringify(await snapshot()) === JSON.stringify(initialState), 'Canonical reconciliation changed ledger during replay or rollback.');
+        report(JSON.stringify({case: mode, ledger_preserved: true, canonical_state_preserved: true}));
+      }
+      } finally {
+        if (mode === 'rollback') await management('/secrets', 'POST', [{name: 'STRIPE_CHECKOUT_PAUSED', value: 'false'}]);
       }
     }
     const after = await checkpoint();

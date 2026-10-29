@@ -125,6 +125,8 @@ export async function handleBilling(request:Request,io:IO=runtime){
   if(!auth.ok)return json({error:'Sign in again to manage billing'},401);
   const user=await auth.json();if(typeof user.id!=='string'||!user.email_confirmed_at)return json({error:'Verify your account first'},403);
   if(body.action==='status')return json({enabled:true,...await client.rpc('status',{user:user.id})});
+  // Pause acquisition without stranding existing subscribers or reconciliation.
+  if(body.action==='checkout'&&io.env('STRIPE_CHECKOUT_PAUSED')==='true')return json({error:'New subscriptions are temporarily paused. Existing billing remains available.'},503);
   row=await client.rpc('claim',{user:user.id,purpose:body.action});
   return json(body.action==='checkout'?await checkout(row!,body.tier,client,cfg,io):await portal(row!,client,cfg));
  }catch(e){return json({error:e instanceof BillingError?e.message:'Billing is temporarily unavailable. Try again shortly.'},e instanceof BillingError?e.status:503);}

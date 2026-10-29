@@ -14,7 +14,7 @@ jobs:
       github.repository == 'ErikFehlan/blumr' && github.event.pull_request.number == 147 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.head_ref == 'feat/subscription-foundation' &&
-      contains(fromJSON('["billing-staging-prepare","billing-staging-inspect","billing-staging-verify","billing-staging-stop"]'), github.event.label.name)
+      contains(fromJSON('["billing-staging-prepare","billing-staging-inspect","billing-staging-verify","billing-staging-stop","billing-staging-clockprepare","billing-staging-security","billing-staging-rollback"]'), github.event.label.name)
     environment: criteria-backend
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -40,5 +40,8 @@ jobs:
             billing-staging-inspect) node scripts/billing-staging-validation.mjs inspect ;;
             billing-staging-verify) node scripts/billing-staging-validation.mjs verify ;;
             billing-staging-stop) node scripts/billing-staging-validation.mjs stop ;;
+            billing-staging-clockprepare) node scripts/billing-staging-validation.mjs clockprepare ;;
+            billing-staging-security) node scripts/billing-staging-validation.mjs security ;;
+            billing-staging-rollback) node scripts/billing-staging-validation.mjs rollback ;;
             *) exit 1 ;;
           esac

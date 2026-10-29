@@ -2,7 +2,7 @@ name: Prepare disabled billing staging
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, labeled]
+    types: [labeled]
     paths:
       - 'scripts/billing-staging-setup.mjs'
       - 'tests/billing-staging-setup.test.mjs'
@@ -27,7 +27,7 @@ jobs:
       ((github.event_name == 'pull_request' && github.event.pull_request.number == 147 &&
         github.event.pull_request.head.repo.full_name == github.repository &&
         github.head_ref == 'feat/subscription-foundation' &&
-        (github.event.action != 'labeled' || github.event.label.name == 'apply-billing-staging-migration')) ||
+        contains(fromJSON('["prepare-disabled-billing-staging","apply-billing-staging-migration"]'), github.event.label.name)) ||
        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feat/subscription-foundation'))
     runs-on: ubuntu-latest
     environment: criteria-backend

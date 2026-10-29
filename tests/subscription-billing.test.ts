@@ -56,6 +56,14 @@ Deno.test('billing requires verified Auth; customer, price and return URLs canno
  const f=fixture();for(const extra of [{customer:'cus_other'},{price:'price_other'},{return_url:'https://evil.test'},{user_id:'other'}])assert((await handleBilling(request({action:'checkout',tier:'basic',...extra}),f.io)).status===400);
  assert(f.state.requests.length===0);f.state.auth=false;assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===401);f.state.auth=true;f.state.verified=false;assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===403);assert(f.state.rpc.length===0);
 });
+Deno.test('checkout pause preserves status, portal and canonical reconciliation',async()=>{
+ const f=fixture();f.env.STRIPE_CHECKOUT_PAUSED='true';f.state.row.customer_id='cus_first';f.state.subs=[subscription()];
+ assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);
+ assert(f.state.rpc.length===0&&!f.state.checkoutCreates.length,'Paused acquisition mutated billing');
+ assert((await handleBilling(request({action:'status'}),f.io)).status===200);
+ assert((await handleBilling(request({action:'portal'}),f.io)).status===200);
+ assert((await worker(f)).status===200);assert(f.state.rpc.some((r:any)=>r.action==='apply'));
+});
 Deno.test('checkout owns customer, pins price, and resumes after a lost persistence response',async()=>{
  const f=fixture();f.state.failRPC='checkout_save';assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);f.state.failRPC=null;
  const retry=await handleBilling(request({action:'checkout',tier:'basic'}),f.io);assert(retry.status===200);assert(f.state.checkoutCreates.length===2);assert(f.state.checkoutCreates[0].key===f.state.checkoutCreates[1].key);assert(f.state.customerCreates.length===1);
