@@ -23,7 +23,9 @@ export async function runReadiness(mode,env=process.env){
  const stripe=async(path)=> (await request('https://api.stripe.com/v1/'+path,{headers:{Authorization:`Bearer ${key}`,'Stripe-Version':version}})).data;
  const baseline=async()=> (await sql(`select jsonb_build_object('usage',(select count(*) from public.ai_provider_usage),'ai_paused',(select ai_paused from public.security_limits where id=true),'ai_crons_paused',(select count(*)=2 and bool_and(not active) from cron.job where jobname in ('ancalagon-criteria-worker','ancalagon-job-reassessment')),'foreign_accounts',(select count(*) from public.subscription_accounts a join auth.users u on u.id=a.user_id where coalesce(u.raw_app_meta_data->>'billing_validation','')<>$1)) as value`,[RUN]))[0].value;
  const before=await baseline();assert.deepEqual(before,{usage:8,ai_paused:true,ai_crons_paused:true,foreign_accounts:0});
- const secrets=await management('/secrets');assert(secrets.some(s=>s.name==='AI_PROVIDER_CALLS_DISABLED'&&s.digest===createHash('sha256').update('true').digest('hex')),'AI runtime lock missing');
+ if(mode==='migrate')await management('/secrets','POST',[{name:'AI_PROVIDER_CALLS_DISABLED',value:'true'}]);
+ const matchesSecret=(s,name,value)=>s.name===name&&(!s.digest||s.digest===createHash('sha256').update(value).digest('hex'));
+ const secrets=await management('/secrets');assert(secrets.some(s=>matchesSecret(s,'AI_PROVIDER_CALLS_DISABLED','true')),'AI runtime lock missing');
  const source=await readFile(new URL('../supabase/migrations/'+migration+'.sql',import.meta.url),'utf8'),hash=createHash('md5').update(source).digest('hex');
  const history=await sql('select version,md5(array_to_string(statements,E\'\\n\')) as hash from supabase_migrations.schema_migrations where name=$1',[migration.slice(15)]);
  if(mode==='migrate'){
@@ -87,7 +89,7 @@ export async function runReadiness(mode,env=process.env){
    for(const m of mappings){const list=await stripe('subscriptions?customer='+m.customer_id+'&status=all&limit=100');assert(!list.has_more&&list.data.every(s=>['canceled','incomplete_expired'].includes(s.status)),'Cancel test subscriptions first');}
    const health=await risk('health');assert.equal(health.pending_risk,0);assert.equal(health.pending_receipts,0);
    await sql("select cron.alter_job(jobid,active:=false) from cron.job where jobname='blumr-billing-reconcile'");await enable(false);
-   const settings=await management('/secrets');for(const [name,value] of [['AI_PROVIDER_CALLS_DISABLED','true'],['STRIPE_BILLING_SANDBOX_ENABLED','false'],['SUBSCRIPTION_FOUNDATION_ENABLED','false']])assert(settings.some(s=>s.name===name&&s.digest===createHash('sha256').update(value).digest('hex')));
+   const settings=await management('/secrets');for(const [name,value] of [['AI_PROVIDER_CALLS_DISABLED','true'],['STRIPE_BILLING_SANDBOX_ENABLED','false'],['SUBSCRIPTION_FOUNDATION_ENABLED','false']])assert(settings.some(s=>matchesSecret(s,name,value)));
    assert.equal((await billing(service,'status')).data.enabled,false);console.log(JSON.stringify({case:'shutdown',flags_verified:true}));
   }else if(mode==='restore'){
    throw Error('Restore runner not yet implemented');
