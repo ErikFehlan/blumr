@@ -1,6 +1,6 @@
 import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
-function sql(query){return new Promise((resolve,reject)=>{const p=spawn('psql',['-h','localhost','-U','postgres','-d','subscription_billing','-v','ON_ERROR_STOP=1','-At','-c',query],{env:process.env});let out='',err='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>err+=b);p.on('error',reject);p.on('exit',code=>code?reject(Error(err)):resolve(out.trim().split('\n').at(-1)));});}
+function sql(query){return new Promise((resolve,reject)=>{const p=spawn('psql',['-h','localhost','-U','postgres','-d','subscription_billing','-v','ON_ERROR_STOP=1','-At','-c',query],{env:process.env});let out='',err='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>err+=b);p.on('error',reject);p.on('close',code=>code?reject(Error(err)):resolve(out.trim().split('\n').at(-1)));});}
 const user='00000000-0000-0000-0000-000000000006',workspace='10000000-0000-0000-0000-000000000002';
 await sql(`insert into auth.users(id) values('${user}');insert into workspace_members values('${workspace}','${user}');
 create function test_billing_claim() returns text language plpgsql as $$begin return subscription_billing_command('claim','{"user":"${user}","purpose":"checkout"}')->>'lease_id';exception when sqlstate 'PT409' then return 'conflict';end$$;`);

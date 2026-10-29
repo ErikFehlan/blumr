@@ -44,7 +44,7 @@ jobs:
         run: |
           createdb -h localhost -U postgres subscription_foundation
           psql -h localhost -U postgres -d subscription_foundation -f tests/subscription-foundation.sql
-          node tests/subscription-concurrency.mjs
+          for attempt in {1..10}; do node tests/subscription-concurrency.mjs; done
           createdb -h localhost -U postgres subscription_screening
           psql -h localhost -U postgres -d subscription_screening -f tests/subscription-screening.sql
           node tests/subscription-screening-concurrency.mjs
