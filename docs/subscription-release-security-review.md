@@ -160,3 +160,27 @@ matching and closed controls. Public job `123755056092` matched 70 served files
 and passed the browser probe. Cloudflare deployment
 `dc60c36c-65ea-44e3-829d-2229b8cd4890` serves that release. No paid provider call,
 charge, refund, enrollment, beta access change or invitation was made.
+
+## Live configuration continuation — October 29
+
+PR #152 adds an acquisition-only tax-readiness gate and live exclusive-price
+validation. Missing/malformed approval blocks before customer/checkout mutations.
+Live Checkout supplies automatic tax and customer billing address collection/save;
+no tax registration or actual charge was created. All 30 offline billing tests and
+four required code workflows passed at `3972de1d605707f6ccfedd7e57d1438cd0086674`.
+The three billing function bundles were deployed and all dependency content was
+read back against reviewed source with existing JWT flags retained.
+
+Fresh production health remained all zero, subscriptions zero, provider ledger
+173, database AI pause true and all three workers inactive. The live account and
+three prices/portal are verified. Advanced/Pro products remain archived. Runtime
+account/price/portal identifiers and explicit false AI-sales/tax-readiness flags
+were installed without changing the existing reconciliation secret.
+
+The prepared production key has Accounts/Charges/Invoices/Prices/Subscriptions
+read and Customers/Checkout/Portal write only. It awaits action-time creation
+confirmation and actual-credential verification; this is not a claim that the key
+is installed. Webhook creation remains deferred because available create flows
+do not expose an initial disabled state. No key/signing secret is in source, chat
+or logs. Current Supabase organization remains Free; leaked-password protection
+is unresolved, with neither an upgrade nor risk acceptance authorized.

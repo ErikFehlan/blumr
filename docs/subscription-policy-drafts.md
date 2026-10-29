@@ -22,8 +22,8 @@ implement checkout terms acceptance before first acquisition.
 
 ## Seller and service — proposed text
 
-“blumr is operated by [confirmed LLC legal name], based in [confirmed city,
-state/province and country]. Contact [monitored support address] for billing,
+“blumr is operated by BLUMRIO LLC, based in Columbus, Ohio, United States.
+Contact erik@blumr.io for billing,
 cancellation, account access and privacy requests.
 
 blumr helps recruiters organize job requirements and review candidate evidence.
@@ -73,7 +73,7 @@ No arbitration clause, liability cap or jurisdiction has been invented.
 **Selected drafting direction — seven-day initial-payment refund:**
 
 “You may request a refund of your first subscription payment within seven
-calendar days after payment by contacting [support address] from your account
+calendar days after payment by contacting erik@blumr.io from your account
 email. Renewal payments are reviewed individually. Canceling a subscription does
 not itself request a refund. This policy does not limit rights required by
 applicable law. A full refund may end access to new paid evaluations; saved
@@ -86,7 +86,7 @@ the support workflow.
 
 **Unselected alternative — discretionary refunds:**
 
-“Refund requests are reviewed individually by [seller] through [support address],
+“Refund requests are reviewed individually by BLUMRIO LLC through erik@blumr.io,
 subject to rights required by applicable law. Canceling stops future renewals at
 the end of the current paid period; it does not automatically refund a payment.”
 
@@ -109,12 +109,13 @@ the application. If AI features are enabled for your plan and request, relevant
 job and candidate content may be sent to our AI provider to produce the requested
 analysis. Basic's rules evaluations do not use AI model calls.
 
-Contact [privacy/support address] to ask about your information, access or
+Contact erik@blumr.io to ask about your information, access or
 deletion. Customers should upload candidate information only when authorized to
 do so and should provide any notices or permissions their use requires.”
 
 Before publishing, verify and fill in:
-- Controller/seller identity and public business contact.
+- Legal entity and public contact are now grounded as BLUMRIO LLC and
+  erik@blumr.io. Formation/governing-law jurisdiction still needs review.
 - Processor list and purposes: observed infrastructure includes Supabase,
   Cloudflare and Stripe; confirm OpenAI and email-provider processing and contracts.
 - Exactly which resume/job fields leave the service when AI is enabled; no blanket
@@ -127,3 +128,35 @@ Before publishing, verify and fill in:
 References for implementation after approval:
 - https://docs.stripe.com/payments/checkout/custom-components?ui=full-page
 - https://docs.stripe.com/customer-management/configure-portal
+
+## Implementation facts for privacy review
+
+These facts improve the draft; they are not new retention promises or approved
+legal terms. Source inspection on October 29 found:
+
+- Supabase handles Auth, database and resume Storage; Cloudflare serves the app;
+  Stripe hosts payment collection. The onboarding-reminders function uses Resend.
+  Confirm processor contracts, regions and any additional services before publication.
+- `assets/demo-analytics.js` stores a demo session with a 30-minute inactivity
+  interval and local signup attribution expiring after 30 days. It records
+  campaign, visit and video progress events in Supabase, and disables its tracking
+  when Do Not Track or Global Privacy Control is set. Authenticated usage and
+  recruiter-retention analytics also exist. Do not claim the app has no analytics.
+- Account deletion requires the existing authenticated user's password and
+  explicit confirmation, blocks unresolved shared-workspace ownership and
+  retries incomplete Storage/Auth cleanup. This code does not establish a public
+  completion SLA or blanket deletion of financial/legal records. No deletion was
+  invoked during this readiness work.
+- Independent encrypted backup artifacts currently have 90-day retention. A
+  deletion/restore policy must address restricted backup copies and replay of
+  deletion requests after recovery. Do not promise immediate erasure from backups.
+
+Proposed retention direction for owner/legal review: retain active workspace
+records until authorized deletion; restrict encrypted backup copies to recovery
+and expire them on the existing 90-day schedule; retain only legally necessary
+billing/security records for a separately confirmed period. A specific response
+SLA, statutory retention period and international-transfer terms remain unresolved.
+
+Proposed checkout approval control: publish approved versioned terms/privacy pages
+and configure explicit terms acceptance before opening paid checkout. No nonexistent
+policy URL is installed and no binding page is published by this PR.

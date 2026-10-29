@@ -29,13 +29,13 @@ requires explicit participants and is capped at ten.
 
 | Input | Concrete decision needed |
 | --- | --- |
-| Live Stripe account | Connect the business's live account; verify account identity and payment readiness before provisioning live objects. Only the sandbox is connected at this checkpoint. |
+| Live Stripe account | Live Dashboard verified BLUMRIO LLC with charges/payouts enabled and no currently-due requirements. Catalog and portal configured; restricted key awaits creation confirmation and inactive webhook creation remains blocked by the provider flow. |
 | Pilot identities | One future Basic participant selected: the owner's existing verified business account. Canonical Auth UUID resolved privately. Do not enroll yet or convert the beta population automatically. |
 | Release operator | Owner confirmed Erik Fehlan for the first 24 hours using the existing administrator account. Release window and failure-notification delivery still need confirmation. |
-| Seller and support | Confirm legal seller name, operating location and monitored customer-support address. No LLC name or jurisdiction is assumed. |
+| Seller and support | BLUMRIO LLC; Columbus, Ohio, United States verified in the live profile. Owner confirmed erik@blumr.io monitored by Erik, saved in Stripe. Formation jurisdiction still needs confirmation. |
 | Refund policy | Owner selected seven-day initial-payment refund requests, renewals reviewed individually, as the drafting direction. Final wording, exceptions and publication still need approval. No refunds are automated by the app. |
 | Terms and privacy | Approved public URLs and accurate service descriptions, including monthly renewal, cancellation timing, allowance limits and handling of customer documents. No draft wording is treated as published or binding. |
-| Tax | Owner selected tax-exclusive price presentation. Actual registrations, relevant jurisdictions and product tax classification remain unconfirmed. Do not infer that no tax is due from an absent Stripe registration. |
+| Tax | Owner selected tax-exclusive prices and business SaaS classification for all plans; configured live. Owner confirms no actual registrations yet. Ohio registration/taxability and customer jurisdictions need resolution; tax-readiness gate remains false. |
 | Password protection | Decide whether to upgrade Supabase for leaked-password protection or explicitly accept that remaining launch limitation. No paid upgrade has been purchased. |
 
 ## Draft checkout-facing summary for review
@@ -54,9 +54,11 @@ completed legal policy.
 
 ## Configuration after the inputs are resolved
 
-Create the three live prices and restricted runtime key, verify `/v1/account`,
-configure the restricted portal and signed webhook, then install live secrets
-directly in the runtime. Keep the endpoint and reconciliation scheduler inactive
+The three live prices and restricted portal are configured; their IDs and the
+live account ID are installed directly in production. Create/install the prepared
+restricted runtime key after the required confirmation, verify `/v1/account` with
+that key, and complete the signed webhook using an initially-inactive flow or the
+separate activation release. Keep the endpoint and reconciliation scheduler inactive
 until their verification step. If Stripe Tax is required, verify Tax settings,
 registrations, price behavior and checkout tax calculation before activation.
 Recording a registration in Stripe does not register the business with a tax
@@ -82,4 +84,6 @@ verified Auth accounts but are kept out of this public repository. Erik Fehlan i
 The source review found no published terms/privacy/refund pages or public support
 email in the served app. Concrete wording and the selected refund draft are in
 [policy drafts](subscription-policy-drafts.md); those are not approved policies.
-Live Stripe identity and registrations remain unverified pending connection.
+Live Stripe identity is verified. Both the owner and live account confirm no tax
+registrations yet; required registrations remain a launch blocker. See the
+activation package for key/webhook limitations and the deployed tax safeguard.

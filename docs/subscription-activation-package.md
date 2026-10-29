@@ -1,6 +1,6 @@
 # Closed production billing: activation package
 
-Prepared October 29, 2026. Activation is **not authorized** by this package.
+Updated October 29, 2026 (UTC). Activation is **not authorized** by this package.
 The existing beta remains open. No account deletion, new signup requirement,
 automatic conversion, enrollment or invitations are part of this release.
 
@@ -46,7 +46,14 @@ three workers paused and checkout disabled. All four required main workflows
 passed. Public check job `123755056092` matched all 70 served files and passed
 the browser navigation/sign-in probe. Cloudflare canonical deployment
 `dc60c36c-65ea-44e3-829d-2229b8cd4890` serves that application release.
-Later decision/evidence-only documentation commits do not change this deployed code.
+Later decision/evidence-only documentation commits do not change that deployed code.
+The live configuration continuation started from main `100c047faf065f7e013713766358bdc0e2a5b6e8`.
+PR #152 adds fail-closed tax readiness, tax-exclusive price validation and live
+Checkout automatic tax with required customer billing address collection/save.
+All four code workflows passed at `3972de1d605707f6ccfedd7e57d1438cd0086674`.
+The three dependent billing functions were deployed with JWT settings retained;
+all six dependency-file readbacks match that reviewed code. No migration changed.
+See the deployment manifest for bundle hashes and backup/validation evidence.
 
 ## Closed controls to retain
 
@@ -59,10 +66,11 @@ Later decision/evidence-only documentation commits do not change this deployed c
 | `SUBSCRIPTION_FOUNDATION_ENABLED` | `false` |
 | `STRIPE_LIVE_COHORT` | Empty |
 | `AI_PROVIDER_CALLS_DISABLED` | `true` |
-| `STRIPE_AI_PLANS_ENABLED` | Absent or `false`; absence fails closed |
+| `STRIPE_AI_PLANS_ENABLED` | `false`; absence also fails closed |
+| `STRIPE_TAX_REGISTRATIONS_VERIFIED` | `false`; absence also fails closed |
 | Database AI pause | `true` |
 | AI crons / billing cron | Inactive |
-| Stripe webhook delivery | Keep disabled; live provider-side state awaits connection |
+| Stripe webhook delivery | Inactive: no live destination created; exact configuration staged only |
 
 Readiness changes independently gate live AI plan sales. Both explicit AI-sales
 approval and enabled runtime provider calls are required before either AI tier
@@ -74,45 +82,55 @@ existing beta path only after the service confirms unmanaged subscription scope.
 Held, inactive, expired, malformed or unavailable subscription checks cannot
 use that fallback. Existing legacy access/budget checks still apply.
 
-## Live Stripe completion blockers
+## Live Stripe configuration and exact remaining blockers
 
-Only the sandbox account is currently connected. The account-management flow
-returned a connection URL. The owner reported connecting live, but two refreshed
-account-list reads still exposed only the sandbox. The authorization must expose
-the live account to this session before any live operation. No live identity, payment readiness, products, registrations,
-portal or webhook is claimed as inspected or configured.
+Authenticated live Dashboard access now works even though the connected API tool
+still lists only the sandbox. The live business account was independently read:
+legal company **BLUMRIO LLC**, operating in Columbus, Ohio, United States; charges,
+payouts and details submission enabled; currently-due, past-due and pending
+verification requirements empty. Formation state is not established by that
+operating address. Private address, owner verification and financial details are
+not retained here. No account or business verification fields were changed.
 
-The current tool session has no usable local execution environment, no secure
-Dashboard/browser session, and no exposed Supabase runtime-secret write or Stripe
-restricted-key creation operation. API-key search did not reveal a key-creation
-operation. Once live connection is complete, use a supported secure Dashboard or
-credential-install workflow; never ask the owner to paste secrets into chat.
-Do not expose a key through GitHub source, workflow inputs/logs or a public URL.
+Live products, prices, portal configurations and webhook destinations were empty
+before provisioning; no matching object was replaced or duplicated.
 
-After connection:
-1. Verify legal seller and live account identity, charges/payout readiness,
-   outstanding requirements and supported currency. Warn before changing the
-   execution context from sandbox to live.
-2. List live products/prices/portal configurations/webhooks. Reuse exact matching
-   blumr objects; do not guess IDs or repurpose another business's objects.
-3. Verify monthly USD, interval count 1, licensed, per-unit prices:
-   Basic 2900, Advanced 7900, Pro 15000 cents. The owner selected tax-exclusive pricing. Verify matching prices use
-   `tax_behavior=exclusive`; explicit inclusive/exclusive behavior cannot subsequently change.
-4. Create a separate restricted live runtime key with Charges/Refunds read,
-   Invoices read, Prices read, Subscriptions read, Customers write, Checkout
-   Sessions write and Customer Portal write. No refund/dispute write privileges.
-   Verify `GET /v1/account` with that actual key and expected account.
-5. Portal: payment-method updates, invoice history and cancellation at period
-   end enabled; subscription switching disabled. Use approved policy/support URLs.
-6. Webhook URL:
-   `https://zqiqjzxcpznhzjengfff.supabase.co/functions/v1/stripe-webhook`.
-   Pin `2026-09-30.endive`; use the exact events below. Create/reuse it disabled.
-   If the creation API cannot create disabled, use an appropriate disabled-destination
-   flow rather than briefly enabling production delivery.
-7. Transfer the restricted key and webhook signing secret directly to production
-   runtime secrets; install nonsecret account/price/portal IDs there. Preserve all
-   closed flags and existing reconciliation credentials. Verify only digests,
-   modes, account identity and redacted object configuration. No charge/refund.
+| Configuration | Verified result |
+| --- | --- |
+| Basic | Monthly USD 2900 cents; active product; 1000/0/0 allowances |
+| Advanced | Monthly USD 7900 cents; product archived while AI is disabled; 1000/100/0 allowances |
+| Pro | Monthly USD 15000 cents; product archived while AI is disabled; 1000/100/500 allowances |
+| All three prices | Live, recurring monthly interval 1, licensed, per-unit, tax-exclusive |
+| Tax category | All three products and default preset `txcd_10103001`, business-use SaaS; owner selected recruiting SaaS with AI as an included feature |
+| Portal | Payment updates and invoice history enabled; cancel at period end; subscription changes disabled; public login link disabled |
+| Support | Owner confirmed `erik@blumr.io`, monitored by Erik; saved as Stripe public support email |
+| Production runtime | Live account, all three price IDs and portal configuration ID installed directly; AI-sales and tax-readiness flags explicitly false |
+| Credentials | Existing reconciliation Vault/runtime credential preserved; live runtime key not yet created or installed |
+| Webhook | No active endpoint/destination; exact 18-event snapshot configuration prepared with `2026-09-30.endive` |
+
+No customers, subscriptions, charges, refunds, payment links or enrollments were
+created. Product creation alone does not open application checkout. The portal
+has no invented terms/privacy URLs; install approved public URLs after publication.
+
+**Restricted runtime key:** The Dashboard form is ready for
+`blumr-production-billing-runtime` with exactly eight permissions: Accounts read,
+Charges/Refunds read, Invoices read, Prices read, Subscriptions read, Customers
+write, Checkout Sessions write, Customer Portal write. Accounts read explicitly
+covers `GET /v1/account`. No refund/dispute, payout, transfer, permission-management
+or webhook write grants are included. Browser security rules require confirmation
+at creation because this grants new persistent production access. No key value
+has been generated, displayed, committed or logged. After confirmation transfer
+it directly into production `STRIPE_SECRET_KEY`, verify the restricted live prefix,
+account identity and required reads using the actual credential, and record only
+redacted results/digests. Do not use the sandbox credential or a full-access key.
+
+**Webhook creation constraint:** The Dashboard's final create form has the exact
+URL/version/18 events but no disabled/draft creation control. The inspected v1 and
+v2 creation schemas expose no initial disabled parameter. Do not create an enabled
+endpoint and then disable it during this closed scope. Creation/signing-secret
+installation therefore await a supported initially-inactive flow or the separate
+webhook activation release. No signing secret exists to install yet. Required URL:
+`https://zqiqjzxcpznhzjengfff.supabase.co/functions/v1/stripe-webhook`.
 
 Required events, sourced from `_shared/stripe-billing.ts`:
 ```text
@@ -142,37 +160,51 @@ radar.early_fraud_warning.created
 | --- | --- |
 | Pilot | Owner selected the owner's existing verified ordinary business account for a future Basic pilot (one account). Canonical Auth UUID and beta eligibility were resolved privately; no identity is committed here. Enrollment and checkout activation are not approved by this selection. |
 | First 24-hour operator | Owner confirmed Erik Fehlan using the existing administrator identity. Confirm the release window and GitHub failure notifications before activation. |
-| Seller | Actual LLC legal name, formation jurisdiction and operating city/state/country remain unconfirmed. Employer and account display names are not legal-seller evidence. |
-| Support | Confirm a monitored business support/privacy mailbox and who checks it. Existing in-app reports alone are insufficient for billing lockout support. |
+| Seller | Stripe legal entity verified as BLUMRIO LLC, operating in Columbus, Ohio, United States. Formation jurisdiction remains unconfirmed. |
+| Support | Owner confirmed erik@blumr.io, monitored by Erik for billing and privacy; Stripe public contact saved. |
 | Policies | Owner chose the seven-day initial-payment refund approach for the review draft; renewal requests individually reviewed. This is drafting direction, not approved publication/effective terms. Review [policy drafts](subscription-policy-drafts.md), confirm retention, processors and jurisdiction, then approve publication separately. |
-| Tax | Confirm actual registration records/effective dates, business locations, pilot customer service locations and prior sales by jurisdiction. Registration absence in Stripe is not evidence of no obligation. |
-| Price presentation | Owner selected tax-exclusive USD prices with any required tax shown before payment. Live price configuration is still blocked by connection; registrations and calculation are separate unresolved work. |
+| Tax | Owner confirmed no registrations yet, including outside Stripe. Stripe registrations are empty. Obtain the relevant registration/effective date and assess other business/customer locations and prior sales; do not infer no obligation. |
+| Price presentation | Owner selected tax-exclusive USD prices with any required tax shown before payment. All three live prices are explicitly exclusive; registrations and calculation remain unresolved. |
 | Password protection | Propose Supabase Pro plus enabling leaked-password protection. Alternative: explicit time-bounded acceptance of the Free-plan limitation with an owner and review date. No upgrade or risk acceptance is authorized. |
 
 ### Tax findings and integration work
 
-Ohio is a jurisdiction to examine based on the owner's stated location, not a
-confirmed LLC registration or tax conclusion. Current Ohio rules tax business-use
-automatic data processing/electronic information services. blumr's browser-based
-recruiting software plausibly falls in that area; a tax adviser must confirm the
-classification and registrations using the actual business/customer facts.
+Ohio operations are evidenced by the live business profile. Current Ohio rules
+include business-use automatic data processing/electronic information services
+within taxable sales; browser recruiting SaaS plausibly falls within this scope.
+Confirm the legal tax treatment with the actual business facts and a qualified
+adviser. This document does not declare a registration or exemption.
 
-Stripe's exact current product-code candidates:
-- Basic: `txcd_10103001`, Software as a service (SaaS) - business use.
-- Advanced/Pro: review whether the same SaaS category or `txcd_10105002`,
-  Artificial Intelligence as a Service (AIaaS) - Cloud Based - Business Use,
-  best describes the product. Do not assume that the AI tiers have identical tax
-  classification merely because they share the application.
+The owner confirmed **no actual registrations yet** and chose business SaaS for
+all tiers. Stripe's canonical code `txcd_10103001` describes browser-delivered,
+non-customized business software with no download. All products now use that code;
+the old downloadable-software default was corrected. Prices and the default are
+exclusive. These settings do not register the seller or start collecting tax.
 
-Current checkout creation does **not** set `automatic_tax[enabled]`, require a
-billing address or save a newly supplied address back to the existing Stripe
-customer. If the approved tax plan uses Stripe Tax, implement and test that flow
-before acquisition, including a zero-tax result explained by registration and
-location evidence. Adding a Stripe registration alone will not enable this
-integration or register the LLC with an authority. Keep collection closed until
-these facts and the implementation are resolved.
+Recommended next step: determine the appropriate Ohio vendor license using the
+LLC's real operating facts, then apply through OH|Tax eServices or the appropriate
+county auditor. Current Ohio guidance lists a $50 vendor-license fee. The owner
+must supply/attest registration facts and authorize any filing/payment; no EIN,
+bank data, private address or government credentials should be put in chat or the
+repository. Record only jurisdiction, active status and effective date here after
+verification. Review other physical locations, customer service locations and
+prior sales separately; Ohio thresholds for remote sellers do not remove an Ohio
+physical-presence obligation.
+
+PR #152 implements live `automatic_tax[enabled]=true`, required billing address
+collection and `customer_update[address]=auto`, behind the separate exact-true
+`STRIPE_TAX_REGISTRATIONS_VERIFIED` gate. The deployed flag remains false. Missing,
+false, uppercase or malformed acknowledgements fail before billing mutation.
+Inclusive/unspecified live checkout prices are rejected. Sandbox behavior and
+existing portal/reconciliation paths are unchanged. Thirty offline billing tests
+passed, including address/tax parameters, recovery/idempotency and gate failures.
+This is not a live jurisdiction calculation test. Before clearing the flag, verify
+actual registrations, effective dates, category and an address-based calculation;
+explain any zero-tax result. Opening acquisition remains separately approved.
 
 Official sources checked October 29:
+- https://tax.ohio.gov/business/ohio-business-taxes/sales-and-use/registration/
+- https://tax.ohio.gov/business/sales-and-use-tax/sales-and-use-tax
 - https://codes.ohio.gov/ohio-revised-code/section-5739.01
 - https://codes.ohio.gov/ohio-administrative-code/rule-5703-9-46
 - https://tax.ohio.gov/business/sales-and-use-tax/taxability
@@ -188,8 +220,9 @@ protection disabled. Both production and staging are active in that organization
 Official pricing starts Pro at $25/month with $10 monthly compute credit. With
 both projects running on Nano/Micro-equivalent paid compute all month, budget
 approximately $35/month before tax, excess usage or other add-ons
-($25 + roughly $20 compute - $10 credit). This is a planning estimate, not an
-account-specific invoice quote; verify the Dashboard total before purchase.
+($25 + roughly $20 compute - $10 credit). The authenticated Dashboard upgrade review now confirms **$25 charge today**
+and a **$35 monthly invoice estimate** for this organization. This estimate can
+change with usage, tax and add-ons; the Confirm upgrade button was not submitted.
 Nano projects carried into a paid organization are billed at the Micro rate.
 Upgrading alone does not confirm the password setting is enabled.
 
@@ -216,7 +249,9 @@ protection. Do not reset accounts or require re-signup as part of either choice.
    and live billing. Verify an unenrolled beta account keeps its existing path,
    a paid/held account cannot bypass enforcement, outsiders cannot check out,
    and account/mode checks succeed.
-4. Enable signed webhook delivery, then activate reconciliation at five invocations
+4. Create/enable the approved signed webhook destination and install its signing
+   secret directly into production. Verify its account/version/events and a
+   signature/authentication probe without a charge, then activate reconciliation at five invocations
    per minute. Check actual HTTP results as well as cron execution. Run the
    health monitor; confirm zero backlog/error counters before acquisition.
 5. Enable `BILLING_MONITOR_ENABLED=true` and confirm the operator receives Actions

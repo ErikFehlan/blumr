@@ -176,3 +176,15 @@ key/catalog/webhook/portal, named cohort, migration parity, a current independen
 application backup, an operating/notification owner, commercial tax/terms/support
 checks and disposition of the existing security findings. No tax requirement has
 been assumed away. Paid AI remains disabled and has its own activation gate.
+
+## Live tax-readiness patch validation — October 29
+
+PR #152 adds 30 passing offline billing tests at
+`3972de1d605707f6ccfedd7e57d1438cd0086674`: exact-true tax acknowledgement,
+exclusive live prices, automatic tax/customer-address parameters, unchanged
+sandbox behavior, portal availability and idempotent recovery. CI
+[40965384883](https://github.com/ErikFehlan/blumr/actions/runs/40965384883)
+also passed the full subscription/native SQL/concurrency suite. The three other
+required workflows passed (40965384885, 40965384925, 40965384920). This is
+offline regression evidence; no new staging lifecycle, live tax calculation,
+real charge or refund was performed during this patch.
