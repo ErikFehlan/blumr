@@ -111,11 +111,11 @@ Deno.test('enforcement preserves only the explicitly unmanaged beta path and fai
   }
   scope=false;scopeStatus=200;
   for(const code of ['subscription_inactive','subscription_period_inactive','billing_review_required','subscription_actor_required']){
-   decision={allowed:false,code};const before=calls;let failure:unknown;
+   decision={allowed:false,code};const before:number=calls;let failure:unknown;
    try{await subscriptionEntitlement('workspace','verified');}catch(error){failure=error;}
    assert(failure instanceof SubscriptionError&&calls===before,'Held, expired, or unauthorized account used the beta fallback');
   }
-  decision={allowed:false,code:'subscription_required'};entitlementStatus=503;const before=calls;let failure:unknown;
+  decision={allowed:false,code:'subscription_required'};entitlementStatus=503;const before:number=calls;let failure:unknown;
   try{await subscriptionEntitlement('workspace','verified');}catch(error){failure=error;}
   assert(failure instanceof SubscriptionError&&failure.code==='subscription_check_unavailable'&&calls===before,'Entitlement outage granted legacy access');
  }finally{restore();}
