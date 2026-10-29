@@ -6,6 +6,10 @@ It is disabled by default. No migration, function deployment, schedule, Stripe
 product, customer, payment or account grant is created by deploying the frontend.
 All subscription migrations remain outside release scripts.
 
+The guarded live adapter and readiness work are described in
+[production operations](subscription-production-operations.md). This document
+retains the sandbox setup procedure; no live activation has occurred.
+
 ## Contract
 
 - Basic $29, Advanced $79, Pro $150 USD monthly, quantity one, per user across
@@ -21,13 +25,13 @@ All subscription migrations remain outside release scripts.
   after Stripe's idempotency retention window. Only a verified expired session
   can be replaced. Completed sessions wait for verified subscription state.
 - Webhooks verify the raw UTF-8 body, HMAC-SHA256, `v1`, five-minute freshness,
-  optional secret rotation, sandbox mode and pinned API version. Acknowledgment
+  optional secret rotation, configured mode and pinned API version. Acknowledgment
   follows persistence of event ID, customer ID, type and body hash. Full payloads
   and customer metadata are neither stored nor trusted for user identity.
 - The worker retrieves canonical customer, subscription and invoice state;
   duplicate/out-of-order events do not replay old tiers. A paid invoice must match
   the subscription, item, price and full period. Redirects never grant access.
-  Live objects, multiple nonterminal subscriptions, unknown prices and unsupported
+  Objects in the wrong mode, multiple nonterminal subscriptions, unknown prices and unsupported
   billing shapes stop for review. Transient failures retain receipts.
 - Manual-to-paid conversion preserves historical usage. Same-period updates and
   payment recovery preserve reservations and usage. Renewal creates a new period.
@@ -35,7 +39,8 @@ All subscription migrations remain outside release scripts.
 - Portal configuration must enable invoices, payment methods and end-of-period
   cancellation, and disable plan switching. Scheduled cancellation retains paid
   access until period end. Upgrade/proration, downgrade scheduling, add-ons,
-  taxes and refund/dispute policy remain separate work.
+  and taxes remain separate work. Refund/dispute/fraud receipts now create canonical,
+  audited review cases and block access when required; see the production operations guide.
 - Deletion is blocked before Storage/Auth cleanup while billing is leased, a
   checkout is pending or a subscription is nonterminal. Cancel, let the paid
   period end, and reconcile before deletion. Resolve ambiguous checkout first.

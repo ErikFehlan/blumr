@@ -1,138 +1,173 @@
-# Hosted billing results — October 29, 2026
+# Billing readiness results — October 29, 2026
 
-The core hosted billing lifecycle passed in Supabase `momfzjmycveqginxmqib` and
-Stripe sandbox `acct_1UVYzGClb9pZVTfu`, using API version `2026-09-30.endive`.
-This supersedes the pending tasks and runtime state in the earlier installation
-checkpoint. Production remains unchanged; this is not production release approval.
+The billing implementation and staging readiness checks passed in Supabase
+`momfzjmycveqginxmqib` and Stripe sandbox `acct_1UVYzGClb9pZVTfu`, pinned to
+`2026-09-30.endive`. This supersedes earlier installation and lifecycle checkpoints.
+Production was not changed. PR #147 remains a draft; live activation requires the
+inputs and approval in [production operations](subscription-production-operations.md).
 
-Implementation/test head: `d79a2dec7972b237842e47e8a9be4faf3d95f54e`, draft PR #147.
-Production `main`: `32854a0c3b64ffad4ca2846f775384c340c5d8bc`.
+Implementation/test head: `a1eacbbe91435ed19621d686a36d896fd139ea32`.
+Subsequent documentation commits do not change executable artifacts.
 
-## Final state
+## Final staging state
 
-- All four disposable subscriptions canceled in Stripe and the application;
-  all four entitlements deny new evaluations with `subscription_inactive`.
-- Four fixture accounts, six paid periods and 25 receipts retained for review;
-  zero pending receipts, zero worker errors, zero real-user accounts.
-- Billing/foundation flags false; billing cron and sandbox webhook disabled
-  after cancellation reconciliation. No recurring test subscription remains.
-- `AI_PROVIDER_CALLS_DISABLED=true`, database AI pause true, and both AI workers
-  paused. The staging network guard remains deployed. Provider usage stayed at
-  **8 rows**, unchanged; no paid AI calls were made.
-- Existing secret stores retain the authorized restricted sandbox key and
-  staging-only migration token. No credential values appear in source/evidence.
-  Synthetic Auth users use `example.invalid`; creation sent no email and runner
-  sessions were logged out. No real charges or real-user access grants occurred.
+- All eight disposable subscriptions canceled in Stripe and the application.
+  Eight accounts, eleven periods (ten paid and one historical manual), 93 lifecycle
+  receipts (including synthetic replay/load fixtures), four risk receipts, three risk
+  cases and four review audit records are
+  retained. No pending receipts, worker/risk errors, unreviewed cases or active
+  subscriptions remain. No real-user accounts were granted access.
+- Billing/foundation flags false; billing cron and sandbox webhook disabled after
+  cancellation reconciliation. The cron retains its tested five-calls-per-minute
+  command with a Vault lookup, never a literal bearer.
+- `AI_PROVIDER_CALLS_DISABLED=true`, database AI pause true, both AI workers paused.
+  The staging network guard remains deployed. Provider usage stayed at **8 rows**;
+  no paid AI calls were made.
+- Authorized sandbox credentials remain in secret stores. The restricted key has
+  Charges and Refunds read in addition to its original billing permissions; it has
+  no refund/dispute write permission. Actual restricted-key charge and invoice
+  payment reads passed. Synthetic Auth users use `example.invalid`, creation sent
+  no email and runner sessions were logged out. No temporary test admin remains.
 
-## Hosted tests
+## Hosted behavior
 
-| Scenario | Result |
+| Scenario | Verified result |
 | --- | --- |
-| Basic $29 checkout | Insufficient-funds attempt granted no account; successful retry created Basic with limits 1000/0/0 |
-| Advanced $79 checkout | Advanced with limits 1000/100/0 |
-| Pro $150 checkout | Pro with stored limits 1000/100/500; product still advertises rules and deep, not an additional shortlist pool |
-| Retry and ownership | Same checkout session reused; conflicting tier/customer injection rejected; cross-user reads empty; service RPC denied |
-| Allowance caps | Hosted transaction filled 1000 Basic rules, 100 Advanced shortlist and 500 Pro deep reservations; next rejected, failed reservation released capacity, unavailable lanes rejected. Transaction rolled back; no provider calls |
-| Renewal | Historical clock advanced August 28 to September 29; paid September invoice created one new period |
-| Failed renewal | October invoice unpaid; canonical `past_due`; access denied; no third period |
-| Recovery | Portal selected successful test card; same October invoice paid; active Pro restored with one October 28–November 28 period |
-| Period-end cancellation | Basic portal scheduled November 29 cancellation; existing paid access/period retained |
-| Terminal cancellation | Four test subscriptions canceled without final invoice/proration; access denied, six periods retained |
+| Basic $29 checkout | Failed initial payment granted no account; successful retry gave limits 1000/0/0 |
+| Advanced $79 / Pro $150 | Limits 1000/100/0 and 1000/100/500 respectively; Pro UI advertises rules and deep, without an additional shortlist pool |
+| Ownership, retries, caps | Same checkout resumed; tier/customer injection and cross-user access rejected; hosted cap exhaustion and release worked without AI calls |
+| Renewal and failed renewal | One new paid period on renewal; unpaid next invoice paused access without creating a period |
+| Payment recovery | Portal updated the payment method; payment of the same invoice restored access without resetting usage |
+| Checkout expiry/abandonment | Abandonment granted no account or period; expiration allowed a fresh session; repeated request reused the existing session |
+| Revoked authentication | After actual signout, the previously valid JWT could create neither checkout nor portal session (401) |
+| Provider outage | Invalid runtime credential made the worker fail; receipt and ledger were preserved; restoring the credential allowed retry |
+| Manual-to-paid conversion | New paid period retained the previous manual period and usage; the old successful result remained cached without another allowance charge |
+| Period-end cancellation | A historical Stripe clock crossed the scheduled boundary; Stripe and the app became canceled while retaining the paid period |
+| Partial/full refund | Actual $10 partial refund created review without a hold; the remaining $140 refund increased the case revision and held access |
+| Dispute / early fraud warning | Actual Stripe test payment events created canonical hold cases; held access was denied |
+| Operator review | Release restored access, duplicate review was idempotent, and renewed hold persisted with append-only audit; transaction-scoped synthetic admin was removed |
+| Capacity | 50 receipts across eight mapped customers, five parallel workers, 4.327 seconds; no duplicate periods or pending receipts |
+| Scheduler | Five invocations per minute; final cycle at 18:29 UTC returned five HTTP 200 responses, each with zero failures |
+| Receipt priority | New receipts bypass the normal poll timer; active leases and provider-error retry backoff still apply, verified in hosted SQL and native CI |
 
-Historical clock starts remained behind UTC wall time; the future-period guard
-was not weakened. Terminal cancellation used immediate cancellation, not an
-application clock advanced through the scheduled cancellation boundary.
+Historical clocks remained behind UTC wall time; the future-period guard was not
+weakened. Scheduled cancellation used `clock_1UVxKuClb9pZVTfuwxQiIsaG`, August 28
+through September 29, and subscription `sub_1UVxNmClb9pZVTfuXy3UYDju`.
+Fixture marker throughout: `billing_validation=20261029-v1`.
 
-Fixture marker: `billing_validation=20261029-v1`.
+Actual risk events retained for review:
 
-| Fixture | Customer | Canceled subscription |
-| --- | --- | --- |
-| Basic | `cus_VWz64PllM8UJOK` | `sub_1UVvGFClb9pZVTfug4KEVDg9` |
-| Advanced | `cus_VWz66BRcOE4riC` | `sub_1UVvHXClb9pZVTfusYmrdHSj` |
-| Pro | `cus_VWz6SGjriPGlEf` | `sub_1UVvJ1Clb9pZVTfu1Bh6qLa1` |
-| Lifecycle Pro | `cus_VWzIFSxAUnfCza` | `sub_1UVvM7Clb9pZVTfuzu5UTDKV` |
+- Refund: `evt_3UVvZJClb9pZVTfu1QC7mjhH` (partial),
+  `evt_3UVvZJClb9pZVTfu19TtY3j5` (full), charge `ch_3UVvZJClb9pZVTfu1mjE8b5s`.
+- Dispute: `evt_1UVxNdClb9pZVTfu8hK899Tp`, dispute `du_1UVxNcClb9pZVTfuyJX7QGYd`.
+- Fraud warning: `evt_1UVxNjClb9pZVTfuBipLZZ5F`, `issfr_1UVxNiClb9pZVTfuzsleCOTP`.
 
-Clock `clock_1UVvJQClb9pZVTfuZS1cHhtM`; lifecycle invoices
-`in_1UVvM7Clb9pZVTfucqozgZvg` (initial),
-`in_1UVvTHClb9pZVTfuWC6OHSWJ` (renewal),
-`in_1UVvZGClb9pZVTfu7x2dItYS` (failed then recovered), all sandbox paid.
+The dispute test found a real `du_` ID prefix that the earlier `dp_` validator
+rejected. The fix accepts canonical IDs; Stripe redelivery returned 200 and the
+worker created the hold. The failed attempts were not acknowledged or lost.
+The scheduled-worker drill also found fresh receipts waiting behind periodic
+polling. Migration `20261029180352_subscription_billing_receipt_priority.sql`
+fixes this without bypassing error backoff. One concurrent verification attempt
+was interrupted and later retried; the final hosted regression and scheduler
+cycle passed. Earlier failed attempts are retained as history, not pass evidence.
 
-## Security and rollback
+## Security and guarded live configuration
 
-Hosted webhook tests rejected invalid/stale signatures, live mode, foreign
-Connect accounts and wrong API versions. Identical signed deliveries yielded one
-receipt; conflicting contents under one event ID returned 409. A signed fixture
-with stale cancellation status and forged user metadata did not change canonical
-ownership/paid state. User tokens cannot invoke the private worker. Canonical
-Stripe reads drove all paid periods; no paid evidence was manually inserted.
+Raw signatures, timestamp freshness, exact API version, mode and Connect account
+checks precede durable enqueue. Duplicate delivery is idempotent; conflicting
+payloads under an event ID fail. Canonical Stripe payment ownership drives access,
+never webhook metadata or browser redirects. Credential-bearing HTTP redirects
+are refused; runtime errors omit provider bodies. The runtime checks the live
+Auth session row as well as the verified user.
 
-Rollback with `STRIPE_CHECKOUT_PAUSED=true` returned 503 for all four checkout
-attempts while portal and reconciliation continued. Paid state and the ledger
-were preserved, excluding the operational admin revision incremented on reconcile.
-The pause was restored afterward. This supplements the earlier maintenance-handler
-deploy/restore drill; no database backup restore was performed.
+Live mode requires the exact production project/origin, a separate restricted
+live key, expected Stripe account identity and explicit activation. Checkout
+requires an explicit cohort of at most ten Auth UUIDs; empty/malformed/oversized
+cohorts fail closed. Removing cohort membership does not remove portal access.
+Offline tests cover successful guarded live checkout, outsider denial, account
+mismatch, mode mismatch and subscriber management. No live network payment or
+production configuration was performed.
 
-Two defects were fixed/deployed with offline regression tests: checkout now pauses
-independently of subscriber management; flexible portal cancellation is recognized
-when `cancel_at` equals the item period end even if `cancel_at_period_end=false`.
-Earlier custom timestamps are not classified as period-end cancellation.
-
-Deployed source checkpoints: `billing-sandbox` version 17 from `f9efd1c`, bundle
-`82a9a17264e557bf70375076932b0fc65bec93d79f2759d2114557d33d2eec97`;
-`billing-reconcile` version 18 from `d79a2de`, bundle
-`d27f35394ad17b0f4f9a3539974c951d1434fce5525b236ff953f3637fe4169b`.
-Secret changes can increment versions without source changes. The unchanged
-webhook handler and previously verified guarded AI handlers remain deployed.
-
-Advisors rerun at 15:56 UTC: all ten subscription/billing tables have RLS; no new
-browser-callable definer warning. Five expected
+Advisors rerun at 18:29 UTC: all 13 billing/allowance tables have RLS, no anonymous
+privileges and no authenticated writes. Eight informational
 [no-policy notices](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
-cover service-only tables. Existing project warnings remain: 73
-[authenticated definer notices](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)
-and [leaked password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
-This slice has only informational performance findings for foreign keys/unused
-indexes, no performance warnings. The whole project is not declared security-clean.
+are intentional service-only tables. Private billing functions use fixed search
+paths and service-only invocation; browser-facing risk writes do not exist.
+There are no new billing authenticated-definer warnings. The existing 73
+[authenticated-definer notices](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)
+and disabled [leaked-password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
+remain project-level release review items. Passing billing checks does not resolve
+or implicitly accept them.
+
+Staging shared source matches the repository. The tested source bundle hashes are:
+
+| Handler | Bundle SHA-256 |
+| --- | --- |
+| billing-sandbox | `a4763a9cca5cabf9b0a0a8a6c6b65cc6d5966aed5b19164c428176ac8dc7ba24` |
+| billing-reconcile | `dbdf36d0183a82c615bb40d4a752a8e21e1bb5779ae58475081f80a8a71043d4` |
+| stripe-webhook | `6f129298a5966cbd0925292e5c2017da10c2189a736532f04e4f449df74af22f` |
+
+Secret changes can increment function versions without changing source. All seven
+subscription migrations are installed in staging, with readiness/priority source
+checksums verified by the runner.
+
+## Rollback, recovery and monitoring
+
+The checkout-pause rehearsal returned 503 for acquisition while portal,
+reconciliation, subscriber enforcement and history continued. A previous
+maintenance-handler deployment/restore rehearsal also passed. Rollback never
+requires dropping the ledger or clearing usage.
+
+The encrypted billing recovery drill restores all 13 tables into disposable
+PostgreSQL 17 with Docker networking disabled. It compares exact rows, constraints,
+indexes, RLS policies, grants, function bodies/settings, triggers and sequence
+state/privileges, verifies encryption/decryption and confirms the source did not
+change. Comparison uses a fixed collation so differently configured databases cannot
+reorder rows during verification; failure output withholds private row contents.
+Only encrypted data, the key envelope and aggregate verification are
+retained; plaintext and the isolated database are removed. External Auth/workspace/
+candidate dependencies are inert ID-only stubs. This is a billing-ledger recovery
+drill, not a claim that Auth credentials or application documents were restored.
+The separate full application backup must still be verified before a live release.
+
+Health monitoring and its scheduled Actions workflow are prepared, disabled until
+release. Thresholds fail closed for five-minute receipt lag, errors, overdue
+customers, unresolved risk and more than ten subscribers. A release operator and
+failure-notification verification are required; scheduled Actions alone are not
+real-time paging. Details are in the production operations guide.
 
 ## Evidence
-
-The hosted runner pins staging/catalog/API version, authenticates marked fixtures,
-rejects redirects, verifies AI locks/usage and logs out sessions. Validation and
-setup jobs serialize through one concurrency group. Ordinary PR pushes cannot
-reset active staging validation.
 
 | Check | Successful Actions run |
 | --- | --- |
 | Three tiers | [40902537510](https://github.com/ErikFehlan/blumr/actions/runs/40902537510) |
 | Webhook security | [40904050392](https://github.com/ErikFehlan/blumr/actions/runs/40904050392) |
 | Checkout rollback | [40904050888](https://github.com/ErikFehlan/blumr/actions/runs/40904050888) |
-| First renewal | [40904372422](https://github.com/ErikFehlan/blumr/actions/runs/40904372422) |
-| Failed renewal | [40905337197](https://github.com/ErikFehlan/blumr/actions/runs/40905337197) |
-| Recovery/all-tier verification | [40906318233](https://github.com/ErikFehlan/blumr/actions/runs/40906318233) |
-| Terminal cancellation | [40906566806](https://github.com/ErikFehlan/blumr/actions/runs/40906566806) |
-| Safe shutdown | [40906691260](https://github.com/ErikFehlan/blumr/actions/runs/40906691260) |
+| Renewal / failed renewal | [40904372422](https://github.com/ErikFehlan/blumr/actions/runs/40904372422) / [40905337197](https://github.com/ErikFehlan/blumr/actions/runs/40905337197) |
+| Recovery and all-tier verification | [40906318233](https://github.com/ErikFehlan/blumr/actions/runs/40906318233) |
+| Expiry, signout and provider outage | [40923779963](https://github.com/ErikFehlan/blumr/actions/runs/40923779963) |
+| Risk review, manual conversion, scheduled expiry | [40926628656](https://github.com/ErikFehlan/blumr/actions/runs/40926628656) |
+| Bounded capacity | [40925232409](https://github.com/ErikFehlan/blumr/actions/runs/40925232409) |
+| Restricted risk permissions | [40926925940](https://github.com/ErikFehlan/blumr/actions/runs/40926925940) |
+| Final encrypted recovery | [40931741798](https://github.com/ErikFehlan/blumr/actions/runs/40931741798) |
+| Final safe shutdown | [40931281614](https://github.com/ErikFehlan/blumr/actions/runs/40931281614) |
 
-All four code CI workflows passed on `d79a2de`: app/browser `40904883229`,
-subscription/PostgreSQL `40904883477`, criteria backend `40904883285`, rules
-`40904883556`. Local billing suite: 19 network-denied Deno tests; runner boundaries:
-3 Node tests. Earlier failed/canceled attempts are superseded by these runs; the
-initial security assertion was corrected to exclude only operational admin revision.
+The final encrypted restore recovered **137 rows across 13 tables in 11 seconds**,
+with exact rows/security/sequence comparison and networking disabled. The
+[encrypted recovery artifact](https://github.com/ErikFehlan/blumr/actions/runs/40931741798/artifacts/12922702955)
+is retained until November 28; renew recovery evidence before relying on it later.
+Aggregate health verification: [40931917244](https://github.com/ErikFehlan/blumr/actions/runs/40931917244).
+Local billing tests: 25 Deno tests with network denied; 15 Node runner/monitor tests.
+Native PostgreSQL CI includes receipt priority, retry backoff, risk holds, audit
+replay, revoked sessions and concurrent allowance reservations. All four code
+workflows must pass at the release commit, including app/browser and backup
+security checks. Production deployment jobs remain gated and skipped on this PR.
 
-## Remaining production release gates
+## Remaining live activation inputs
 
-1. Implement/validate refund, dispute and early fraud warning policy/handling:
-   `charge.refunded`, `charge.dispute.created`, `radar.early_fraud_warning.created`.
-   This adapter rejects live keys and is not a production billing adapter.
-2. Complete the broader runbook's hosted outage/retry, checkout expiry/abandonment,
-   signout-during-request, manual conversion and actual period-end expiry cases.
-   Relevant offline/SQL/browser checks passed; these are not all separately hosted
-   end-to-end tests. A full database restore drill is also separate.
-3. Review existing security advisories and define cohort monitoring/worker capacity.
-   Four synthetic users are not production load testing.
-4. Prepare live configuration and a small rollout for separate approval. Start
-   with checkout closed; verify migration parity and live catalog/webhook identity;
-   name a limited cohort before activation. Pause new checkout for allowance
-   mismatches, worker errors or excessive lag, retaining portal, webhook,
-   reconciliation, enforcement and history for subscribers. Paid AI has its own gate.
-
-No production secrets, live Stripe objects, production schema/runtime or
-production deployment changed during this validation.
+The billing engineering gaps above are implemented and staging-validated. Release
+still requires separate approval and concrete live configuration: restricted live
+key/catalog/webhook/portal, named cohort, migration parity, a current independent
+application backup, an operating/notification owner, commercial tax/terms/support
+checks and disposition of the existing security findings. No tax requirement has
+been assumed away. Paid AI remains disabled and has its own activation gate.

@@ -301,14 +301,14 @@ throughput measurements. Native database/concurrency and the full browser suite
 continue to run in CI. Stripe sandbox integration is the next implementation step;
 hosted staging, advisor checks, release parity and controlled rollout remain open.
 
-## Hosted billing staging checkpoint
+## Hosted billing readiness checkpoint — October 29
 
-Staging has three of five subscription migrations and all three billing handlers.
-AI workers are paused and existing AI handlers have a staging-only network guard.
-A Stripe sandbox webhook and private reconciliation schedule are installed but
-inactive; their secrets are encrypted in Vault. The checkout handler maintenance
-rollback/restore check passed. Remaining migrations are blocked by an expired
-connector approval handoff despite the configured Allow all actions permission;
-runtime secret configuration and full billing lifecycle validation remain pending.
-See [the current checkpoint](subscription-staging-validation.md) for exact versions,
-checks, advisories and activation order. Production has not changed.
+The subscription migrations, billing handlers, sandbox secrets and hosted lifecycle
+validation are complete in staging. Refund/dispute/fraud holds, revoked-session
+checks, remaining hosted edge cases, bounded worker capacity, monitoring, encrypted
+billing recovery and guarded live-mode configuration are implemented and tested.
+See [current results](subscription-staging-results.md) and the
+[limited rollout procedure](subscription-production-operations.md) for evidence,
+current runtime state and the explicit live activation inputs. Earlier checkpoints
+above are historical implementation notes. Production has not changed and paid AI
+remains disabled.
