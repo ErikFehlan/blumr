@@ -12,10 +12,23 @@ export async function subscriptionEntitlement(workspace:string,actor:string|null
   try{
     const response=await fetch(base+'/rest/v1/rpc/subscription_entitlement',{
       method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},
-      body:JSON.stringify({p_workspace:workspace,p_actor:actor}),signal:AbortSignal.timeout(10000)
+      body:JSON.stringify({p_workspace:workspace,p_actor:actor}),redirect:'error',signal:AbortSignal.timeout(10000)
     });
     if(!response.ok)throw new SubscriptionError('subscription_check_unavailable',503);
     const data=await response.json();
+    // Match the database's opt-in rollout: a workspace member without a
+    // subscription keeps the existing beta path. Existing/held/expired paid
+    // accounts must never fall back to that path.
+    if(data?.allowed===false&&data.code==='subscription_required'){
+      const scope=await fetch(base+'/rest/v1/rpc/subscription_scope_managed',{
+        method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},
+        body:JSON.stringify({p_workspace:workspace,p_actor:actor}),redirect:'error',signal:AbortSignal.timeout(10000)
+      });
+      if(!scope.ok)throw new SubscriptionError('subscription_check_unavailable',503);
+      const managed=await scope.json();
+      if(managed===false)return null;
+      if(managed!==true)throw new SubscriptionError('subscription_check_unavailable',503);
+    }
     if(data?.allowed!==true){
       const code=['subscription_required','subscription_inactive','subscription_period_inactive','subscription_actor_required'].includes(data?.code)?data.code:'subscription_check_unavailable';
       throw new SubscriptionError(code,code==='subscription_check_unavailable'?503:403);
