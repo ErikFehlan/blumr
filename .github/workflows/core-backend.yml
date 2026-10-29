@@ -91,6 +91,7 @@ jobs:
     needs: [validate, staging]
     if: >-
       always() && !cancelled() && github.ref == 'refs/heads/main' &&
+      vars.PAID_AI_RELEASE_ENABLED == 'true' &&
       needs.validate.result == 'success' &&
       (needs.staging.result == 'success' || (inputs.staging_verified && needs.staging.result == 'skipped'))
     runs-on: ubuntu-latest

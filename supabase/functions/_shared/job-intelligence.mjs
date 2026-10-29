@@ -26,6 +26,10 @@ export async function buildJobIntelligence({workspaceId,job,priorities,feedbackV
  const manager=approvedManagerSources({feedback,assessments,lessons,job});
  const source={version:jobIntelligenceVersion,engineVersion:screeningVersion,ruleSpecVersion,requirementsVersion,vocabularyVersion,relationships,workflowRelationships,equivalentCapabilities,titleFamilies,credentialFamilies,capabilityWorkflows,workspaceId,jobId:job.id,title:job.title,description:job.description||'',criteria:job.criteria||[],knockouts:job.knockouts||[],managerContext:job.manager_feedback||'',priorities,feedbackVersion,managerSources:manager.sources,asOf:day};
  const key=await fingerprint(source);
+ // Freshness changes for new notes and dates; usage follows compiled requirements.
+ // Approved manager sources and engine policy still invalidate usage, while
+ // candidate-only notes do not charge a new rules pass across the whole pool.
+ const billingKey=await fingerprint({...source,asOf:undefined,feedbackVersion:undefined});
  if(priorities?.source_title!==job.title||priorities?.source_description!==(job.description||''))issues.push({code:'stale_priorities'});
  if(!priorities?.items?.length)issues.push({code:'missing_priorities'});
  if(issues.length)return {version:jobIntelligenceVersion,key,status:'needs_review',issues,weights:[],weightPolicy:'priority_order_with_explicit_manager_emphasis_v1',rubric:null,aiCalls:0};
@@ -47,7 +51,7 @@ export async function buildJobIntelligence({workspaceId,job,priorities,feedbackV
  const rubric=await buildScreeningRubric({workspaceId,jobId:job.id,jobVersion:key,feedbackVersion,asOf:day,
   priorities:canonical,rules:primary.map(r=>({priorityId:r.id,weight:r.weight,condition:r.condition})),
   additionalRequirements:compiled.rules.filter(r=>!primaryIds.has(r.id)),titleTerms:equivalentTitles(job.title)});
- return {version:jobIntelligenceVersion,key,status:'ready',priorityBasis,issues,weights,weightPolicy:'priority_order_with_explicit_manager_emphasis_v1',rubric,aiCalls:0,
+ return {version:jobIntelligenceVersion,key,billingKey,status:'ready',priorityBasis,issues,weights,weightPolicy:'priority_order_with_explicit_manager_emphasis_v1',rubric,aiCalls:0,
   asOf:day,coverage:{priorities:primary.length,additionalRequirements:compiled.rules.length-primary.length,excluded:compiled.excluded,managerAdjustments:compiled.adjustments,managerSources:manager.sources.map(({id,kind,quote})=>({id,kind,quote}))},
   seniority:{title:job.title,explicitRequirements:compiled.rules.filter(r=>/senior|lead|supervis|independent|ownership|manage/i.test(r.title)).map(r=>r.id),note:'Titles are relevance context, not proof of seniority, years, management or qualification.'}};
 }

@@ -43,6 +43,7 @@ jobs:
   release-browser:
     if: >-
       github.ref == 'refs/heads/main' &&
+      vars.PAID_AI_RELEASE_ENABLED == 'true' &&
       (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: ubuntu-latest
     container:

@@ -6,6 +6,8 @@ import {jobPassages,prioritiesSchema,priorityInstructions,validatePriorities} fr
 import {personalizeCriteria} from './code-first.mjs';
 import {analysisModel,modelReasoning} from '../_shared/model-routing.mjs';
 import {fetchWithRetry} from '../_shared/provider-retry.ts';
+import {subscriptionEntitlement,SubscriptionError} from '../_shared/subscriptions.ts';
+import {rulesOnlyPriorities} from './rules-only.mjs';
 
 const response=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 type IntakeEngine='legacy_ai'|'hybrid';
@@ -38,6 +40,7 @@ export async function handleCriteria(request:Request){
   try{
     [task]=await rpc(jobId?'claim_job_criteria_for_job':'claim_job_criteria',jobId?{p_job:jobId}:{});
     if(!task)return response({status:'idle'});
+    const entitlement=await subscriptionEntitlement(task.workspace_id,task.usage_actor_id||null);
 
     const source=prepare(task.input),passages=jobPassages(task.input);
     if(!source.length&&!passages.length){
@@ -50,7 +53,7 @@ export async function handleCriteria(request:Request){
       if(!apiKey)throw Error('ai_unavailable');
       const model=analysisModel('reassessment',name=>Deno.env.get(name));
       const legacy=kind==='legacy';
-      await reserveModelCall(task.workspace_id,null,new TextEncoder().encode(JSON.stringify({job:task.input,criteria:legacy?source:undefined,job_description_sources:passages})).length+(legacy?20000:12000),legacy?8000:4000);
+      await reserveModelCall(task.workspace_id,task.usage_actor_id||null,new TextEncoder().encode(JSON.stringify({job:task.input,criteria:legacy?source:undefined,job_description_sources:passages})).length+(legacy?20000:12000),legacy?8000:4000,{operation:'job_setup'});
       const schema=legacy
         ? {type:'object',additionalProperties:false,required:['criteria','hiring_priorities'],properties:{hiring_priorities:prioritiesSchema(passages),criteria:{type:'array',items:{type:'object',additionalProperties:false,required:['index','label','question'],properties:{index:{type:'integer'},label:{type:'string'},question:{type:'string'}}}}}}
         : {type:'object',additionalProperties:false,required:['hiring_priorities'],properties:{hiring_priorities:prioritiesSchema(passages)}};
@@ -80,11 +83,14 @@ export async function handleCriteria(request:Request){
     if(saved){
       result={...personalizeCriteria(source),hiring_priorities:(task.priority_suggestions?.title===task.input.title&&task.priority_suggestions?.description===(task.input.description||'')?task.priority_suggestions.items:saved.items),engine:'saved_priorities',confidence:null,fallback_reason:null};
       model=task.priority_suggestions?.model||'saved-priorities';
+    }else if(entitlement?.tier==='basic'){
+      const draft=rulesOnlyPriorities(task.input);model=draft.model;
+      result={...personalizeCriteria(source),...draft,confidence:null,fallback_reason:null};
     }else if(intakeEngine==='legacy_ai'){
       const ai=await modelRequest('legacy');model=ai.model;
       result={...validate(ai.parsed,source),hiring_priorities:validatePriorities(ai.parsed.hiring_priorities,passages),engine:'legacy_ai',confidence:null,fallback_reason:'legacy_mode'};
     }else{
-      const ai=await generatePriorities(task.input,{requestId:`criteria-${task.usage_run_id||task.revision}-priorities`,beforeModel:(bytes,tokens)=>reserveModelCall(task.workspace_id,null,bytes,tokens),onUsage:body=>recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null)});
+      const ai=await generatePriorities(task.input,{requestId:`criteria-${task.usage_run_id||task.revision}-priorities`,beforeModel:(bytes,tokens)=>reserveModelCall(task.workspace_id,task.usage_actor_id||null,bytes,tokens,{operation:'job_setup'}),onUsage:body=>recordProviderUsage(task.workspace_id,'criteria_refinement',body,task.usage_actor_id||null)});
       model=ai.model;
       result={...personalizeCriteria(source),hiring_priorities:ai.hiring_priorities,engine:'role_analysis',confidence:null,fallback_reason:null};
     }
@@ -95,7 +101,7 @@ export async function handleCriteria(request:Request){
   }catch(error){
     const allowed=['invalid_priorities','input_too_large','invalid_result','threshold_changed','negation_removed','ai_rate_limit','ai_budget_exhausted','ai_unavailable'];
     const message=error instanceof Error?error.message:'';
-    const code=error instanceof SecurityLimit?'usage_limit':allowed.includes(message)?message:'processing_failed';
+    const code=error instanceof SubscriptionError?error.code:error instanceof SecurityLimit?'usage_limit':allowed.includes(message)?message:'processing_failed';
     if(task)try{await rpc('finish_job_criteria',{p_job:task.job_id,p_revision:task.revision,p_lease:task.lease_id,p_result:null,p_error:code});}catch{/* Lease expiry makes this task eligible for retry. */}
     return response({status:'retry_or_attention',code},502);
   }

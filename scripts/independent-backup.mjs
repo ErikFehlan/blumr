@@ -8,19 +8,22 @@ import {isDeepStrictEqual} from 'node:util';
 import {seal,unseal,digest} from './backup-crypto.mjs';
 import {inventorySQL} from './backup-inventory.mjs';
 import {backupSecuritySQL,backupManagedSchemaSQL} from './backup-security.mjs';
+import {backupFailureCategories,backupFailureHints} from './backup-diagnostics.mjs';
+import {backupPoolerURL} from './backup-connection.mjs';
 const runStarted=Date.now();let capturedAt,recoveryStarted;
 const ref=process.env.SUPABASE_PROJECT_REF,token=process.env.SUPABASE_ACCESS_TOKEN;
 if(ref!=='zqiqjzxcpznhzjengfff'||!token)throw Error('Independent backup requires the configured production project');
 const output=join(process.cwd(),'test-results','independent-backup');
 const work=await mkdtemp(join(tmpdir(),'blumr-private-backup-'));
 const source=join(work,'source'),restore=join(work,'restore');
-async function command(binary,args,{cwd=work,input,timeout=600000,localDiagnostics=false,databaseDiagnostics=false}={}){
+async function command(binary,args,{cwd=work,input,timeout=600000,localDiagnostics=false,databaseDiagnostics=false,remoteDiagnostics=false}={}){
  return new Promise((resolve,reject)=>{
   const child=spawn(binary,args,{cwd,env:process.env,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
-  child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>{if(localDiagnostics||databaseDiagnostics)stderr+=x;});
+  child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>{if(localDiagnostics||databaseDiagnostics||remoteDiagnostics)stderr+=x;});
   const timer=setTimeout(()=>child.kill('SIGKILL'),timeout);
   child.on('error',reject);child.stdin.on('error',error=>{if(error.code!=='EPIPE')reject(error);});
   child.on('close',code=>{clearTimeout(timer);
+   if(code!==0&&remoteDiagnostics)console.error('Read-only dump diagnostic: '+JSON.stringify({categories:backupFailureCategories(stderr+'\n'+stdout),hints:backupFailureHints(stderr+'\n'+stdout),stderr_bytes:stderr.length,stdout_bytes:stdout.length}));
    if(code!==0&&localDiagnostics)console.error(stderr.split('\n').filter(line=>!/password|secret|token|key|postgresql:\/\/|eyJ[A-Za-z0-9_-]+\./i.test(line)).slice(-35).join('\n'));
    if(code!==0&&databaseDiagnostics){const category=['does not exist','already exists','permission denied','duplicate key','foreign key constraint','check constraint','syntax error','cannot change','invalid input','authentication failed','no password supplied','connection refused'].find(x=>stderr.includes(x))||'unclassified';const objects=[...stderr.matchAll(/(?:relation|column|constraint|function|sequence|index|table|role) "([a-z_][a-z0-9_.]*)"/gi)].map(m=>m[1]);console.error('Isolated restore diagnostic: '+JSON.stringify({category,objects}));}
    code===0?resolve(stdout):reject(Error(`${binary} ${args.slice(0,2).join(' ')} operation failed (exit ${code}); private output was withheld`));});
@@ -42,9 +45,17 @@ try{
  console.log('Preparing read-only database dumps.');
  await command('supabase',['init','--workdir',source]);
  await command('supabase',['link','--project-ref',ref,'--workdir',source,'--yes']);
+ // A scoped deployment token may intentionally omit pooler-configuration
+ // access. The reviewed non-secret route can instead come from the Dashboard.
+ const pooler=backupPoolerURL(process.env.BACKUP_POOLER_URL
+  ? [{database_type:'PRIMARY',connection_string:process.env.BACKUP_POOLER_URL}]
+  : await api('/config/database/pooler'),ref);
+ await mkdir(join(source,'supabase','.temp'),{recursive:true,mode:0o700});
+ await writeFile(join(source,'supabase','.temp','pooler-url'),pooler,{mode:0o600});
+ console.log('Verified project-specific primary session pooler; no database password persisted.');
  for(const [file,flags] of [['roles.sql',['--role-only']],['schema.sql',[]],['data.sql',['--data-only','--use-copy','--exclude','storage.buckets_vectors,storage.vector_indexes']]]){
   console.log('Capturing '+file+'.');
-  await command('supabase',['db','dump','--linked','--workdir',source,'-f',join(source,file),...flags]);
+  await command('supabase',['db','dump','--linked','--workdir',source,'-f',join(source,file),...flags],{remoteDiagnostics:true});
  }
  const objects=await api('/database/query',{query:'select bucket_id,name,metadata,updated_at from storage.objects order by bucket_id,name'});
  console.log('Copying stored document bytes.');
@@ -60,7 +71,7 @@ try{
  }
  try{assert.deepEqual(await inventory(),before);assert.deepEqual((await api('/database/query',{query:backupSecuritySQL}))[0].security,securityBefore);}
  catch{throw Object.assign(Error('Source changed during backup; no archive accepted'),{backupRetryable:true});}
- await writeFile(join(source,'manifest.json'),JSON.stringify({version:2,project:ref,created_at:new Date(capturedAt).toISOString(),inventory:before,security:securityBefore,files}),{mode:0o600});
+ await writeFile(join(source,'manifest.json'),JSON.stringify({version:2,row_checksum_collation:'C',project:ref,created_at:new Date(capturedAt).toISOString(),inventory:before,security:securityBefore,files}),{mode:0o600});
  await writeFile(join(source,'restore-prelude.sql'),await readFile('scripts/backup-restore-prelude.sql','utf8'),{mode:0o600});
  // Exclude CLI credentials and local config from the archive.
  const archive=join(work,'backup.tar');await command('tar',['-cf',archive,'roles.sql','restore-prelude.sql','schema.sql','data.sql','managed-schema.sql','manifest.json','objects'],{cwd:source});

@@ -67,6 +67,8 @@
       if(status.textContent!==message)status.textContent=message;
       panel.dataset.state=error||failed.length?'attention':ready.length?'ready':working.length?'working':loaded?'idle':'loading';
       const relevant=tasks.filter(t=>['ready','queued','processing','failed'].includes(t.status));
+      const manual=api.manual?.()===true;panel.hidden=manual&&!relevant.length;
+      const help=api.root.querySelector('#jobAssessmentHelp');if(help)help.textContent=manual?'Previously prepared assessments remain available for review. Basic does not request new AI assessments.':'Saved criteria and approved shared preferences automatically review this job’s candidates. Candidate feedback updates that person’s assessment. Review each AI proposal before applying it.';
       relevant.sort((a,b)=>(a.status==='ready'?0:1)-(b.status==='ready'?0:1));
       const wanted=new Set(relevant.map(t=>t.candidate_id));
       [...wrap.children].forEach(el=>{if(!wanted.has(el.dataset.reviewCard)){

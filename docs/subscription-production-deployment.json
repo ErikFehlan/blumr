@@ -1,0 +1,272 @@
+{
+  "project": "zqiqjzxcpznhzjengfff",
+  "release_sha": "a3c392737c42b91e95f39d7a47f674f0664798a1",
+  "deployment_run": 40951227952,
+  "backup_run": 40945589186,
+  "backup_artifact": 12928364091,
+  "provider_usage": 173,
+  "checkout_enabled": false,
+  "functions": [
+    {
+      "name": "analyze-candidate",
+      "verify_jwt": true,
+      "ezbr_sha256": "032a187f57647ac8ae23961cbaab41edc999b6ef54112326902821c67a730045",
+      "dependency_files": 2
+    },
+    {
+      "name": "analyze-patterns",
+      "verify_jwt": true,
+      "ezbr_sha256": "ce06a5d089af6b79a66fa4ecc85acd7b14aa12ee52dfb33baf95a9410e0a94b3",
+      "dependency_files": 2
+    },
+    {
+      "name": "analyze-patterns-v2",
+      "verify_jwt": true,
+      "ezbr_sha256": "096f15f9518fe711514e7eef4e0a807a76ab01e2d700266df2402995fe0fcaa4",
+      "dependency_files": 33
+    },
+    {
+      "name": "analyze-patterns-beta",
+      "verify_jwt": true,
+      "ezbr_sha256": "aa69703d24001a5cc9c1e905715b41057a6616dff1597394c651a9f724601c59",
+      "dependency_files": 33
+    },
+    {
+      "name": "refine-job-criteria",
+      "verify_jwt": false,
+      "ezbr_sha256": "78d0ccbd773aabb112dea4124465e2955709c6a57c0ac7bc36108cecf855dea5",
+      "dependency_files": 16
+    },
+    {
+      "name": "reassess-job",
+      "verify_jwt": false,
+      "ezbr_sha256": "c49cc8685c4a14c28423fd1b3f84dca8bdac4a6aad49816b7c9c3761ee317a38",
+      "dependency_files": 32
+    },
+    {
+      "name": "billing-sandbox",
+      "verify_jwt": false,
+      "ezbr_sha256": "06cdcb8885213bed00da05800081834fc1af036124607e3d40c6766ac6c37ab5",
+      "dependency_files": 2
+    },
+    {
+      "name": "stripe-webhook",
+      "verify_jwt": false,
+      "ezbr_sha256": "7729c249978d4da53cdfdb743f2829280e9347e7536f1d6c594abe41736f1a65",
+      "dependency_files": 2
+    },
+    {
+      "name": "billing-reconcile",
+      "verify_jwt": false,
+      "ezbr_sha256": "deb8f87aa564874bbf5da5716c601b38aa1dfae24b0194984aa7d28964623785",
+      "dependency_files": 2
+    }
+  ],
+  "source_files_verified": 51,
+  "files": [
+    {
+      "path": "assets/context.js",
+      "sha256": "e2785c3a7fdea6fc613f68bef33461ce23c62318bb351a271e1cc8e79816f6aa"
+    },
+    {
+      "path": "assets/resume-intake.js",
+      "sha256": "98a0c80af9cf81dba774d6e3315d3420d5647e6cf478a66ea01e84d916cc1423"
+    },
+    {
+      "path": "supabase/functions/_shared/assessment-depth.mjs",
+      "sha256": "22ffb9dd8c66a48a6a63bab0fc4bc8cb41a91e373eb61baa43e3f09d89922d2b"
+    },
+    {
+      "path": "supabase/functions/_shared/bulk-screening.ts",
+      "sha256": "1b8f4872a03dc5cdd36c5aac2b2d84ad8af6f00bea6b0475923e18bca3e1f6e5"
+    },
+    {
+      "path": "supabase/functions/_shared/capability-workflows.mjs",
+      "sha256": "47b5a407a5c00c302f43c78cd41f53a068fb63dfaffd5581dcdd92c67f74510d"
+    },
+    {
+      "path": "supabase/functions/_shared/direct-idempotency.ts",
+      "sha256": "3cfdf1d0a7425f3d3a24cc68e2a4221dd654162e49c8b58dae3b94393d17e8a5"
+    },
+    {
+      "path": "supabase/functions/_shared/experience-intelligence.mjs",
+      "sha256": "691d0d10891940e5718a634ff689e5b56b4ff1b9c5d09884d9b173b8fa9e65e9"
+    },
+    {
+      "path": "supabase/functions/_shared/feedback-task.mjs",
+      "sha256": "bdafa35ac8541df7a65fbef645f487311dd9d99370d26f610ac11167fffcb37f"
+    },
+    {
+      "path": "supabase/functions/_shared/job-intelligence.mjs",
+      "sha256": "1df738df3ab792887acf49e9881ecb8827e6ac445a7fb2100b509665dc9fa368"
+    },
+    {
+      "path": "supabase/functions/_shared/legacy-ai-disabled.ts",
+      "sha256": "c6139146512319e733ccfca434704950df6fb1f4a72e6d1e5b0f08804eab8f4e"
+    },
+    {
+      "path": "supabase/functions/_shared/model-routing.mjs",
+      "sha256": "3fb8f2222c1c6cfc3e04d19f6cad72922a2abe856e14940e1ddd937caf21c72c"
+    },
+    {
+      "path": "supabase/functions/_shared/priority-assessment.mjs",
+      "sha256": "38a2cae3ae563c2664c42d907a7ac8841c3582723fa60f1fa823da465313d1fe"
+    },
+    {
+      "path": "supabase/functions/_shared/provider-policy.ts",
+      "sha256": "268975d4a0a7805d68c8ead352e1a79063ab4bca4603a2d1ce29dbe7d5bef129"
+    },
+    {
+      "path": "supabase/functions/_shared/provider-retry.ts",
+      "sha256": "aa1b6a51a2e403e75edbd3d62c55f7a31a42d0b297932384dce0c3cea3d472e8"
+    },
+    {
+      "path": "supabase/functions/_shared/screening-engine.mjs",
+      "sha256": "9056de1c5b4907b671d3ee72b5e49c243fdc37f34c30848deedb29e428babb1a"
+    },
+    {
+      "path": "supabase/functions/_shared/screening-evidence.mjs",
+      "sha256": "6a984417aa9f8dbea6701ed9af1c688ad015b5bd3d4f3a757eaa518feffd23ad"
+    },
+    {
+      "path": "supabase/functions/_shared/screening-qualifications.mjs",
+      "sha256": "5c31cda4af0e782838fccf23709d6a229b0261f92b1f338b2ec7babbde3195d6"
+    },
+    {
+      "path": "supabase/functions/_shared/screening-requirements.mjs",
+      "sha256": "20e098b0667dbd9f86f7cb189f23a74b17b968230011f88410011894b132da94"
+    },
+    {
+      "path": "supabase/functions/_shared/screening-rule-spec.mjs",
+      "sha256": "0b45fa68d13db7b83f2b0f102d915990297b044ec01e238849e09e0cae85b38b"
+    },
+    {
+      "path": "supabase/functions/_shared/screening-vocabulary.mjs",
+      "sha256": "5aed9af5830c950afb333bd5016e9a78b99559b54e60f87f5bcc2335efdb4673"
+    },
+    {
+      "path": "supabase/functions/_shared/security.ts",
+      "sha256": "62c270d34369d55de0cf1048e91c088fc6a09111ccc39b5b34205f6669a1af9a"
+    },
+    {
+      "path": "supabase/functions/_shared/source-instructions.mjs",
+      "sha256": "148b3c7db4ba5ea687d36bbeede84f9a0148b616d00c31fe7c13ebc863732843"
+    },
+    {
+      "path": "supabase/functions/_shared/stripe-billing.ts",
+      "sha256": "8924e110ea715e9ddbd80dd04871601fb36e576ca58364617ebad22ef68ff9f2"
+    },
+    {
+      "path": "supabase/functions/_shared/subscriptions.ts",
+      "sha256": "a22223984c707c7a381dd0ce54349f1edf582130e8696e4fcd90043b47ca4112"
+    },
+    {
+      "path": "supabase/functions/_shared/transferability.mjs",
+      "sha256": "d64429c38f350290824e64048fdafe7e3c7a1d05c51f24b756ea02318aec62eb"
+    },
+    {
+      "path": "supabase/functions/_shared/untrusted-input.mjs",
+      "sha256": "b61170f5791328f1fb73bca6b70caf7ed1db00f34b2721e92b8726bd9dffbabf"
+    },
+    {
+      "path": "supabase/functions/account-controls/cleanup.ts",
+      "sha256": "4e500687bdfcc567505bfa10dc4b4e09b0d31a48e6a02c0e8fec87eccda1aa01"
+    },
+    {
+      "path": "supabase/functions/analyze-candidate/index.ts",
+      "sha256": "df5945a939e4bf29742963e621aeb947ebd1a3a310a9b9b61d582c119bc82a34"
+    },
+    {
+      "path": "supabase/functions/analyze-patterns-beta/handler.ts",
+      "sha256": "7508f04a545cf1450e63e7048d7ca7591748b1dd6de65f7cfd0b18b28241f41c"
+    },
+    {
+      "path": "supabase/functions/analyze-patterns-beta/index.ts",
+      "sha256": "fba73d1b127b41651ef770856e8c6f900b9a700b22a27a7f66fc844a1e7a444d"
+    },
+    {
+      "path": "supabase/functions/analyze-patterns-beta/screening.ts",
+      "sha256": "6d39b603cdc976b41cd10b6dd5403fd73bd96d47c429e4d36cbcaee36c45d209"
+    },
+    {
+      "path": "supabase/functions/analyze-patterns-v2/analysis.ts",
+      "sha256": "923f57566c4df25eb423092a86faff6ca599c7099aeb092c35df4254372d81ff"
+    },
+    {
+      "path": "supabase/functions/analyze-patterns-v2/index.ts",
+      "sha256": "025648a96ad4ac18c1e047e5087eee4bae3e0b53858667a9d9554ef8cd66a2a9"
+    },
+    {
+      "path": "supabase/functions/analyze-patterns-v2/resume-sources.mjs",
+      "sha256": "ac5456c28ab1e9b94d9468bc932bf45542c5f7e0b6756c1fa4f4b795a0ca2f11"
+    },
+    {
+      "path": "supabase/functions/analyze-patterns/index.ts",
+      "sha256": "df5945a939e4bf29742963e621aeb947ebd1a3a310a9b9b61d582c119bc82a34"
+    },
+    {
+      "path": "supabase/functions/billing-reconcile/index.ts",
+      "sha256": "16c163357b1de31189f43d48cb753d4bc8ed6c5aa61f7427a3d122979039e9d4"
+    },
+    {
+      "path": "supabase/functions/billing-sandbox/index.ts",
+      "sha256": "5ae5d81d27c27fff17e4c5de1ffe9c849f780d7834b0c563ba7549664a9f740c"
+    },
+    {
+      "path": "supabase/functions/reassess-job/handler.ts",
+      "sha256": "cd609c4735cb267a1badcd7f96835d6a6310e33f37dda6f525b8e8709300f3bc"
+    },
+    {
+      "path": "supabase/functions/reassess-job/index.ts",
+      "sha256": "2d86e9a29cf628bb3a7293603bb41ec2c8bdaec30ae32494df2fe37d9d0c5636"
+    },
+    {
+      "path": "supabase/functions/reassess-job/intake.mjs",
+      "sha256": "550aba1cb92407630193bf2245f876a701870ef5b664dde1704d73a8d3153d6b"
+    },
+    {
+      "path": "supabase/functions/reassess-job/lease.ts",
+      "sha256": "5faf45775f943088600df7f5efe0d019e8101b440f4a07dd9db034f4d55b36c3"
+    },
+    {
+      "path": "supabase/functions/reassess-job/logic.mjs",
+      "sha256": "4ed5cb24fcdd69ded89c94eaf6e041c7a27381f5e56606bc2e16472c082ce60a"
+    },
+    {
+      "path": "supabase/functions/refine-job-criteria/code-first.mjs",
+      "sha256": "1a0bf26954d81b97bf4737d5b191e57d188008110fc1169c9e4160953ec16fd8"
+    },
+    {
+      "path": "supabase/functions/refine-job-criteria/drafts.ts",
+      "sha256": "93b76bd2a76c8f4be9189a3fe6a86ba2d8c971343737f497a8e0491f78e61775"
+    },
+    {
+      "path": "supabase/functions/refine-job-criteria/generate.ts",
+      "sha256": "3cb901804b24c3fd69f710f210f519cc8f86d8fff9c19cdb5c2897a63191a068"
+    },
+    {
+      "path": "supabase/functions/refine-job-criteria/handler.ts",
+      "sha256": "abc300dfed062fad4581492fd08633b305508935265044ed811ab4f6e341c6bd"
+    },
+    {
+      "path": "supabase/functions/refine-job-criteria/index.ts",
+      "sha256": "60a21c878da485ac8f76cb9a36d1b096de0aa9271291036018ad8b961190a2ed"
+    },
+    {
+      "path": "supabase/functions/refine-job-criteria/logic.mjs",
+      "sha256": "239826aee5cd8873e23a74ea38ebaf24928fc37bb083be83538029e189637443"
+    },
+    {
+      "path": "supabase/functions/refine-job-criteria/priorities.mjs",
+      "sha256": "d04aa75c92cfc78a6507d531e0927c7492c66b6347889a6973f268dd78d9f062"
+    },
+    {
+      "path": "supabase/functions/refine-job-criteria/rules-only.mjs",
+      "sha256": "202e11bc93bc199ec64a74ae6566a90ee6f150a4cf24a1df14c36e73ac08a53f"
+    },
+    {
+      "path": "supabase/functions/stripe-webhook/index.ts",
+      "sha256": "8665b75b453e16c18408090ddcab9f4b02a607b867a3c1872845de63f941b291"
+    }
+  ]
+}

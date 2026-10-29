@@ -1,7 +1,7 @@
 (function(global){
  'use strict';
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- function next({job,candidates=[],selected=null,canReview=()=>false,uploads=[]}){
+ function next({job,candidates=[],selected=null,canReview=()=>false,uploads=[],basic=false}){
   const result=(step,action,label,text,candidate=null)=>({step,action,label,text,candidateId:candidate?.id||null});
   if(!job)return result(0,'start','Start a search','Add a job description to begin.');
   if(job.status==='closed')return result(0,'jobs','Choose an open search','This search is closed. Your work is still available.');
@@ -14,7 +14,7 @@
   const failed=c=>['error','failed'].includes(phase(c));
   const chosen=list.find(c=>c.id===selected?.id);
   const review=chosen&&ready(chosen)?chosen:list.find(ready);
-  if(review)return result(2,'review','Review candidate','Check the evidence and approve or correct the assessment.',review);
+  if(review)return result(2,'review','Review candidate',basic?'Check saved rules evidence and record your own feedback.':'Check the evidence and approve or correct the assessment.',review);
   const issue=list.find(failed);
   if(issue)return result(2,'review','Resolve assessment issue','Open the candidate to retry or correct the issue.',issue);
   const uploadIssue=uploads.some(i=>i.jobId===job.id&&i.state==='error');

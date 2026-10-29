@@ -1,0 +1,47 @@
+name: Validate hosted sandbox billing
+on:
+  pull_request:
+    branches: [main]
+    types: [labeled]
+permissions:
+  contents: read
+jobs:
+  validate:
+    concurrency:
+      group: billing-staging-setup
+      cancel-in-progress: false
+    if: >-
+      github.repository == 'ErikFehlan/blumr' && github.event.pull_request.number == 147 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feat/subscription-foundation' &&
+      contains(fromJSON('["billing-staging-prepare","billing-staging-inspect","billing-staging-verify","billing-staging-stop","billing-staging-clockprepare","billing-staging-security","billing-staging-rollback"]'), github.event.label.name)
+    environment: criteria-backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify staging validation boundaries
+        run: node --test tests/billing-staging-validation.test.mjs
+      - name: Exercise the owned sandbox through hosted handlers
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          STRIPE_BILLING_SANDBOX_KEY: ${{ secrets.STRIPE_BILLING_SANDBOX_KEY }}
+          SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
+          VALIDATION_LABEL: ${{ github.event.label.name }}
+        run: |
+          case "$VALIDATION_LABEL" in
+            billing-staging-prepare) node scripts/billing-staging-validation.mjs prepare ;;
+            billing-staging-inspect) node scripts/billing-staging-validation.mjs inspect ;;
+            billing-staging-verify) node scripts/billing-staging-validation.mjs verify ;;
+            billing-staging-stop) node scripts/billing-staging-validation.mjs stop ;;
+            billing-staging-clockprepare) node scripts/billing-staging-validation.mjs clockprepare ;;
+            billing-staging-security) node scripts/billing-staging-validation.mjs security ;;
+            billing-staging-rollback) node scripts/billing-staging-validation.mjs rollback ;;
+            *) exit 1 ;;
+          esac

@@ -1,0 +1,31 @@
+{
+  "environment": "sandbox",
+  "stripe_context": "acct_1UVYzGClb9pZVTfu",
+  "livemode": false,
+  "api_version": "2026-09-30.endive",
+  "configured_at": "2026-10-28",
+  "prices": {
+    "basic": {
+      "id": "price_1UVbIzClb9pZVTfu95lWfhhL",
+      "lookup_key": "blumr_basic_v1_usd_month",
+      "product": "prod_blumr_basic_v1",
+      "unit_amount": 2900
+    },
+    "advanced": {
+      "id": "price_1UVbJAClb9pZVTfuuHGa13Op",
+      "lookup_key": "blumr_advanced_v1_usd_month",
+      "product": "prod_blumr_advanced_v1",
+      "unit_amount": 7900
+    },
+    "pro": {
+      "id": "price_1UVbJDClb9pZVTfuIimgv6ad",
+      "lookup_key": "blumr_pro_v1_usd_month",
+      "product": "prod_blumr_pro_v1",
+      "unit_amount": 15000
+    }
+  },
+  "currency": "usd",
+  "interval": "month",
+  "portal_configuration": "bpc_1UVbJJClb9pZVTfuAtCZMMrU",
+  "notes": "Nonsecret identifiers only. This file does not enable, deploy, or configure runtime secrets."
+}

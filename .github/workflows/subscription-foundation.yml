@@ -1,0 +1,60 @@
+name: Validate subscription foundation
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/migrations/*subscription*'
+      - 'tests/*subscription*'
+      - 'tests/fixtures/subscription*'
+      - 'assets/subscription*.js'
+      - 'scripts/billing*.mjs'
+      - 'tests/billing*.mjs'
+      - 'scripts/billing-staging-guard.ts'
+      - '.github/workflows/subscription-foundation.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Validate hosted runner boundaries and monitor thresholds
+        run: node --test tests/billing-*.test.mjs
+      - name: Validate with simulated providers and denied network access
+        run: deno test --no-prompt --deny-net --allow-env tests/legacy-ai-disabled.test.ts tests/subscription-staging-guard.test.ts tests/subscription-billing.test.ts tests/subscription-routing.test.ts tests/subscription-offline.test.ts tests/subscription-workers.test.ts tests/subscription-screening.test.ts tests/subscription-feedback.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
+      - name: Verify native SQL and simultaneous allowance reservations
+        env:
+          PGPASSWORD: postgres
+        run: |
+          createdb -h localhost -U postgres subscription_foundation
+          psql -h localhost -U postgres -d subscription_foundation -f tests/subscription-foundation.sql
+          node tests/subscription-concurrency.mjs
+          createdb -h localhost -U postgres subscription_screening
+          psql -h localhost -U postgres -d subscription_screening -f tests/subscription-screening.sql
+          node tests/subscription-screening-concurrency.mjs
+          createdb -h localhost -U postgres subscription_feedback
+          psql -h localhost -U postgres -d subscription_feedback -f tests/subscription-feedback.sql
+          createdb -h localhost -U postgres subscription_admin
+          psql -h localhost -U postgres -d subscription_admin -f tests/subscription-admin.sql
+          node tests/subscription-admin-concurrency.mjs
+          createdb -h localhost -U postgres subscription_billing
+          psql -h localhost -U postgres -d subscription_billing -f tests/subscription-billing.sql
+          node tests/subscription-billing-concurrency.mjs
+          createdb -h localhost -U postgres subscription_readiness
+          psql -h localhost -U postgres -d subscription_readiness -f tests/subscription-billing-readiness.sql

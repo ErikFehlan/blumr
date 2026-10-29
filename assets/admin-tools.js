@@ -1,9 +1,9 @@
 (function(global){
  'use strict';
- function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,reminderLoad,reminderSave,reminderSend,planLoad,planSave,ratesLoad,ratesSave,costLoad,healthLoad,recoveryLoad,recoveryRetry}){
-  let allowed=false,version=0,loading=null;
+ function create({host,load,download,authorize,getSettings,saveSettings,onDenied,toast,saveFile,supportLoad,supportReview,securityLoad,securityAccess,securityPause,reminderLoad,reminderSave,reminderSend,planLoad,ratesLoad,ratesSave,costLoad,healthLoad,recoveryLoad,recoveryRetry,subscriptionFind,subscriptionChange,subscriptionChanged}){
+  let allowed=false,version=0,loading=null,subscriptions=null;
   const files={downloadServer:'server',downloadSchema:'schema',downloadPrompt:'prompt',downloadPackage:'pkg',downloadEnv:'env'};
-  function clear(){version++;loading=null;host.replaceChildren();}
+  function clear(){version++;loading=null;subscriptions?.clear();subscriptions=null;host.replaceChildren();}
   function setAllowed(value){allowed=value===true;if(!allowed)clear();}
   function deny(){setAllowed(false);onDenied();}
   function message(text,retry=false){
@@ -13,7 +13,7 @@
   async function open(){
    if(!allowed){clear();return;}
    if(loading)return loading;
-   const request=++version;message('Loading admin tools…');
+   const request=++version;subscriptions?.clear();subscriptions=null;message('Loading admin tools…');
    loading=(async()=>{
     try{
      const payload=await load();
@@ -25,7 +25,7 @@
      host.replaceChildren();
      const tabs=document.createElement('nav');tabs.className='rf-admin-tabs';tabs.setAttribute('aria-label','Admin areas');host.append(tabs);
      const areas={};
-     for(const [key,label] of [['overview','Overview'],['health','System'],['users','Users'],['emails','Communications'],['usage','Usage'],['rewards','Rewards'],['advanced','Technical setup']]){
+     for(const [key,label] of [['overview','Overview'],['health','System'],['users','Users'],['subscriptions','Subscriptions'],['emails','Communications'],['usage','Usage'],['rewards','Rewards'],['advanced','Technical setup']]){
       const button=document.createElement('button');button.type='button';button.className='rf-admin-tab';button.textContent=label;button.dataset.adminArea=key;button.setAttribute('aria-pressed',key==='overview'?'true':'false');tabs.append(button);
       const area=document.createElement('div');area.className='rf-admin-area';area.dataset.adminPanel=key;area.hidden=key!=='overview';host.append(area);areas[key]=area;
      }
@@ -37,10 +37,11 @@
       const card=document.createElement('button');card.type='button';card.className='rf-admin-summary-card';card.dataset.adminJump=key==='support'?'users':key;card.innerHTML=`<strong data-admin-count="${key}">—</strong><span>${label}</span>`;card.addEventListener('click',()=>showArea(card.dataset.adminJump));summary.append(card);
      }
      areas.overview.append(summary);
-     const intro=document.createElement('p');intro.className='rf-sub';intro.textContent='Review users, communications, usage, system health, and rewards. Technical configuration is available separately.';areas.overview.append(intro);
+     const intro=document.createElement('p');intro.className='rf-sub';intro.textContent='Review users, subscriptions, communications, usage, system health, and rewards. Technical configuration is available separately.';areas.overview.append(intro);
      if(healthLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='systemHealthPanel';areas.health.append(panel);void loadHealth(request);}
      const setup=document.createElement('details');setup.innerHTML='<summary>Advanced configuration and downloads</summary>';setup.append(technical);areas.advanced.append(setup);
      const rewards=document.createElement('section');rewards.className='rf-card';rewards.id='adminRewardsPanel';rewards.innerHTML='<div class="rf-cardhead"><h3>Referral rewards</h3><span class="rf-pill rf-gray">Coming soon</span></div><p>Referral tracking and free-month credits are not active yet. The draft below is ready to review; it cannot be sent from this screen.</p>';areas.rewards.append(rewards);
+     if(subscriptionFind&&subscriptionChange){const panel=document.createElement('section');panel.className='rf-card subscription-admin';panel.id='subscriptionAdminPanel';areas.subscriptions.append(panel);subscriptions=global.BlumrSubscriptionAdmin.mount(panel,{find:subscriptionFind,change:subscriptionChange,allowed:()=>allowed&&request===version,denied:deny,saved:subscriptionChanged});}
      if(securityLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='betaSecurityPanel';areas.users.append(panel);void loadSecurity(request);}
      if(reminderLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='onboardingRemindersPanel';areas.emails.append(panel);void loadReminders(request);}
      if(planLoad){const panel=document.createElement('section');panel.className='rf-card';panel.id='adminPlansPanel';areas.usage.append(panel);void loadPlans(request);}
@@ -203,21 +204,11 @@
    const panel=host.querySelector('#adminPlansPanel');if(!panel)return;panel.textContent='Loading team plans…';
    try{
     const plans=await planLoad();if(!allowed||request!==version)return;panel.replaceChildren();
-    const title=document.createElement('h3');title.textContent='Paid pilot access';panel.append(title);
-    const note=document.createElement('p');note.className='rf-sub';note.textContent='Set pilot access after confirming payment outside blumr. This does not charge a customer.';panel.append(note);
-    const form=document.createElement('form');form.className='rf-form';
-    const label=(text,control)=>{const wrap=document.createElement('label');wrap.textContent=text;wrap.append(control);return wrap;};
-    const team=document.createElement('select');team.required=true;
-    for(const item of plans||[]){const option=document.createElement('option');option.value=item.id;option.textContent=item.name+' · '+item.owner_email+' · '+item.plan+' ('+item.status+')';team.append(option);}
-    const plan=document.createElement('select');for(const value of ['beta','pilot']){const option=document.createElement('option');option.value=value;option.textContent=value==='beta'?'Beta':'Paid pilot';plan.append(option);}
-    const status=document.createElement('select');for(const value of ['active','paused','expired']){const option=document.createElement('option');option.value=value;option.textContent=value;status.append(option);}
-    const allowance=document.createElement('input');allowance.type='number';allowance.min='1';allowance.max='100000';allowance.value='200';
-    const end=document.createElement('input');end.type='date';
-    const sync=()=>{const selected=plans.find(item=>item.id===team.value);if(!selected)return;plan.value=selected.plan;status.value=selected.status;allowance.value=selected.monthly_ai_calls||200;end.value=selected.period_ends_at?.slice(0,10)||'';};team.addEventListener('change',sync);sync();
-    const button=document.createElement('button');button.className='rf-btn primary';button.type='submit';button.textContent='Save plan';const feedback=document.createElement('p');feedback.setAttribute('role','status');
-    form.append(label('Team ',team),label('Plan ',plan),label('Access ',status),label('AI calls per month ',allowance),label('Access end date (optional) ',end),button,feedback);
-    form.addEventListener('submit',async event=>{event.preventDefault();button.disabled=true;feedback.textContent='Saving plan…';try{await planSave(team.value,plan.value,status.value,plan.value==='pilot'?Number(allowance.value):null,end.value?new Date(end.value+'T23:59:59Z').toISOString():null);if(allowed&&request===version)await loadPlans(request);}catch(error){feedback.textContent=error.message||'Could not save plan.';}finally{button.disabled=false;}});
-    panel.append(form);
+    const title=document.createElement('h3');title.textContent='Legacy workspace access';panel.append(title);
+    const note=document.createElement('p');note.className='rf-sub';note.textContent='Existing beta and pilot access is retained. Manage individual evaluation allowances in Subscriptions. Provider spending limits are managed by the service.';panel.append(note);
+    const list=document.createElement('ul');
+    for(const item of plans||[]){const row=document.createElement('li');row.textContent=item.name+' · '+item.owner_email+' · '+item.plan+' ('+item.status+')';list.append(row);}panel.append(list);
+
    }catch(error){if(request!==version)return;if(error.code==='42501')deny();else panel.textContent='Team plans could not be loaded. Reopen Admin to retry.';}
   }
   async function loadSupport(request=version){

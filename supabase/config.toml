@@ -1,3 +1,9 @@
+[functions.analyze-candidate]
+verify_jwt = true
+
+[functions.analyze-patterns]
+verify_jwt = true
+
 [functions.analyze-patterns-v2]
 verify_jwt = true
 
@@ -18,4 +24,16 @@ verify_jwt = false
 
 [functions.staging-provider-bridge]
 # A private per-run worker credential is checked before parsing any request.
+verify_jwt = false
+
+[functions.billing-sandbox]
+# Handler verifies the bearer against Auth before using service-only billing RPCs.
+verify_jwt = false
+
+[functions.stripe-webhook]
+# Raw-body Stripe signature verification; no Supabase JWT is sent by Stripe.
+verify_jwt = false
+
+[functions.billing-reconcile]
+# Private worker secret, never exposed to browsers. No scheduler enabled here.
 verify_jwt = false
