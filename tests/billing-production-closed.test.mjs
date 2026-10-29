@@ -10,8 +10,9 @@ function fixture({paused=true,accounts=0,wrongDigest=false,usageDrift=false}={})
   const body=options.body?JSON.parse(options.body):null;
   if(url.endsWith('/database/query')){
    assert.match(body.query,/^select /);assert.doesNotMatch(body.query,/vault|decrypted|http_post|alter_job|schedule/);
-   if(body.query.includes('as checkpoint'))return Response.json([{checkpoint:{ai_paused:paused,workers_paused:paused,provider_usage:173+(reads++&&usageDrift?1:0),accounts_table:true}}]);
-   return Response.json([{accounts}]);
+   // Management SQL POST uses HTTP 201 with a JSON result body.
+   if(body.query.includes('as checkpoint'))return Response.json([{checkpoint:{ai_paused:paused,workers_paused:paused,provider_usage:173+(reads++&&usageDrift?1:0),accounts_table:true}}],{status:201});
+   return Response.json([{accounts}],{status:201});
   }
   if(url.endsWith('/secrets')&&options.method==='POST'){
    writes++;assert.deepEqual(Object.fromEntries(body.map(s=>[s.name,s.value])),closedConfiguration);return new Response(null,{status:201});

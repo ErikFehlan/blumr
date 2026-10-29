@@ -30,7 +30,7 @@ export async function configureClosedProduction({env=process.env,fetchImpl=fetch
    ...(body===undefined?{}:{body:JSON.stringify(body)}),redirect:'error',signal:AbortSignal.timeout(30000),
   });}catch{throw Error('Production management request failed; private output withheld.');}
   if(!response.ok)throw Error(`Production management ${method} ${path} failed (HTTP ${response.status}); private output withheld.`);
-  if(response.status===201||response.status===204)return null;
+  if(path==='/secrets'&&method==='POST'&&(response.status===201||response.status===204))return null;
   try{return await response.json();}catch{throw Error('Production management returned an invalid response.');}
  }
  async function checkpoint(){
