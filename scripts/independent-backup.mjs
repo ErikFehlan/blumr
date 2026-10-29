@@ -9,6 +9,7 @@ import {seal,unseal,digest} from './backup-crypto.mjs';
 import {inventorySQL} from './backup-inventory.mjs';
 import {backupSecuritySQL,backupManagedSchemaSQL} from './backup-security.mjs';
 import {backupFailureCategories,backupFailureHints} from './backup-diagnostics.mjs';
+import {backupPoolerURL} from './backup-connection.mjs';
 const runStarted=Date.now();let capturedAt,recoveryStarted;
 const ref=process.env.SUPABASE_PROJECT_REF,token=process.env.SUPABASE_ACCESS_TOKEN;
 if(ref!=='zqiqjzxcpznhzjengfff'||!token)throw Error('Independent backup requires the configured production project');
@@ -44,6 +45,10 @@ try{
  console.log('Preparing read-only database dumps.');
  await command('supabase',['init','--workdir',source]);
  await command('supabase',['link','--project-ref',ref,'--workdir',source,'--yes']);
+ const pooler=backupPoolerURL(await api('/config/database/pooler'),ref);
+ await mkdir(join(source,'supabase','.temp'),{recursive:true,mode:0o700});
+ await writeFile(join(source,'supabase','.temp','pooler-url'),pooler,{mode:0o600});
+ console.log('Verified project-specific primary session pooler; no database password persisted.');
  for(const [file,flags] of [['roles.sql',['--role-only']],['schema.sql',[]],['data.sql',['--data-only','--use-copy','--exclude','storage.buckets_vectors,storage.vector_indexes']]]){
   console.log('Capturing '+file+'.');
   await command('supabase',['db','dump','--linked','--workdir',source,'-f',join(source,file),...flags],{remoteDiagnostics:true});

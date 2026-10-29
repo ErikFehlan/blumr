@@ -9,6 +9,7 @@ export function backupFailureCategories(stderr) {
   ['connection_timeout', /timed out|timeout|deadline exceeded/i],
   ['dns_failure', /no such host|could not translate host|name resolution/i],
   ['network_unreachable', /network is unreachable|no route to host/i],
+  ['ipv6_unavailable_without_pooler', /IPv6 is not supported on your current network/i],
   ['tls_failure', /TLS|SSL connection|certificate verify/i],
   ['version_mismatch', /server version mismatch|aborting because of server version/i],
   ['docker_unavailable', /cannot connect to the docker|docker.*not running|docker.*not found/i],

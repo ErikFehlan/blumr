@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: '17 7 * * *'
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [labeled]
   push:
     branches: [reliability/backups-and-release-gates, hardening/production-readiness, main]
     paths: ['scripts/*backup*', '.github/workflows/independent-backup.yml']
@@ -13,15 +16,23 @@ concurrency:
   cancel-in-progress: false
 jobs:
   backup:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.repository == 'ErikFehlan/blumr' && github.event.pull_request.number == 147 &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.head_ref == 'feat/subscription-foundation' && github.event.label.name == 'verify-production-backup')
     runs-on: ubuntu-latest
     environment: criteria-backend
     timeout-minutes: 40
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
+      SUPABASE_TELEMETRY_DISABLED: 'true'
+      DO_NOT_TRACK: '1'
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
