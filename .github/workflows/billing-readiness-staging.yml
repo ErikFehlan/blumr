@@ -33,3 +33,11 @@ jobs:
           SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
           READINESS_LABEL: ${{ github.event.label.name }}
         run: node scripts/billing-readiness-staging.mjs "${READINESS_LABEL#billing-readiness-}"
+      - name: Retain encrypted billing recovery evidence
+        if: github.event.label.name == 'billing-readiness-restore' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: billing-recovery-${{ github.run_id }}
+          path: test-results/billing-recovery/
+          retention-days: 30
+          if-no-files-found: error

@@ -182,3 +182,16 @@ Deno.test('risk graph verifies canonical ownership and only current full refunds
 Deno.test('billing transport refuses credential-bearing redirects',async()=>{
  const f=fixture();await handleBilling(request({action:'checkout',tier:'basic'}),f.io);assert(f.state.requests.every((r:any)=>r.init.redirect==='error'));
 });
+
+Deno.test('live rollout checks account identity and limits acquisition to ten explicit users',async()=>{
+ const f=fixture();Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected'});
+ const fetch=f.io.fetch;let account='acct_expected';f.io.fetch=async(input,init)=>String(input).endsWith('/v1/account')?Response.json({id:account,charges_enabled:true}):fetch(input,init);
+ assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===403);assert(!f.state.rpc.length);
+ f.env.STRIPE_LIVE_COHORT=user;assert((await handleBilling(request({action:'status'}),f.io)).status===200);
+ account='acct_other';assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);const count=f.state.rpc.length;assert((await worker(f)).status===503);assert(f.state.rpc.length===count);
+ account='acct_expected';f.env.STRIPE_LIVE_COHORT=Array(11).fill(user).join(',');assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);
+ f.env.STRIPE_LIVE_COHORT=user;const baseFetch=f.io.fetch;f.io.fetch=async(input,init)=>{if(String(input).includes('api.stripe.com')&&!String(input).endsWith('/account')){const r=await baseFetch(input,init);const body=await r.json();body.livemode=true;return Response.json(body);}return baseFetch(input,init);};
+ // Status and acquisition have independent gates; a mode-mismatched object
+ // must still fail before a checkout can be accepted.
+ assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);
+});

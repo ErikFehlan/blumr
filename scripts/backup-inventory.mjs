@@ -2,7 +2,7 @@
 export const inventorySQL=`create or replace function pg_temp.blumr_inventory() returns jsonb language plpgsql as $$
 declare t record; result jsonb:='[]'; n bigint; checksum text;
 begin
- for t in select schemaname,tablename from pg_tables where schemaname='public'
+ for t in select schemaname,tablename from pg_tables where schemaname in ('public','blumr_billing_private','blumr_subscriptions_private')
    or (schemaname='auth' and tablename in ('users','identities'))
    or (schemaname='storage' and tablename in ('buckets','objects')) order by schemaname,tablename
  loop

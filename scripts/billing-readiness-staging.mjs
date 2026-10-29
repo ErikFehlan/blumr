@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
+import {recoverBillingLedger} from './billing-ledger-recovery.mjs';
 import {createHash,createHmac} from 'node:crypto';
-import {readFile,writeFile,mkdtemp,rm} from 'node:fs/promises';
-import {join} from 'node:path';
-import {tmpdir} from 'node:os';
-import {execFileSync} from 'node:child_process';
+import {readFile} from 'node:fs/promises';
 export const PROJECT='momfzjmycveqginxmqib',RUN='20261029-v1';
 const base=`https://${PROJECT}.supabase.co`,app='https://feat-subscription-foundation.blumr.pages.dev';
 const migration='20261029171215_subscription_billing_readiness',version='2026-09-30.endive';
@@ -20,7 +18,7 @@ export async function runReadiness(mode,env=process.env){
  }
  const management=async(path,method='GET',body,token=env.SUPABASE_ACCESS_TOKEN)=> (await request(`https://api.supabase.com/v1/projects/${PROJECT}${path}`,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})})).data;
  const sql=(query,parameters=[])=>management('/database/query','POST',{query,parameters});
- const stripe=async(path)=> (await request('https://api.stripe.com/v1/'+path,{headers:{Authorization:`Bearer ${key}`,'Stripe-Version':version}})).data;
+ const stripe=async(path,form)=> (await request('https://api.stripe.com/v1/'+path,{method:form?'POST':'GET',headers:{Authorization:`Bearer ${key}`,'Stripe-Version':version,...(form?{'Content-Type':'application/x-www-form-urlencoded'}:{})},...(form?{body:new URLSearchParams(form)}:{})})).data;
  const baseline=async()=> (await sql(`select jsonb_build_object('usage',(select count(*) from public.ai_provider_usage),'ai_paused',(select ai_paused from public.security_limits where id=true),'ai_crons_paused',(select count(*)=2 and bool_and(not active) from cron.job where jobname in ('ancalagon-criteria-worker','ancalagon-job-reassessment')),'foreign_accounts',(select count(*) from public.subscription_accounts a join auth.users u on u.id=a.user_id where coalesce(u.raw_app_meta_data->>'billing_validation','')<>$1)) as value`,[RUN]))[0].value;
  const before=await baseline();assert.deepEqual(before,{usage:8,ai_paused:true,ai_crons_paused:true,foreign_accounts:0});
  if(mode==='migrate')await management('/secrets','POST',[{name:'AI_PROVIDER_CALLS_DISABLED',value:'true'}]);
@@ -66,6 +64,11 @@ export async function runReadiness(mode,env=process.env){
    const status=await billing(access,'status');assert.equal(status.data.pending,true);
    assert.equal((await sql('select count(*)::int as count from public.subscription_periods'))[0].count,count);
    console.log(JSON.stringify({case:'abandoned_checkout',session:mapping.checkout_session,periods_unchanged:true}));
+   const expired=await stripe('checkout/sessions/'+mapping.checkout_session+'/expire',{});assert.equal(expired.status,'expired');
+   const replacement=await billing(access,'checkout','basic');assert.notEqual(replacement.data.url,start.data.url);
+   const second=(await sql('select checkout_session from blumr_billing_private.customers where user_id=$1',[session.user.id]))[0].checkout_session;
+   await stripe('checkout/sessions/'+second+'/expire',{});
+   console.log(JSON.stringify({case:'expired_checkout',fresh_session:true,periods_unchanged:true}));
    // Revoke this actual fixture session and replay its formerly valid JWT.
    await call('/auth/v1/logout?scope=local',access,{});
    await billing(access,'portal',undefined,[401]);await billing(access,'checkout','basic',[401]);
@@ -73,11 +76,14 @@ export async function runReadiness(mode,env=process.env){
    // A bounded invalid sandbox credential simulates a provider authentication
    // outage; restore the original key in finally, never weakening the AI guard.
    await schedule();
+   const receipt='evt_readiness_outage_'+Date.now();await call('/rest/v1/rpc/subscription_billing_command',service,{p_action:'enqueue',p_args:{id:receipt,type:'invoice.paid',customer:'cus_VWz64PllM8UJOK',hash:createHash('sha256').update(receipt).digest('hex')}});
    const ledger=(await sql("select jsonb_build_object('accounts',(select jsonb_agg(to_jsonb(a)-'admin_revision' order by id) from public.subscription_accounts a),'periods',(select jsonb_agg(to_jsonb(p) order by id) from public.subscription_periods p)) as value"))[0].value;
-   try{await management('/secrets','POST',[{name:'STRIPE_SECRET_KEY',value:'rk_test_readinessUnavailable'}]);await worker([503]);}
+   try{await management('/secrets','POST',[{name:'STRIPE_SECRET_KEY',value:'rk_test_readinessUnavailable'}]);await worker([503]);assert.equal((await sql('select processed_at is null as pending from blumr_billing_private.events where id=$1',[receipt]))[0].pending,true);}
    finally{await management('/secrets','POST',[{name:'STRIPE_SECRET_KEY',value:key}]);}
    assert.deepEqual((await sql("select jsonb_build_object('accounts',(select jsonb_agg(to_jsonb(a)-'admin_revision' order by id) from public.subscription_accounts a),'periods',(select jsonb_agg(to_jsonb(p) order by id) from public.subscription_periods p)) as value"))[0].value,ledger);
    await schedule();for(let i=0;i<4;i++)await worker();
+   assert.equal((await sql('select processed_at is not null as processed from blumr_billing_private.events where id=$1',[receipt]))[0].processed,true);
+   assert.equal((await sql('select count(*)::int as count from public.subscription_periods'))[0].count,count);
    console.log(JSON.stringify({case:'provider_outage_recovery',ledger_preserved:true,retry_succeeded:true}));
   }else if(mode==='risk'){
    await enable(true);await worker();console.log(JSON.stringify({case:'risk_health',...await risk('health')}));
@@ -92,7 +98,7 @@ export async function runReadiness(mode,env=process.env){
    const settings=await management('/secrets');for(const [name,value] of [['AI_PROVIDER_CALLS_DISABLED','true'],['STRIPE_BILLING_SANDBOX_ENABLED','false'],['SUBSCRIPTION_FOUNDATION_ENABLED','false']])assert(settings.some(s=>matchesSecret(s,name,value)));
    assert.equal((await billing(service,'status')).data.enabled,false);console.log(JSON.stringify({case:'shutdown',flags_verified:true}));
   }else if(mode==='restore'){
-   throw Error('Restore runner not yet implemented');
+   await recoverBillingLedger(sql);
   }
   assert.deepEqual(await baseline(),before);console.log(JSON.stringify({mode,project:PROJECT,provider_usage:8,paid_ai_disabled:true}));
  }finally{for(const access of sessions)await call('/auth/v1/logout?scope=local',access,{}).catch(()=>{});}

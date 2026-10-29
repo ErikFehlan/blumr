@@ -52,7 +52,7 @@ function ioClient(io:IO,cfg:Config){
 export type Client=ReturnType<typeof ioClient>;
 function validatePrice(price:Obj,tier:string,cfg:Config,forCheckout=false){
  checked(price,cfg);
- if(price.id!==cfg.prices[tier]||(forCheckout&&price.active!==true)||price.currency!=='usd'||price.unit_amount!==tiers[tier as keyof typeof tiers]||price.type!=='recurring'||price.recurring?.interval!=='month'||price.recurring?.interval_count!==1||price.recurring?.usage_type!=='licensed'||price.billing_scheme!=='per_unit')fail('Sandbox price configuration needs review.');
+ if(price.id!==cfg.prices[tier]||(forCheckout&&price.active!==true)||price.currency!=='usd'||price.unit_amount!==tiers[tier as keyof typeof tiers]||price.type!=='recurring'||price.recurring?.interval!=='month'||price.recurring?.interval_count!==1||price.recurring?.usage_type!=='licensed'||price.billing_scheme!=='per_unit')fail('Price configuration needs review.');
 }
 async function subscriptions(client:Client,customer:string,cfg:Config){
  const list=await client.stripe('subscriptions?customer='+encodeURIComponent(customer)+'&status=all&limit=100');
@@ -135,6 +135,11 @@ export async function handleBilling(request:Request,io:IO=runtime){
   if(body.action==='status')return json({enabled:true,mode:cfg.live?'live':'sandbox',...await client.rpc('status',{user:user.id})});
   // Pause acquisition without stranding existing subscribers or reconciliation.
   if(body.action==='checkout'&&io.env('STRIPE_CHECKOUT_PAUSED')==='true')return json({error:'New subscriptions are temporarily paused. Existing billing remains available.'},503);
+  if(body.action==='checkout'&&cfg.live){
+   const cohort=(io.env('STRIPE_LIVE_COHORT')||'').split(',').map(s=>s.trim()).filter(Boolean);
+   if(cohort.length>10||new Set(cohort).size!==cohort.length||cohort.some(s=>!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)))fail('Live cohort configuration needs review.');
+   if(!cohort.includes(user.id))return json({error:'Paid subscriptions are not open for this account yet.'},403);
+  }
   row=await client.rpc('claim',{user:user.id,purpose:body.action});
   return json(body.action==='checkout'?await checkout(row!,body.tier,client,cfg,io):await portal(row!,client,cfg));
  }catch(e){return json({error:e instanceof BillingError?e.message:'Billing is temporarily unavailable. Try again shortly.'},e instanceof BillingError?e.status:503);}
@@ -219,6 +224,7 @@ export async function handleBillingReconcile(request:Request,io:IO=runtime){
  if(secret.length<32||!await equalSecret(request.headers.get('authorization')||'','Bearer '+secret))return Response.json({error:'Unauthorized'},{status:401});
  try{
   const cfg=config(io),client=ioClient(io,cfg);let completed=0,failed=0;
+  if(cfg.live){const account=await client.stripe('account');if(account.id!==cfg.account||!account.charges_enabled)fail('Live account verification failed.');}
   const risk=await client.risk('claim_next');
   if(risk){try{await reconcileRisk(risk,client,cfg);completed++;}catch{failed++;await client.risk('release',{id:risk.id,lease:risk.lease_id}).catch(()=>{});}}
   // Bound each invocation to fit the Edge wall-clock budget; concurrent workers
