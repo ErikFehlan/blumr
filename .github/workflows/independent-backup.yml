@@ -29,6 +29,8 @@ jobs:
       SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
       SUPABASE_TELEMETRY_DISABLED: 'true'
       DO_NOT_TRACK: '1'
+      # Password-free production session route verified in Supabase Connect.
+      BACKUP_POOLER_URL: postgresql://postgres.zqiqjzxcpznhzjengfff@aws-0-us-east-2.pooler.supabase.com:5432/postgres
     steps:
       - uses: actions/checkout@v4
         with:

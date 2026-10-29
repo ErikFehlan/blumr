@@ -45,7 +45,11 @@ try{
  console.log('Preparing read-only database dumps.');
  await command('supabase',['init','--workdir',source]);
  await command('supabase',['link','--project-ref',ref,'--workdir',source,'--yes']);
- const pooler=backupPoolerURL(await api('/config/database/pooler'),ref);
+ // A scoped deployment token may intentionally omit pooler-configuration
+ // access. The reviewed non-secret route can instead come from the Dashboard.
+ const pooler=backupPoolerURL(process.env.BACKUP_POOLER_URL
+  ? [{database_type:'PRIMARY',connection_string:process.env.BACKUP_POOLER_URL}]
+  : await api('/config/database/pooler'),ref);
  await mkdir(join(source,'supabase','.temp'),{recursive:true,mode:0o700});
  await writeFile(join(source,'supabase','.temp','pooler-url'),pooler,{mode:0o600});
  console.log('Verified project-specific primary session pooler; no database password persisted.');
