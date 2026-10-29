@@ -24,9 +24,10 @@ authorize first live checkout; the missing business inputs are recorded in
 
 ## Activation configuration
 
-Deploy the additive subscription migrations in repository order and the reviewed
-billing, enforcement and frontend artifacts. Take a verified independent backup
-first; keep acquisition closed throughout installation. Do not roll back by
+The eight additive subscription migrations are already installed. Verify their
+checksums instead of replaying them. Deploy only necessary reviewed changes to
+billing, enforcement and frontend artifacts after a verified independent backup;
+keep acquisition closed throughout installation. Do not roll back by
 removing ledger tables or replaying a schema dump into a running application.
 
 | Setting | Production value / release input |
@@ -45,6 +46,7 @@ removing ledger tables or replaying a schema dump into a running application.
 | `STRIPE_PORTAL_CONFIGURATION_ID` | Live portal with payment updates, invoice history, period-end cancellation; plan changes disabled |
 | `STRIPE_WEBHOOK_SECRET` | Live endpoint's signing secret in the runtime secret store |
 | `BILLING_RECONCILE_SECRET` | Separate random bearer in runtime and Vault, at least 32 characters |
+| `STRIPE_AI_PLANS_ENABLED` | Absent or `false`; separate paid-AI sales approval required |
 | `AI_PROVIDER_CALLS_DISABLED` | `true` throughout this rollout |
 | Database AI pause / AI crons | Paused; paid AI activation has a separate release gate |
 
@@ -168,3 +170,17 @@ Free plan and requires a separate paid-plan/launch decision. Do not describe the
 entire application as security-clean. References:
 https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable
 and https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
+
+## Continuing with the beta open
+
+The [activation package](subscription-activation-package.md) records the current
+closed-state evidence, missing live Stripe connection and business decisions.
+The eight migrations are already installed: verify their checksums and do not
+reapply or replace them. Current beta identities/workspace plans are preserved.
+
+AI-tier checkout now requires both `STRIPE_AI_PLANS_ENABLED=true` and
+`AI_PROVIDER_CALLS_DISABLED=false`; the default is closed. Basic acquisition
+does not imply approval of either setting. Before any later AI-sales activation,
+also verify the database pause, workers, service readiness and plan benefits.
+Unenrolled beta members retain the legacy path after an explicit service-only
+unmanaged-scope result; inactive/held/invalid subscription results stay blocked.

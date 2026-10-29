@@ -3,8 +3,11 @@
 The billing implementation and staging readiness checks passed in Supabase
 `momfzjmycveqginxmqib` and Stripe sandbox `acct_1UVYzGClb9pZVTfu`, pinned to
 `2026-09-30.endive`. This supersedes earlier installation and lifecycle checkpoints.
-Production was not changed. PR #147 remains a draft; live activation requires the
-inputs and approval in [production operations](subscription-production-operations.md).
+This section describes the staging checkpoint before production installation.
+PR #147 was subsequently merged and the closed production release installed;
+see [production operations](subscription-production-operations.md) and the
+[current activation package](subscription-activation-package.md). Live checkout
+and paid AI still require separate decisions.
 
 Hosted billing/recovery checkpoint: `a1eacbbe91435ed19621d686a36d896fd139ea32`.
 The final PR also applies the verified fixed-collation checksum ordering to the

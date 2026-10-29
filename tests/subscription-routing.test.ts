@@ -1,6 +1,7 @@
 import {handleAuthenticatedAnalysis} from '../supabase/functions/analyze-patterns-beta/handler.ts';
 import {handleCriteria} from '../supabase/functions/refine-job-criteria/handler.ts';
 import {reserveModelCall,SecurityLimit} from '../supabase/functions/_shared/security.ts';
+import {subscriptionEntitlement,SubscriptionError} from '../supabase/functions/_shared/subscriptions.ts';
 import {rulesOnlyPriorities} from '../supabase/functions/refine-job-criteria/rules-only.mjs';
 function assert(ok:unknown,message:string):asserts ok{if(!ok)throw Error(message);}
 const json=(body:unknown,status=200)=>Response.json(body,{status});
@@ -87,4 +88,35 @@ Deno.test('weak Basic descriptions stay reviewable and never invent five priorit
  assert(draft.hiring_priorities.every((p:any)=>text.includes(p.source_quote)),'Evidence fabricated');
  assert(!draft.hiring_priorities.some((p:any)=>/Java/.test(p.title)),'Negated requirement promoted');
  assert(draft.hiring_priorities.some((p:any)=>p.title.includes('5+ years')&&p.requirement_type==='preferred'),'Threshold or preference changed');
+});
+
+
+Deno.test('enforcement preserves only the explicitly unmanaged beta path and fails closed on ambiguous scope',async()=>{
+ const restore=setup();let scope:unknown=false,scopeStatus=200,entitlementStatus=200,calls=0;
+ let decision:any={allowed:false,code:'subscription_required'};
+ globalThis.fetch=async(url,init)=>{
+  const body=JSON.parse(String(init?.body));
+  assert(body.p_actor==='verified'&&body.p_workspace==='workspace','Scope used a different actor');
+  assert(init?.redirect==='error','Privileged transport permits redirects');
+  if(String(url).endsWith('/subscription_entitlement'))return json(decision,entitlementStatus);
+  assert(String(url).endsWith('/subscription_scope_managed'),'Unexpected legacy bypass request');calls++;
+  return json(scope,scopeStatus);
+ };
+ try{
+  assert(await subscriptionEntitlement('workspace','verified')===null&&calls===1,'Unenrolled beta was converted to a required subscription');
+  for(const [value,status,code] of [[true,200,'subscription_required'],[null,200,'subscription_check_unavailable'],[{},200,'subscription_check_unavailable'],['false',200,'subscription_check_unavailable'],[false,503,'subscription_check_unavailable']] as const){
+   scope=value;scopeStatus=status;let failure:unknown;
+   try{await subscriptionEntitlement('workspace','verified');}catch(error){failure=error;}
+   assert(failure instanceof SubscriptionError&&failure.code===code,'Ambiguous or managed scope bypassed enforcement');
+  }
+  scope=false;scopeStatus=200;
+  for(const code of ['subscription_inactive','subscription_period_inactive','billing_review_required','subscription_actor_required']){
+   decision={allowed:false,code};const before:number=calls;let failure:unknown;
+   try{await subscriptionEntitlement('workspace','verified');}catch(error){failure=error;}
+   assert(failure instanceof SubscriptionError&&calls===before,'Held, expired, or unauthorized account used the beta fallback');
+  }
+  decision={allowed:false,code:'subscription_required'};entitlementStatus=503;const before:number=calls;let failure:unknown;
+  try{await subscriptionEntitlement('workspace','verified');}catch(error){failure=error;}
+  assert(failure instanceof SubscriptionError&&failure.code==='subscription_check_unavailable'&&calls===before,'Entitlement outage granted legacy access');
+ }finally{restore();}
 });
