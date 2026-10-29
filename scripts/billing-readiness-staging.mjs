@@ -6,7 +6,7 @@ export const PROJECT='momfzjmycveqginxmqib',RUN='20261029-v1';
 const base=`https://${PROJECT}.supabase.co`,app='https://feat-subscription-foundation.blumr.pages.dev';
 const migration='20261029171215_subscription_billing_readiness',version='2026-09-30.endive';
 export async function runReadiness(mode,env=process.env){
- assert(['migrate','preflight','edges','risk','monitor','restore','stop'].includes(mode),'Invalid readiness mode');
+ assert(['migrate','preflight','fixtures','edges','risk','monitor','restore','stop'].includes(mode),'Invalid readiness mode');
  assert.equal(env.SUPABASE_PROJECT_REF,PROJECT);assert(env.SUPABASE_ACCESS_TOKEN?.trim(),'Staging management credential required');
  assert(/^rk_test_[A-Za-z0-9]+$/.test(env.STRIPE_BILLING_SANDBOX_KEY||''),'Restricted sandbox key required');
  const key=env.STRIPE_BILLING_SANDBOX_KEY,sessions=[];
@@ -48,7 +48,36 @@ export async function runReadiness(mode,env=process.env){
  const worker=async(expected=[200])=>call('/functions/v1/billing-reconcile',workerSecret,{},expected);
  const schedule=()=>sql("update blumr_billing_private.customers set next_reconcile_at=now() where coalesce(lease_until,'-infinity')<now()");
  try{
-  if(mode==='preflight'){
+  if(mode==='fixtures'){
+   await enable(true);
+   const customers={dispute:'cus_VX1Nb2RNXzjtuE',fraud:'cus_VX1NxkADfslTZL',expiry:'cus_VX1NjY5x6UoLpL',conversion:'cus_VX1Ovb9j1R2R8H'};
+   for(const [fixture,customerId] of Object.entries(customers)){
+    const customer=await stripe('customers/'+customerId);assert.equal(customer.livemode,false);assert.equal(customer.metadata.billing_validation,RUN);assert.equal(customer.metadata.readiness_case,fixture);
+    const email=`blumr-billing-${RUN}-${fixture}@example.invalid`,password=createHmac('sha256',key).update(`blumr-billing-fixture:${PROJECT}:${email}`).digest('base64url');
+    let rows=await sql("select id,raw_app_meta_data->>'billing_validation' as marker from auth.users where email=$1",[email]);
+    if(!rows.length){await sql('insert into public.beta_access(email) values($1) on conflict do nothing',[email]);const created=(await call('/auth/v1/admin/users',service,{email,password,email_confirm:true,app_metadata:{billing_validation:RUN},user_metadata:{display_name:'Disposable billing readiness'}})).data;rows=[{id:created.id,marker:created.app_metadata.billing_validation}];}
+    assert.equal(rows.length,1);assert.equal(rows[0].marker,RUN);const user=rows[0].id;
+    const rpc=async(p_action,p_args)=>(await call('/rest/v1/rpc/subscription_billing_command',service,{p_action,p_args})).data;
+    const lease=await rpc('claim',{user,purpose:'portal'});try{assert(!lease.customer_id||lease.customer_id===customerId);await rpc('customer',{user,lease:lease.lease_id,customer:customerId});}finally{await rpc('release',{user,lease:lease.lease_id});}
+    if(fixture==='conversion'){
+     // Synthetic manual allowance only: all paid state will come from Stripe.
+     await sql(`do $$declare u uuid; a uuid; p uuid; w uuid; attempt uuid:=gen_random_uuid();r jsonb;begin
+      select id into u from auth.users where email='blumr-billing-20261029-v1-conversion@example.invalid' and raw_app_meta_data->>'billing_validation'='20261029-v1';
+      if u is null then raise exception 'Fixture missing';end if;
+      if not exists(select from public.subscription_accounts where user_id=u) then
+       insert into public.subscription_accounts(user_id,plan_code,status,source,access_until) values(u,'basic-v1','complimentary','manual',now()+interval '7 days') returning id into a;
+       insert into public.subscription_periods(account_id,starts_at,ends_at,rules_limit,shortlist_ai_limit,deep_ai_limit) values(a,now()-interval '1 day',now()+interval '7 days',1000,0,0) returning id into p;
+       update public.subscription_accounts set current_period_id=p where id=a;
+       select workspace_id into w from public.workspace_members where user_id=u limit 1;
+       r:=public.reserve_subscription_evaluation(w,u,'rules',repeat('c',64),attempt);
+       perform public.settle_subscription_evaluation((r->>'reservation_id')::uuid,attempt,'succeeded',gen_random_uuid());
+      end if;
+     end$$`);
+     const manual=(await sql("select a.source,count(e.id)::int as usage from public.subscription_accounts a join public.subscription_evaluations e on e.account_id=a.id where a.user_id=$1 and e.state='succeeded' group by a.source",[user]))[0];assert.deepEqual(manual,{source:'manual',usage:1});
+    }
+    console.log(JSON.stringify({case:'readiness_fixture',fixture,user,customer:customerId}));
+   }
+  }else if(mode==='preflight'){
    // Verify the one additional read permission with a known sandbox charge.
    const charge=await stripe('charges/ch_3UVvZJClb9pZVTfu1mjE8b5s');assert.equal(charge.livemode,false);assert.equal(charge.customer,'cus_VWzIFSxAUnfCza');
    const pay=await stripe('invoice_payments?payment[type]=payment_intent&payment[payment_intent]=pi_3UVvZJClb9pZVTfu1QQIDSQH&limit=100');assert(pay.data.some(p=>p.invoice==='in_1UVvZGClb9pZVTfu7x2dItYS'));
