@@ -140,6 +140,11 @@ export async function handleBilling(request:Request,io:IO=runtime){
    if(cohort.length>10||new Set(cohort).size!==cohort.length||cohort.some(s=>!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)))fail('Live cohort configuration needs review.');
    if(!cohort.includes(user.id))return json({error:'Paid subscriptions are not open for this account yet.'},403);
   }
+  // Selling AI allowances requires a separate release decision. A Basic pilot
+  // must remain safe if acquisition opens while provider calls stay disabled.
+  if(body.action==='checkout'&&cfg.live&&body.tier!=='basic'&&
+     (io.env('STRIPE_AI_PLANS_ENABLED')!=='true'||io.env('AI_PROVIDER_CALLS_DISABLED')!=='false'))
+   return json({error:'AI subscription plans are not available yet.'},503);
   row=await client.rpc('claim',{user:user.id,purpose:body.action});
   return json(body.action==='checkout'?await checkout(row!,body.tier,client,cfg,io):await portal(row!,client,cfg));
  }catch(e){return json({error:e instanceof BillingError?e.message:'Billing is temporarily unavailable. Try again shortly.'},e instanceof BillingError?e.status:503);}

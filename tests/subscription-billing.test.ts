@@ -199,3 +199,36 @@ Deno.test('live rollout checks account identity and limits acquisition to ten ex
  assert(f.state.checkoutCreates.length===1&&f.state.checkoutCreates[0].form.integration_identifier==='blumr_live_scmgehri');
  f.env.STRIPE_LIVE_COHORT='';assert((await handleBilling(request({action:'status'}),f.io)).status===200);assert((await handleBilling(request({action:'portal'}),f.io)).status===200);
 });
+
+
+Deno.test('live AI plan sales require separate approval and enabled provider calls before any billing mutation',async()=>{
+ for(const tier of ['advanced','pro']){
+  for(const [sales,disabled] of [[undefined,undefined],['false','false'],['true',undefined],['true','true'],['true','invalid']] as const){
+   const f=fixture();
+   Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected',STRIPE_LIVE_COHORT:user});
+   if(sales!==undefined)f.env.STRIPE_AI_PLANS_ENABLED=sales;
+   if(disabled!==undefined)f.env.AI_PROVIDER_CALLS_DISABLED=disabled;
+   const transport=f.io.fetch;
+   f.io.fetch=async(input,init)=>String(input).endsWith('/v1/account')?Response.json({id:'acct_expected',charges_enabled:true}):transport(input,init);
+   const response=await handleBilling(request({action:'checkout',tier}),f.io);
+   assert(response.status===503&&(await response.json()).error==='AI subscription plans are not available yet.');
+   assert(!f.state.rpc.length&&!f.state.customerCreates.length&&!f.state.checkoutCreates.length,'Unavailable AI plan mutated billing');
+  }
+ }
+});
+Deno.test('separately approved live AI sales still enforce the exact tier price and mode',async()=>{
+ for(const tier of ['advanced','pro']){
+  const f=fixture();
+  Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected',STRIPE_LIVE_COHORT:user,STRIPE_AI_PLANS_ENABLED:'true',AI_PROVIDER_CALLS_DISABLED:'false'});
+  Object.assign(f.state.price,{id:'price_'+tier,unit_amount:tier==='advanced'?7900:15000});
+  const transport=f.io.fetch;
+  f.io.fetch=async(input,init)=>{
+   if(String(input).endsWith('/v1/account'))return Response.json({id:'acct_expected',charges_enabled:true});
+   const r=await transport(input,init);
+   if(String(input).startsWith('https://api.stripe.com/')){const body=await r.json();body.livemode=true;return Response.json(body);}
+   return r;
+  };
+  assert((await handleBilling(request({action:'checkout',tier}),f.io)).status===200);
+  assert(f.state.checkoutCreates[0].form['line_items[0][price]']==='price_'+tier);
+ }
+});
