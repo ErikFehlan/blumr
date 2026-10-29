@@ -28,3 +28,11 @@ export function backupFailureCategories(stderr) {
  const categories=rules.filter(([,pattern])=>pattern.test(stderr)).map(([category])=>category);
  return categories.length ? categories : ['unclassified'];
 }
+
+// Unknown failures still reveal only a fixed vocabulary, never raw messages,
+// quoted values, paths, identifiers, response bodies or credentials.
+export function backupFailureHints(output) {
+ const words=new Set(output.toLowerCase().replace(/https?:\/\/\S+|postgres(?:ql)?:\/\/\S+|"[^"]*"|'[^']*'|`[^`]*`/g,'').match(/[a-z]+/g)||[]);
+ const safe='error failed failure initializing login role password permissions access forbidden unauthorized connect connection database postgres dump roles linked project config configuration parse read write file directory local remote docker image pull download stream response request status unexpected invalid unsupported command flag argument missing required cannot unable not found refused timeout incompatible version server client old new minimum maximum executable process spawn signal killed broken pipe aborted platform architecture manifest token expired temporary endpoint api service network address certificate tls ssl unknown container workdir backup telemetry disabled enabled dry run'.split(' ');
+ return safe.filter(word=>words.has(word));
+}

@@ -1,12 +1,14 @@
 \set ON_ERROR_STOP on
 \ir subscription-billing.sql
 set constraints all immediate;
-alter table auth.users add column email text,add column deleted_at timestamptz;
+alter table auth.users add column email text,add column deleted_at timestamptz,add column revoked boolean not null default false;
+create or replace function public.has_beta_access(p_user uuid) returns boolean language sql stable security definer set search_path='' as $$select exists(select from auth.users where id=p_user and not revoked and deleted_at is null)$$;
 create table auth.sessions(id uuid primary key,user_id uuid references auth.users,not_after timestamptz);
-create table public.app_admins(email text primary key);
+create table public.app_admins(email text primary key,user_id uuid references auth.users);
 update auth.users set email='operator@example.invalid' where id='00000000-0000-0000-0000-000000000003';
-insert into public.app_admins values('operator@example.invalid');
+insert into public.app_admins values('operator@example.invalid','00000000-0000-0000-0000-000000000003');
 \ir ../supabase/migrations/20261029171215_subscription_billing_readiness.sql
+\ir ../supabase/migrations/20261029194000_subscription_billing_reviewer_identity.sql
 update public.subscription_accounts set status='active' where user_id='00000000-0000-0000-0000-000000000001';
 set role authenticated;
 do $$begin
@@ -15,6 +17,8 @@ do $$begin
 end$$;
 reset role;
 insert into auth.sessions(id,user_id) values('90000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001');
+update auth.users set email='changed-operator@example.invalid' where id='00000000-0000-0000-0000-000000000003';
+update auth.users set email='operator@example.invalid' where id='00000000-0000-0000-0000-000000000001';
 set role service_role;
 do $$declare e jsonb;u uuid:='00000000-0000-0000-0000-000000000001';args jsonb;request uuid:=gen_random_uuid();begin
  if subscription_billing_risk_command('session',jsonb_build_object('user',u,'session','90000000-0000-0000-0000-000000000001'))->>'valid'<>'true' then raise exception 'Valid session denied';end if;
@@ -50,6 +54,17 @@ do $$begin
  if (select count(*) from blumr_billing_private.risk_events)<>1 then raise exception 'Receipt replay duplicated';end if;
 end$$;
 select 'PASS: durable risk queue, service-only review, hold enforcement, audit replay and revoked-session admission';
+
+-- Revocation is checked before even an idempotent operator replay is accepted.
+update auth.users set revoked=true where id='00000000-0000-0000-0000-000000000003';
+set role service_role;
+do $$begin
+ begin perform subscription_billing_risk_command('review','{"actor":"00000000-0000-0000-0000-000000000003"}');raise exception 'Revoked admin admitted';exception when insufficient_privilege then null;end;
+end$$;
+reset role;
+update auth.users set revoked=false where id='00000000-0000-0000-0000-000000000003';
+select 'PASS: canonical admin identity survives email changes; recycled emails and revoked admins are denied';
+
 
 \ir ../supabase/migrations/20261029180352_subscription_billing_receipt_priority.sql
 -- Existing evt_during arrived during a previous lease and is still pending.

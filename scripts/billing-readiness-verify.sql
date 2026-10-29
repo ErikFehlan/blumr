@@ -15,7 +15,7 @@ do $$declare c record;u uuid:='89c987aa-f4aa-4f65-b1a1-cb9f948d4119';w uuid;args
  -- No admin identity exists in this stage. This grant is never visible outside
  -- this transaction: it is inserted and removed before commit.
  if exists(select from public.app_admins where email='blumr-billing-20261029-v1-fraud@example.invalid') then raise exception 'Unexpected persistent test admin';end if;
- insert into public.app_admins(email) values('blumr-billing-20261029-v1-fraud@example.invalid');
+ insert into public.app_admins(email,user_id) values('blumr-billing-20261029-v1-fraud@example.invalid',u);
  select * into c from blumr_billing_private.risk_cases where user_id=u and kind='fraud_warning';
  args:=jsonb_build_object('object',c.object_id,'invoice',c.invoice_id,'revision',c.revision,'request',request,'actor',u,'decision','allow','reason','Sandbox readiness: validate audited release of a synthetic fraud hold');
  select count(*) into n from blumr_billing_private.risk_reviews;

@@ -1,0 +1,374 @@
+{
+  "reviewed_at": "2026-10-29",
+  "project": "zqiqjzxcpznhzjengfff",
+  "source": "pg_get_functiondef",
+  "anonymous_execute": false,
+  "fixed_search_path": true,
+  "functions": [
+    {
+      "signature": "admin_ai_cost_report(integer)",
+      "authorization": "application administrator",
+      "sha256": "d6d0d795931f4e3c776351575f510d2e4852a7c26a3ff354d284d5bc2cb8a914"
+    },
+    {
+      "signature": "admin_grant_reward_access(uuid,text,integer,integer,timestamp with time zone)",
+      "authorization": "application administrator",
+      "sha256": "334c489fce6179f5e72b29f38af89e274a410d71c327264de6b54b8c8b45a0ef"
+    },
+    {
+      "signature": "admin_list_model_rates()",
+      "authorization": "application administrator",
+      "sha256": "30f6a26b38851b311a118a3346d7463b1a32a374c5adc62a5515591d5006f44b"
+    },
+    {
+      "signature": "admin_list_workspace_plans()",
+      "authorization": "application administrator",
+      "sha256": "87aec8ab1b7209125d5902b01857bf495fec0be16a245242ed7eab770ee47d05"
+    },
+    {
+      "signature": "admin_set_model_rate(text,numeric,numeric,numeric)",
+      "authorization": "application administrator",
+      "sha256": "014fac7ced21feff92b9613a86fd7e5e5d17505d5217e910888045e868784bbc"
+    },
+    {
+      "signature": "admin_set_workspace_plan(uuid,text,text,integer,timestamp with time zone)",
+      "authorization": "application administrator",
+      "sha256": "6aa009a21dd9a9d3bcf705703c840e2bd23f8f29a2b4d3996704abcfea664a40"
+    },
+    {
+      "signature": "append_resume_upload(uuid,integer,jsonb)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "9c974a41bde19dcdacadc31073558ba634940f0e27cefdca9b74869f77fca32c"
+    },
+    {
+      "signature": "bulk_screening_page(uuid,text,integer)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "eaca000149103f1d3198041d79fef31e3ca84e540d63406996a8a249987fff71"
+    },
+    {
+      "signature": "bulk_screening_source(uuid)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "bc3d588cab0b656a8f85a5a8ad14edc741c892da07eb0cb5ffe506d962df970f"
+    },
+    {
+      "signature": "can_access_resume_path(text)",
+      "authorization": "active workspace membership",
+      "sha256": "2ba3d6ffa26e7f2d66b16359dd008798d6909f100eef63aa056458fa94404b70"
+    },
+    {
+      "signature": "can_manage_workspace(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "dc04162cf5b0dd42ded30dc736818ba4261b274e4c3c345d798b883683607d0a"
+    },
+    {
+      "signature": "create_resume_upload(uuid,uuid,jsonb)",
+      "authorization": "delegates to create_screening_batch membership guard",
+      "sha256": "c0a8cccff44d3149b954760be2acfe809031c07025024a9e932397473b0b11ab"
+    },
+    {
+      "signature": "create_screening_batch(uuid,uuid,jsonb,numeric)",
+      "authorization": "active workspace membership",
+      "sha256": "925711714bffd48c0c9f04491ee09652006237a01a9a785380a7589c580db795"
+    },
+    {
+      "signature": "exclude_automatic_job_knowledge(uuid,text)",
+      "authorization": "active workspace membership",
+      "sha256": "c908cd0dee77b85645636cab6311d5fcc76c4a5c198d2cffbd31e2b6dceb5c84"
+    },
+    {
+      "signature": "get_account_deletion_status()",
+      "authorization": "own authenticated account",
+      "sha256": "5fd784373d37f99ad4463ec7c4abb5498d0f58ef5a2dc76fb7241da9b09c1b9c"
+    },
+    {
+      "signature": "get_account_export()",
+      "authorization": "active workspace membership",
+      "sha256": "fbde2b77d5ffb714ee4512f7868298b05daf4a92f810a915cee6f6982ec7e81a"
+    },
+    {
+      "signature": "get_actionable_notifications(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "ce1850b6d7041f914274b3cb6c0b754b688dfd01437661815ac50a68f4ab7e53"
+    },
+    {
+      "signature": "get_admin_activation_summary()",
+      "authorization": "application administrator",
+      "sha256": "951b4576f05b1342bd9b7b260530f2a7e90598673586d5d8fc7c4414f9bcf873"
+    },
+    {
+      "signature": "get_admin_retention_summary()",
+      "authorization": "application administrator",
+      "sha256": "9e198dd149e8306b1310704631198fb01ca8e893fae711bf24051f0a4abfc559"
+    },
+    {
+      "signature": "get_admin_starter_file(text,text,text)",
+      "authorization": "application administrator",
+      "sha256": "6643ea51e3fba963e4a58f29e3192612eb7fb368ffacb09360b2fac3e10b4cd0"
+    },
+    {
+      "signature": "get_admin_support_requests()",
+      "authorization": "application administrator",
+      "sha256": "6321b3172c40afaa896a0ac1510f2da90f8ccb19aa2e781ca1c5db330326b1b9"
+    },
+    {
+      "signature": "get_admin_tools()",
+      "authorization": "application administrator",
+      "sha256": "e1663c556c7fb6386d48abff84d8979aa1c813e76a892c1171d72a401e3c74ec"
+    },
+    {
+      "signature": "get_admin_usage_summary()",
+      "authorization": "application administrator",
+      "sha256": "5c38552a63003c32e5158202c0278d32f734a965068875908c4b905479ad1d02"
+    },
+    {
+      "signature": "get_assessment_lessons(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "5ce6861ef3443d0035a840a47e353026851a5722f30e49bb121009ef715d8781"
+    },
+    {
+      "signature": "get_automatic_job_knowledge(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "757fcaf46c57bdf64ac6854352cb6ed18b7c1528d32fdfa7818611b68fcda010"
+    },
+    {
+      "signature": "get_beta_security()",
+      "authorization": "application administrator",
+      "sha256": "74b47878a7e3aa17f7e685ea66c0b4597af7cffca12cd498fbb57dd073e52dd3"
+    },
+    {
+      "signature": "get_direct_ai_recovery()",
+      "authorization": "application administrator",
+      "sha256": "44e7cef2c1743d757c94e96a87258fa1e8878449a0963bcdb5f02c969a58927b"
+    },
+    {
+      "signature": "get_feedback_learning_model(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "506860643f80c42fbe00df89598ef6894d6618b9c9efdfd131f10c75ee0d3707"
+    },
+    {
+      "signature": "get_inference_learning_quality(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "92a6e1a57ff8d8600456e272f246c37cf7fbead9b32fc6800d11a0f08ead5b50"
+    },
+    {
+      "signature": "get_job_hiring_priorities(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "43a2752f1ec25cb61d791217ed69085c7f28d31abe1695480b7da59e944605c7"
+    },
+    {
+      "signature": "get_onboarding_reminders()",
+      "authorization": "application administrator",
+      "sha256": "84252564b9adaca257820d25c1ceb31d9fac0f3db37bb74ac04f7307d4ca3bb0"
+    },
+    {
+      "signature": "get_personal_usage()",
+      "authorization": "active workspace membership",
+      "sha256": "654d90ff83b3bb10bf7f201288ddaca99ae25b443643a1175bd688f3d83350db"
+    },
+    {
+      "signature": "get_resume_analysis(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "e7dae63be6c2464d89d45f3ebe56adba215b9f0eaf6de7e08fb4eb261a6e790d"
+    },
+    {
+      "signature": "get_system_health()",
+      "authorization": "application administrator",
+      "sha256": "1899103aae2f5046ded82a37a3c6c40d4c3a054c2c5d7151105b2d5cd094d1f5"
+    },
+    {
+      "signature": "get_user_settings()",
+      "authorization": "own authenticated account",
+      "sha256": "ce67451a39e1d7dd2933816b9b1e3d2bda160e8acd4a78ffb22eae60c12a1b0d"
+    },
+    {
+      "signature": "get_workspace_job_knowledge(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "93b03bcf0e58efd4afdd08b0491a325a673b6b694f404aed0f215e3b28f903a1"
+    },
+    {
+      "signature": "is_app_admin()",
+      "authorization": "canonical user ID and has_beta_access helper",
+      "sha256": "628657bbe73bb59138c3f6d071841a3ed5a8a5f5af26b46a65f826a62647a15c"
+    },
+    {
+      "signature": "is_workspace_member(uuid)",
+      "authorization": "canonical user ID and has_beta_access helper",
+      "sha256": "d708c5aa342daf5bde8e71d8d31e1467384ca2718e4aa7c09984dc6d745a31cf"
+    },
+    {
+      "signature": "manage_beta_access(text,boolean)",
+      "authorization": "application administrator",
+      "sha256": "11c8eeff6c0217aa66c6a18b43b664c636761f58fce858123e058af86399cac2"
+    },
+    {
+      "signature": "mark_notifications_read(uuid[])",
+      "authorization": "active workspace membership",
+      "sha256": "7d773e2c374cd2f9838c5a9d746414fa01992982aedbe0af7be8bd0ff342cf54"
+    },
+    {
+      "signature": "opt_out_onboarding_reminders()",
+      "authorization": "own authenticated account",
+      "sha256": "e777168f5a4b11c975c995ca889aaf92c92b6010875d4dba83116da3f63d4e4d"
+    },
+    {
+      "signature": "prepare_screening_upload(uuid,integer,text)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "12bd30ccd9c3caed9b1b4e21657626cb5d7590fb86c01e69ed061be168624e60"
+    },
+    {
+      "signature": "record_reliability_event(uuid,text,text,text,text,text,integer,jsonb)",
+      "authorization": "active workspace membership",
+      "sha256": "d0301731fc9f8b4b7cd1da2398df8b85a67ab233b9bf9f00d6915fa4f70b18aa"
+    },
+    {
+      "signature": "record_retention_comparison(uuid,uuid[],uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "80db59dfe87ebb1e62ace4f0e419bcd5d980969a1ff0a044e11fb6cdf4ade5d3"
+    },
+    {
+      "signature": "recover_direct_ai_request(uuid,text,boolean)",
+      "authorization": "application administrator",
+      "sha256": "efab229af2db5c61e242a9032062e16b2ceb780ba917805a65e16225b6f657ef"
+    },
+    {
+      "signature": "request_candidate_reassessment(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "d5ea91ecdb2df4220cd9bc302df6e851fa1b22f3bbe5ed7f2215925e76d1e2fd"
+    },
+    {
+      "signature": "request_hiring_priorities(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "3c6e8d0a5ff023050c25c5c7a20e2953746d9b7e2f074d198b28642227ee0f6b"
+    },
+    {
+      "signature": "request_resume_intake(uuid,boolean)",
+      "authorization": "active workspace membership",
+      "sha256": "0d98a3689b432d9407b885dc6d96bb2f06ba59f4206c6204e54b29f31eb55214"
+    },
+    {
+      "signature": "retry_job_criteria(uuid,text)",
+      "authorization": "active workspace membership",
+      "sha256": "a61d2bfe2ae7fa6ce5adc354dc7b3f32eaac264292ac5c238dcb7f3fc3edd46c"
+    },
+    {
+      "signature": "review_job_hiring_priorities(uuid,integer,text,jsonb)",
+      "authorization": "active workspace membership",
+      "sha256": "02650534f1320435dcb155c4498aba8a547046fc6a532b0857772e861e224222"
+    },
+    {
+      "signature": "review_job_reassessment(uuid,text,text)",
+      "authorization": "active workspace membership",
+      "sha256": "a815cd8fdd699afc56352820a33e78823cf0c89e46fb9dc2f909669eb46e5ad5"
+    },
+    {
+      "signature": "review_resume_intake(uuid,text,text)",
+      "authorization": "active workspace membership",
+      "sha256": "d00ebcb698ec53c586226763b1996975092daface3bf4017037af3cd4b254929"
+    },
+    {
+      "signature": "review_support_request(uuid,text)",
+      "authorization": "application administrator",
+      "sha256": "4222c120c76b60c6eb60cc842dbaa6346b9c59294351f3a18ab1a5469bd776fe"
+    },
+    {
+      "signature": "save_assessment_lesson(uuid,text,integer,text)",
+      "authorization": "active workspace membership",
+      "sha256": "f9e0749eb44ac74fe5a59a9ee8a30977b525e1bd0e8c7a3a3edfb43336833982"
+    },
+    {
+      "signature": "save_user_settings(jsonb,bigint)",
+      "authorization": "own settings through get_user_settings guard",
+      "sha256": "0ea6d08654610e160a18d89b5d3f0a9b045271c2a3380d7b070d57c64f6b2c4c"
+    },
+    {
+      "signature": "screening_batch_snapshot(uuid)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "9a63060c1509cd45e0b13fa74a81a05ca7635cee522143d64bceb69ba4eab512"
+    },
+    {
+      "signature": "screening_capabilities()",
+      "authorization": "nonprivate feature limits and signed-in capability flag",
+      "sha256": "e86ebf3c15897f86b352add20151542126284b279b84cfa112f7dd005a35b524"
+    },
+    {
+      "signature": "seal_screening_batch(uuid)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "3aa421537d8e4ddff443fe964c2cd948885c07d2aa28543e3cb3f92f385f1280"
+    },
+    {
+      "signature": "select_screening_finalists(uuid,uuid[],text,integer)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "32bff55185ad63fb018289447963b88ef22916215852745339b7ec4574a1cac1"
+    },
+    {
+      "signature": "set_ai_paused(boolean)",
+      "authorization": "application administrator",
+      "sha256": "082feb79be9bf98d3ee0a3015da3fde83de0030c00635e51767bb5da89ef84f7"
+    },
+    {
+      "signature": "set_learning_permission(uuid,boolean,text)",
+      "authorization": "workspace owner",
+      "sha256": "20f2f63198356d4bcdb440d7f807eadde2af51c0d8b83cc0416b57fdd4924d6a"
+    },
+    {
+      "signature": "set_onboarding_reminder_recipient(uuid,boolean)",
+      "authorization": "application administrator",
+      "sha256": "de2fb03d69900d32e6cec547f049fe7abc0b1e3c6a20fdedf25205ab0cd14f45"
+    },
+    {
+      "signature": "set_retention_cohort(uuid,text)",
+      "authorization": "application administrator",
+      "sha256": "b1ad6edbd38c7e3a4250caf573c7d8fef1290a8e52ce15be572163875d0b2ed7"
+    },
+    {
+      "signature": "start_resume_analysis(uuid)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "0a7646ae8d2dc0c92f392f6002e1d632b62df695931e1acf977860a69925d12c"
+    },
+    {
+      "signature": "submit_support_request(uuid,text,text)",
+      "authorization": "own authenticated account",
+      "sha256": "59e661c596ab82ab6ac05b3dac04d7aba940b5e15d1365c45642b2ca8b871dcd"
+    },
+    {
+      "signature": "team_add_member(uuid,text,text)",
+      "authorization": "workspace owner or administrator",
+      "sha256": "45d0f1b8e99b4d27baa3fa7d9ce95a5aa11bf54900cd0fc08594d862ffd620ba"
+    },
+    {
+      "signature": "team_overview(uuid)",
+      "authorization": "active workspace membership",
+      "sha256": "62ff5a5541195ce0f3ebceee779364253f07e7388db0926b9c3e778a808a9092"
+    },
+    {
+      "signature": "team_remove_member(uuid,uuid)",
+      "authorization": "workspace owner or administrator",
+      "sha256": "ed09d75649b7f9d193400be7387d7ffce177a984fdd6945778812f6b30944122"
+    },
+    {
+      "signature": "team_rename(uuid,text)",
+      "authorization": "workspace owner or administrator",
+      "sha256": "d29f8629ed793bcb0cfd6aecfe747ef7a7fb964adc4f8bbb6b7deec58b18584a"
+    },
+    {
+      "signature": "update_assessment_lesson(uuid,integer,text,boolean)",
+      "authorization": "active workspace membership",
+      "sha256": "b3629b5420687904d7382ac10a8551090c94ad8c3280ab856795a04adf9ec6f5"
+    },
+    {
+      "signature": "update_screening_budget(uuid,numeric)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "cf38883002a9eb2c5ba4c9d7dc3a77a7a44debfb8f23e0994927ba9fdf96a069"
+    },
+    {
+      "signature": "update_screening_item(uuid,integer,text)",
+      "authorization": "screening batch workspace membership",
+      "sha256": "93e9051af475df8dd1f0ebbf1cd75beb04ffacc95dd1937dfccd005acaf7a300"
+    },
+    {
+      "signature": "use_original_job_criteria(uuid,text,boolean)",
+      "authorization": "active workspace membership",
+      "sha256": "2da4ef4b505a6bb6139321397477515c6a9240414b4070101a8f42abbbc9ad30"
+    }
+  ]
+}
