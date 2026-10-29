@@ -8,19 +8,21 @@ import {isDeepStrictEqual} from 'node:util';
 import {seal,unseal,digest} from './backup-crypto.mjs';
 import {inventorySQL} from './backup-inventory.mjs';
 import {backupSecuritySQL,backupManagedSchemaSQL} from './backup-security.mjs';
+import {backupFailureCategories} from './backup-diagnostics.mjs';
 const runStarted=Date.now();let capturedAt,recoveryStarted;
 const ref=process.env.SUPABASE_PROJECT_REF,token=process.env.SUPABASE_ACCESS_TOKEN;
 if(ref!=='zqiqjzxcpznhzjengfff'||!token)throw Error('Independent backup requires the configured production project');
 const output=join(process.cwd(),'test-results','independent-backup');
 const work=await mkdtemp(join(tmpdir(),'blumr-private-backup-'));
 const source=join(work,'source'),restore=join(work,'restore');
-async function command(binary,args,{cwd=work,input,timeout=600000,localDiagnostics=false,databaseDiagnostics=false}={}){
+async function command(binary,args,{cwd=work,input,timeout=600000,localDiagnostics=false,databaseDiagnostics=false,remoteDiagnostics=false}={}){
  return new Promise((resolve,reject)=>{
   const child=spawn(binary,args,{cwd,env:process.env,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';
-  child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>{if(localDiagnostics||databaseDiagnostics)stderr+=x;});
+  child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>{if(localDiagnostics||databaseDiagnostics||remoteDiagnostics)stderr+=x;});
   const timer=setTimeout(()=>child.kill('SIGKILL'),timeout);
   child.on('error',reject);child.stdin.on('error',error=>{if(error.code!=='EPIPE')reject(error);});
   child.on('close',code=>{clearTimeout(timer);
+   if(code!==0&&remoteDiagnostics)console.error('Read-only dump failure categories: '+JSON.stringify(backupFailureCategories(stderr)));
    if(code!==0&&localDiagnostics)console.error(stderr.split('\n').filter(line=>!/password|secret|token|key|postgresql:\/\/|eyJ[A-Za-z0-9_-]+\./i.test(line)).slice(-35).join('\n'));
    if(code!==0&&databaseDiagnostics){const category=['does not exist','already exists','permission denied','duplicate key','foreign key constraint','check constraint','syntax error','cannot change','invalid input','authentication failed','no password supplied','connection refused'].find(x=>stderr.includes(x))||'unclassified';const objects=[...stderr.matchAll(/(?:relation|column|constraint|function|sequence|index|table|role) "([a-z_][a-z0-9_.]*)"/gi)].map(m=>m[1]);console.error('Isolated restore diagnostic: '+JSON.stringify({category,objects}));}
    code===0?resolve(stdout):reject(Error(`${binary} ${args.slice(0,2).join(' ')} operation failed (exit ${code}); private output was withheld`));});
@@ -44,7 +46,7 @@ try{
  await command('supabase',['link','--project-ref',ref,'--workdir',source,'--yes']);
  for(const [file,flags] of [['roles.sql',['--role-only']],['schema.sql',[]],['data.sql',['--data-only','--use-copy','--exclude','storage.buckets_vectors,storage.vector_indexes']]]){
   console.log('Capturing '+file+'.');
-  await command('supabase',['db','dump','--linked','--workdir',source,'-f',join(source,file),...flags]);
+  await command('supabase',['db','dump','--linked','--workdir',source,'-f',join(source,file),...flags],{remoteDiagnostics:true});
  }
  const objects=await api('/database/query',{query:'select bucket_id,name,metadata,updated_at from storage.objects order by bucket_id,name'});
  console.log('Copying stored document bytes.');
