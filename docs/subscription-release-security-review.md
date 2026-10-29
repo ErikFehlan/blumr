@@ -118,3 +118,36 @@ retained all 320. The concurrency helpers now await `close`; the native allowanc
 race passes ten consecutive rounds with persisted reservations checked separately
 from process responses. No application SQL or deployed function changed for this
 test correction, and the publication gates remain required.
+
+
+## Closed continuation: preserve beta and gate AI sales
+
+The October 29 continuation refreshed production evidence: all eight migration
+checksums, nine bundle fingerprints, 13 ledger isolation boundaries and closed
+runtime digests passed again in run 40954869096 (attempt 2). Public verification
+again matched 70 served files. Database reads found 13 approved beta records,
+12 verified eligible Auth identities, 15 active beta workspace plans and zero
+subscription accounts. Provider usage remained 173; all three workers stayed
+inactive. Advisor counts remain 73 reviewed definer notices, 34 no-policy
+notices and the Free-plan leaked-password warning.
+
+Two code corrections were prepared in PR #150:
+- Live Advanced/Pro checkout requires explicit AI-sales approval and enabled
+  runtime provider calls before a customer lease or Stripe object is created.
+  Basic, portal access, receipts and reconciliation retain their existing gates.
+- The TypeScript entitlement adapter now matches the SQL opt-in scope for
+  unenrolled members. A canonical missing-subscription result alone is insufficient:
+  a service-only scope check must return exactly false. Managed, held, inactive,
+  expired and ambiguous/error states remain blocked. Both privileged reads reject
+  redirects. Existing beta access checks and the AI pause still apply.
+
+All 12 verified beta workspace memberships currently produce the canonical
+missing-subscription/unmanaged combination. The regression proves that combination
+retains the legacy path without making grants, and that unavailable or malformed
+scope results fail closed. Paid-account negative cases do not enter the fallback.
+
+No migrations, beta records, Auth accounts, workspace plans or live Stripe
+objects are modified by these corrections. Exact patch source and deployed bundle
+fingerprints are recorded in `subscription-production-deployment.json`.
+Policy drafts and the activation package are review documents, not approved legal
+terms or an activation decision. Live Stripe configuration awaits connection.

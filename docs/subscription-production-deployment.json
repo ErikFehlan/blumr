@@ -1,7 +1,7 @@
 {
   "project": "zqiqjzxcpznhzjengfff",
-  "release_sha": "a3c392737c42b91e95f39d7a47f674f0664798a1",
-  "deployment_run": 40951227952,
+  "release_sha": "c29e34b05748b35d2d2d73b0e995199b3bf1d910",
+  "deployment_run": null,
   "backup_run": 40945589186,
   "backup_artifact": 12928364091,
   "provider_usage": 173,
@@ -22,43 +22,43 @@
     {
       "name": "analyze-patterns-v2",
       "verify_jwt": true,
-      "ezbr_sha256": "096f15f9518fe711514e7eef4e0a807a76ab01e2d700266df2402995fe0fcaa4",
+      "ezbr_sha256": "90bf75001406b04ad0b768c4aabc37036c689de649f6260c02bb0b9c520677ef",
       "dependency_files": 33
     },
     {
       "name": "analyze-patterns-beta",
       "verify_jwt": true,
-      "ezbr_sha256": "aa69703d24001a5cc9c1e905715b41057a6616dff1597394c651a9f724601c59",
+      "ezbr_sha256": "4a82608842d6ec010b61d7f7a035db34d75f50d55966b2cd565aadafa21fd726",
       "dependency_files": 33
     },
     {
       "name": "refine-job-criteria",
       "verify_jwt": false,
-      "ezbr_sha256": "78d0ccbd773aabb112dea4124465e2955709c6a57c0ac7bc36108cecf855dea5",
+      "ezbr_sha256": "6956aab6f246f9eeafa152bba17dfdb0eea71c340239220f1baa23caf4995c7a",
       "dependency_files": 16
     },
     {
       "name": "reassess-job",
       "verify_jwt": false,
-      "ezbr_sha256": "c49cc8685c4a14c28423fd1b3f84dca8bdac4a6aad49816b7c9c3761ee317a38",
+      "ezbr_sha256": "a54a1567176ddba8e718b229363cc25c8c35b80b939606b2e1fa63c371d355bc",
       "dependency_files": 32
     },
     {
       "name": "billing-sandbox",
       "verify_jwt": false,
-      "ezbr_sha256": "06cdcb8885213bed00da05800081834fc1af036124607e3d40c6766ac6c37ab5",
+      "ezbr_sha256": "434e4d8bb82896a7e570687d77887bfb3466a0ba49491007ed8d2654a4fa8f2d",
       "dependency_files": 2
     },
     {
       "name": "stripe-webhook",
       "verify_jwt": false,
-      "ezbr_sha256": "7729c249978d4da53cdfdb743f2829280e9347e7536f1d6c594abe41736f1a65",
+      "ezbr_sha256": "b1fbcc3770b232476536c3b641bb3376f9f03ef59ac7fc51c3beb8316825b85b",
       "dependency_files": 2
     },
     {
       "name": "billing-reconcile",
       "verify_jwt": false,
-      "ezbr_sha256": "deb8f87aa564874bbf5da5716c601b38aa1dfae24b0194984aa7d28964623785",
+      "ezbr_sha256": "1fe622ffe86d3ae127671e309b0c0410e34f1c0fdd9994e32d9f0fc3c43742fe",
       "dependency_files": 2
     }
   ],
@@ -154,11 +154,11 @@
     },
     {
       "path": "supabase/functions/_shared/stripe-billing.ts",
-      "sha256": "8924e110ea715e9ddbd80dd04871601fb36e576ca58364617ebad22ef68ff9f2"
+      "sha256": "dfe46b3f8c2e7a54c91f818d4a785626c6c0d3b850919cc25b2cf8297c1d617a"
     },
     {
       "path": "supabase/functions/_shared/subscriptions.ts",
-      "sha256": "a22223984c707c7a381dd0ce54349f1edf582130e8696e4fcd90043b47ca4112"
+      "sha256": "ae284b7a39aa681ca95bdb08c1e767dd6934598c9006c8329cb796523e2a4c8b"
     },
     {
       "path": "supabase/functions/_shared/transferability.mjs",
@@ -268,5 +268,32 @@
       "path": "supabase/functions/stripe-webhook/index.ts",
       "sha256": "8665b75b453e16c18408090ddcab9f4b02a607b867a3c1872845de63f941b291"
     }
-  ]
+  ],
+  "initial_release_sha": "a3c392737c42b91e95f39d7a47f674f0664798a1",
+  "initial_deployment_run": 40951227952,
+  "deployment_method": "Supabase connected deployment after four required CI workflows passed",
+  "readiness_patch": {
+    "pull_request": 150,
+    "installed_at": "2026-10-29T21:45:39.285Z",
+    "functions": [
+      "analyze-patterns-v2",
+      "analyze-patterns-beta",
+      "refine-job-criteria",
+      "reassess-job",
+      "billing-sandbox",
+      "stripe-webhook",
+      "billing-reconcile"
+    ],
+    "migration_changes": 0,
+    "backup_run": 40953103986,
+    "backup_artifact": 12930754838,
+    "validation_runs": [
+      40959256151,
+      40959255976,
+      40959255780,
+      40959255924
+    ],
+    "source_readback_verified": true,
+    "closed_controls_preserved": true
+  }
 }
