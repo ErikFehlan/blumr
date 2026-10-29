@@ -95,3 +95,26 @@ Disabled bundle hashes are respectively
 The 173-row application provider ledger does not cover any historical calls that
 may have bypassed that ledger through retired endpoints; no such call was made
 as part of this review.
+
+## Installed release recovery checkpoint
+
+After installation, main backup run **40953103986** passed at 20:58 UTC, including
+exact restored row checksums, RLS, grants, policies, privileged function hashes
+and all 160 stored objects. Artifact **12930754838** expires January 27, 2027;
+uploaded ZIP SHA-256:
+`1bb283c477903b27ede914aeaa2e459b7859f456f093b6ea62f0260d2e56113d`.
+https://github.com/ErikFehlan/blumr/actions/runs/40953103986
+
+Closed configuration run **40952223609** also passed: the reconciliation bearer
+is installed in Vault and runtime with matching digests, its five-per-minute
+scheduler is configured inactive, and all eight migrations, nine deployed bundles
+and 13 ledger permission boundaries pass the read-only verification. Production
+provider usage remains 173, with checkout and all three workers disabled.
+
+The first main frontend publication was correctly blocked by an allowance test
+harness failure. Child-process `exit` sometimes fired before SQL stdout drained:
+a 320-process reproduction lost 16 outputs at exit, while waiting for `close`
+retained all 320. The concurrency helpers now await `close`; the native allowance
+race passes ten consecutive rounds with persisted reservations checked separately
+from process responses. No application SQL or deployed function changed for this
+test correction, and the publication gates remain required.

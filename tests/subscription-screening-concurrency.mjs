@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
 function sql(query){return new Promise((resolve,reject)=>{
  const p=spawn('psql',['-h','localhost','-U','postgres','-d','subscription_screening','-v','ON_ERROR_STOP=1','-At','-c',query],{env:process.env});
- let out='',err='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>err+=b);p.on('error',reject);p.on('exit',code=>code?reject(Error(err)):resolve(out.trim()));
+ let out='',err='';p.stdout.on('data',b=>out+=b);p.stderr.on('data',b=>err+=b);p.on('error',reject);p.on('close',code=>code?reject(Error(err)):resolve(out.trim()));
 });}
 const scope="set test.workspace='00000000-0000-0000-0000-000000000001';set test.actor='00000000-0000-0000-0000-000000000001';set test.role='authenticated';";
 const account="'20000000-0000-0000-0000-000000000001'";
