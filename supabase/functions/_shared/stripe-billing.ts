@@ -164,7 +164,11 @@ export async function reconcile(row:Obj,client:Client,cfg:Config){
  const sub=list.open||list.all.find(s=>row.checkout_id&&s.metadata?.blumr_checkout===row.checkout_id)||list.all.find(s=>s.id===row.subscription_id);
  if(row.subscription_id&&!sub)fail('Subscription history needs review.');
  if(sub){
-  const args:Obj={user:row.user_id,lease:row.lease_id,subscription:sub.id,status:sub.status,cancel_at_period_end:sub.cancel_at_period_end===true};
+  // Flexible subscriptions can express portal period-end cancellation as an
+  // explicit cancel_at timestamp while cancel_at_period_end remains false.
+  const periodEnd=sub.items?.data?.length===1?sub.items.data[0].current_period_end:undefined;
+  const endsAtPeriodEnd=Number.isSafeInteger(sub.cancel_at)&&Number.isSafeInteger(periodEnd)&&sub.cancel_at===periodEnd;
+  const args:Obj={user:row.user_id,lease:row.lease_id,subscription:sub.id,status:sub.status,cancel_at_period_end:sub.cancel_at_period_end===true||endsAtPeriodEnd};
   if(sub.status==='active'){
    if(sub.pause_collection||sub.pending_update)fail('Subscription update is pending.');
    if(sub.collection_method!=='charge_automatically'||sub.items?.has_more||sub.items?.data?.length!==1)fail('Subscription configuration needs review.');

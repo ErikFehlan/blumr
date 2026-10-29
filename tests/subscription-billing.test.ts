@@ -108,6 +108,15 @@ Deno.test('failed payment pauses access and does not create a paid period',async
  const f=fixture();f.state.row.customer_id='cus_first';f.state.subs=[subscription()];f.state.invoice.status='open';assert((await worker(f)).status===200);
  const applied=f.state.rpc.find((c:any)=>c.action==='apply').args;assert(applied.status==='past_due'&&!applied.paid&&!applied.start);
 });
+Deno.test('flexible portal cancellation at the item period end is surfaced without revoking paid access',async()=>{
+ const f=fixture();f.state.row.customer_id='cus_first';const sub=subscription();f.state.subs=[sub];
+ Object.assign(sub,{cancel_at:sub.items.data[0].current_period_end,cancel_at_period_end:false});
+ assert((await worker(f)).status===200);
+ const applied=f.state.rpc.find((r:any)=>r.action==='apply').args;
+ assert(applied.cancel_at_period_end===true&&applied.status==='active'&&applied.paid===true);
+ f.state.claimed=false;f.state.rpc=[];Object.assign(sub,{cancel_at:sub.items.data[0].current_period_end-3600});
+ assert((await worker(f)).status===200);assert(f.state.rpc.find((r:any)=>r.action==='apply').args.cancel_at_period_end===false,'Custom earlier cancellation mislabeled');
+});
 Deno.test('wrong customer, unpaid period evidence, duplicate subscriptions and API outages retain receipts',async()=>{
  for(const alter of [(f:any)=>f.state.invoice.customer='cus_other',(f:any)=>f.state.invoice.lines.data[0].period.end--,(f:any)=>f.state.subs.push({...subscription(),id:'sub_second'}),(f:any)=>f.state.invoice.livemode=true,(f:any)=>f.state.subs[0].items.data[0].quantity=2]){
   const f=fixture();f.state.row.customer_id='cus_first';f.state.subs=[subscription()];alter(f);assert((await worker(f)).status===503);assert(!f.state.rpc.some((c:any)=>c.action==='apply'||c.action==='finish'));assert(f.state.rpc.at(-1).action==='release');
