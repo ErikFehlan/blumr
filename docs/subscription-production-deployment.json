@@ -1,6 +1,6 @@
 {
   "project": "zqiqjzxcpznhzjengfff",
-  "release_sha": "c29e34b05748b35d2d2d73b0e995199b3bf1d910",
+  "release_sha": "3972de1d605707f6ccfedd7e57d1438cd0086674",
   "deployment_run": null,
   "backup_run": 40945589186,
   "backup_artifact": 12928364091,
@@ -46,19 +46,19 @@
     {
       "name": "billing-sandbox",
       "verify_jwt": false,
-      "ezbr_sha256": "434e4d8bb82896a7e570687d77887bfb3466a0ba49491007ed8d2654a4fa8f2d",
+      "ezbr_sha256": "f17c7fa9fbe1a4deb44fdb0edde3ef082408ddea6b98137fcd554e946c37d41d",
       "dependency_files": 2
     },
     {
       "name": "stripe-webhook",
       "verify_jwt": false,
-      "ezbr_sha256": "b1fbcc3770b232476536c3b641bb3376f9f03ef59ac7fc51c3beb8316825b85b",
+      "ezbr_sha256": "7ccc75adb4fe05e73d55dcc9c65dd663d13f38446db27109051b0df2b75e7695",
       "dependency_files": 2
     },
     {
       "name": "billing-reconcile",
       "verify_jwt": false,
-      "ezbr_sha256": "1fe622ffe86d3ae127671e309b0c0410e34f1c0fdd9994e32d9f0fc3c43742fe",
+      "ezbr_sha256": "27c88cbae5a7df08b417b1bc740c124b663d273ec3f763fe70455cbf3ca6b5d4",
       "dependency_files": 2
     }
   ],
@@ -154,7 +154,7 @@
     },
     {
       "path": "supabase/functions/_shared/stripe-billing.ts",
-      "sha256": "dfe46b3f8c2e7a54c91f818d4a785626c6c0d3b850919cc25b2cf8297c1d617a"
+      "sha256": "d4efd7d9749527ec78d5d73ad6a4966e871da6d6fd38bce6f066167c339cabff"
     },
     {
       "path": "supabase/functions/_shared/subscriptions.ts",
@@ -306,5 +306,49 @@
     "public_verification_job": 123755056092,
     "public_assets_verified": 70,
     "cloudflare_deployment": "dc60c36c-65ea-44e3-829d-2229b8cd4890"
+  },
+  "tax_readiness_patch": {
+    "source_sha": "3972de1d605707f6ccfedd7e57d1438cd0086674",
+    "installed_at": "2026-10-29T22:37:38.583Z",
+    "functions": [
+      {
+        "name": "billing-sandbox",
+        "ezbr_sha256": "f17c7fa9fbe1a4deb44fdb0edde3ef082408ddea6b98137fcd554e946c37d41d",
+        "version": 6,
+        "verify_jwt": false,
+        "dependency_files": 2
+      },
+      {
+        "name": "stripe-webhook",
+        "ezbr_sha256": "7ccc75adb4fe05e73d55dcc9c65dd663d13f38446db27109051b0df2b75e7695",
+        "version": 6,
+        "verify_jwt": false,
+        "dependency_files": 2
+      },
+      {
+        "name": "billing-reconcile",
+        "ezbr_sha256": "27c88cbae5a7df08b417b1bc740c124b663d273ec3f763fe70455cbf3ca6b5d4",
+        "version": 6,
+        "verify_jwt": false,
+        "dependency_files": 2
+      }
+    ],
+    "validation_runs": [
+      40965384883,
+      40965384885,
+      40965384925,
+      40965384920
+    ],
+    "pull_request": 152,
+    "migration_changes": 0,
+    "backup_run": 40953103986,
+    "backup_artifact": 12930754838,
+    "source_readback_verified": true,
+    "closed_controls_preserved": true,
+    "runtime_identifiers_installed": true,
+    "runtime_tax_gate": false,
+    "runtime_ai_sales_gate": false,
+    "restricted_key_installed": false,
+    "webhook_created": false
   }
 }

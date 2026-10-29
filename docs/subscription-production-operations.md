@@ -46,7 +46,8 @@ removing ledger tables or replaying a schema dump into a running application.
 | `STRIPE_PORTAL_CONFIGURATION_ID` | Live portal with payment updates, invoice history, period-end cancellation; plan changes disabled |
 | `STRIPE_WEBHOOK_SECRET` | Live endpoint's signing secret in the runtime secret store |
 | `BILLING_RECONCILE_SECRET` | Separate random bearer in runtime and Vault, at least 32 characters |
-| `STRIPE_AI_PLANS_ENABLED` | Absent or `false`; separate paid-AI sales approval required |
+| `STRIPE_AI_PLANS_ENABLED` | `false`; separate paid-AI sales approval required |
+| `STRIPE_TAX_REGISTRATIONS_VERIFIED` | `false`; exact `true` only after actual registration and tax calculation verification |
 | `AI_PROVIDER_CALLS_DISABLED` | `true` throughout this rollout |
 | Database AI pause / AI crons | Paused; paid AI activation has a separate release gate |
 
@@ -55,7 +56,7 @@ not created by the staging runner. Before activation verify live mode and accoun
 identity, exact price/portal settings, migration hashes, deployed source hashes,
 permission boundaries and all four code CI workflows at the release commit.
 Confirm GET `/v1/account` works with the restricted runtime key. Its required
-object permissions are Charges and Refunds read, Invoices read, Prices read,
+object permissions are Accounts read (for `/v1/account`), Charges and Refunds read, Invoices read, Prices read,
 Subscriptions read, Customers write, Checkout Sessions write and Customer Portal
 write. Refund/dispute writes are intentionally absent from the runtime key.
 
@@ -174,7 +175,7 @@ and https://supabase.com/docs/guides/auth/password-security#password-strength-an
 ## Continuing with the beta open
 
 The [activation package](subscription-activation-package.md) records the current
-closed-state evidence, missing live Stripe connection and business decisions.
+closed-state evidence, completed live catalog/portal settings and remaining decisions.
 The eight migrations are already installed: verify their checksums and do not
 reapply or replace them. Current beta identities/workspace plans are preserved.
 
@@ -184,3 +185,26 @@ does not imply approval of either setting. Before any later AI-sales activation,
 also verify the database pause, workers, service readiness and plan benefits.
 Unenrolled beta members retain the legacy path after an explicit service-only
 unmanaged-scope result; inactive/held/invalid subscription results stay blocked.
+
+## October 29 live configuration continuation
+
+The live identity and payment readiness are verified through the authenticated
+Dashboard. Three exclusive monthly prices and the cancellation-only portal are
+configured; nonsecret IDs are installed in production. Advanced and Pro products
+are archived until paid AI release. The public support email is the owner's
+confirmed monitored business mailbox. See the activation package for legal seller
+and product/tax evidence; private verification details are not recorded.
+
+The production runtime key is staged with eight least-privilege permissions but
+not created: final browser security confirmation is required. The webhook form is
+prepared with 18 events and the pinned snapshot API version, but creation offers
+no initial disabled state. Keep delivery inactive by leaving it unsubmitted until
+a supported disabled flow or the separate activation step is approved. No signing
+secret has been generated.
+
+PR #152's live checkout requires an exact-true tax-readiness acknowledgement and
+exclusive live prices. It supplies automatic tax and required customer address
+collection/update only after that gate. The current acknowledgement is false;
+owner confirms no tax registrations yet. Portal, status, webhooks and reconciliation
+are not blocked by this acquisition-only flag. Do not set it true based solely on
+Stripe Tax settings showing active or on a sandbox calculation.

@@ -53,6 +53,7 @@ export type Client=ReturnType<typeof ioClient>;
 function validatePrice(price:Obj,tier:string,cfg:Config,forCheckout=false){
  checked(price,cfg);
  if(price.id!==cfg.prices[tier]||(forCheckout&&price.active!==true)||price.currency!=='usd'||price.unit_amount!==tiers[tier as keyof typeof tiers]||price.type!=='recurring'||price.recurring?.interval!=='month'||price.recurring?.interval_count!==1||price.recurring?.usage_type!=='licensed'||price.billing_scheme!=='per_unit')fail('Price configuration needs review.');
+ if(forCheckout&&cfg.live&&price.tax_behavior!=='exclusive')fail('Price tax configuration needs review.');
 }
 async function subscriptions(client:Client,customer:string,cfg:Config){
  const list=await client.stripe('subscriptions?customer='+encodeURIComponent(customer)+'&status=all&limit=100');
@@ -90,6 +91,7 @@ async function checkout(row:Obj,tier:string,client:Client,cfg:Config,io:IO){
   integration_identifier:cfg.live?'blumr_live_scmgehri':'blumr_sandbox_scmgehri',mode:'subscription',customer:row.customer_id,'line_items[0][price]':cfg.prices[row.checkout_tier],'line_items[0][quantity]':'1',
   'allowed_payment_method_types[0]':'card','subscription_data[billing_mode][type]':'flexible','subscription_data[metadata][blumr_checkout]':row.checkout_id,success_url:cfg.app+'?billing=return',cancel_url:cfg.app+'?billing=return',
   expires_at:String(Math.floor(Date.parse(row.checkout_expires_at)/1000)),
+  ...(cfg.live?{'automatic_tax[enabled]':'true','billing_address_collection':'required','customer_update[address]':'auto'}:{}),
  },'blumr-checkout-'+row.checkout_id),cfg);
  if(objectId(session.customer)!==row.customer_id||session.mode!=='subscription')fail();
  // Save the ID even if the session expired after a lost response; its terminal
@@ -145,6 +147,12 @@ export async function handleBilling(request:Request,io:IO=runtime){
   if(body.action==='checkout'&&cfg.live&&body.tier!=='basic'&&
      (io.env('STRIPE_AI_PLANS_ENABLED')!=='true'||io.env('AI_PROVIDER_CALLS_DISABLED')!=='false'))
    return json({error:'AI subscription plans are not available yet.'},503);
+  // Stripe Tax silently collects nothing without registrations. This release
+  // acknowledgement is set only after actual registrations, product categories
+  // and an address-based calculation have been verified. It gates acquisition
+  // only: existing billing, signed receipts and recovery remain available.
+  if(body.action==='checkout'&&cfg.live&&io.env('STRIPE_TAX_REGISTRATIONS_VERIFIED')!=='true')
+   return json({error:'Paid subscriptions are awaiting tax setup.'},503);
   row=await client.rpc('claim',{user:user.id,purpose:body.action});
   return json(body.action==='checkout'?await checkout(row!,body.tier,client,cfg,io):await portal(row!,client,cfg));
  }catch(e){return json({error:e instanceof BillingError?e.message:'Billing is temporarily unavailable. Try again shortly.'},e instanceof BillingError?e.status:503);}

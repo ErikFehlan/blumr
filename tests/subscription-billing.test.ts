@@ -2,7 +2,7 @@ import {handleBilling,handleStripeWebhook,handleBillingReconcile,reconcile,recon
 import captured from './fixtures/subscription-stripe-sandbox.json' with {type:'json'};
 function assert(value:unknown,message='Assertion failed'):asserts value{if(!value)throw Error(message);}
 const now=Date.parse('2026-10-28T12:00:00Z'),user='00000000-0000-0000-0000-000000000001';
-const price={id:'price_basic',livemode:false,active:true,currency:'usd',unit_amount:2900,type:'recurring',billing_scheme:'per_unit',recurring:{interval:'month',interval_count:1,usage_type:'licensed'}};
+const price={id:'price_basic',livemode:false,active:true,tax_behavior:'exclusive',currency:'usd',unit_amount:2900,type:'recurring',billing_scheme:'per_unit',recurring:{interval:'month',interval_count:1,usage_type:'licensed'}};
 const subscription=()=>({id:'sub_first',customer:'cus_first',livemode:false,status:'active',collection_method:'charge_automatically',cancel_at_period_end:false,metadata:{blumr_checkout:'operation'},latest_invoice:'in_first',items:{has_more:false,data:[{id:'si_first',quantity:1,current_period_start:now/1000-60,current_period_end:now/1000+2591940,price:structuredClone(price)}]}});
 const invoice=()=>({id:'in_first',livemode:false,customer:'cus_first',status:'paid',currency:'usd',parent:{subscription_details:{subscription:'sub_first'}},lines:{has_more:false,data:[{livemode:false,parent:{subscription_item_details:{subscription_item:'si_first',proration:false}},pricing:{price_details:{price:'price_basic'}},quantity:1,period:{start:now/1000-60,end:now/1000+2591940}}]}});
 function fixture(){
@@ -184,7 +184,7 @@ Deno.test('billing transport refuses credential-bearing redirects',async()=>{
 });
 
 Deno.test('live rollout checks account identity and limits acquisition to ten explicit users',async()=>{
- const f=fixture();Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected'});
+ const f=fixture();Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected',STRIPE_TAX_REGISTRATIONS_VERIFIED:'true'});
  const fetch=f.io.fetch;let account='acct_expected';f.io.fetch=async(input,init)=>String(input).endsWith('/v1/account')?Response.json({id:account,charges_enabled:true}):fetch(input,init);
  assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===403);assert(!f.state.rpc.length);
  f.env.STRIPE_LIVE_COHORT=user;assert((await handleBilling(request({action:'status'}),f.io)).status===200);
@@ -205,7 +205,7 @@ Deno.test('live AI plan sales require separate approval and enabled provider cal
  for(const tier of ['advanced','pro']){
   for(const [sales,disabled] of [[undefined,undefined],['false','false'],['true',undefined],['true','true'],['true','invalid']] as const){
    const f=fixture();
-   Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected',STRIPE_LIVE_COHORT:user});
+   Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected',STRIPE_TAX_REGISTRATIONS_VERIFIED:'true',STRIPE_LIVE_COHORT:user});
    if(sales!==undefined)f.env.STRIPE_AI_PLANS_ENABLED=sales;
    if(disabled!==undefined)f.env.AI_PROVIDER_CALLS_DISABLED=disabled;
    const transport=f.io.fetch;
@@ -219,7 +219,7 @@ Deno.test('live AI plan sales require separate approval and enabled provider cal
 Deno.test('separately approved live AI sales still enforce the exact tier price and mode',async()=>{
  for(const tier of ['advanced','pro']){
   const f=fixture();
-  Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected',STRIPE_LIVE_COHORT:user,STRIPE_AI_PLANS_ENABLED:'true',AI_PROVIDER_CALLS_DISABLED:'false'});
+  Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected',STRIPE_TAX_REGISTRATIONS_VERIFIED:'true',STRIPE_LIVE_COHORT:user,STRIPE_AI_PLANS_ENABLED:'true',AI_PROVIDER_CALLS_DISABLED:'false'});
   Object.assign(f.state.price,{id:'price_'+tier,unit_amount:tier==='advanced'?7900:15000});
   const transport=f.io.fetch;
   f.io.fetch=async(input,init)=>{
@@ -231,4 +231,46 @@ Deno.test('separately approved live AI sales still enforce the exact tier price 
   assert((await handleBilling(request({action:'checkout',tier}),f.io)).status===200);
   assert(f.state.checkoutCreates[0].form['line_items[0][price]']==='price_'+tier);
  }
+});
+
+Deno.test('live acquisition requires verified tax setup before customer or ledger mutation',async()=>{
+ for(const value of [undefined,'false','TRUE','invalid']){
+  const f=fixture();
+  Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected',STRIPE_LIVE_COHORT:user});
+  if(value!==undefined)f.env.STRIPE_TAX_REGISTRATIONS_VERIFIED=value;
+  const transport=f.io.fetch;
+  f.io.fetch=async(input,init)=>String(input).endsWith('/v1/account')?Response.json({id:'acct_expected',charges_enabled:true}):transport(input,init);
+  const response=await handleBilling(request({action:'checkout',tier:'basic'}),f.io);
+  assert(response.status===503&&(await response.json()).error==='Paid subscriptions are awaiting tax setup.');
+  assert(!f.state.rpc.length&&!f.state.customerCreates.length&&!f.state.checkoutCreates.length);
+  assert((await handleBilling(request({action:'status'}),f.io)).status===200,'Tax readiness must not disable billing status');
+ }
+});
+Deno.test('live checkout collects current address and automatic tax with exclusive prices; retries stay identical',async()=>{
+ const f=fixture();
+ Object.assign(f.env,{STRIPE_BILLING_MODE:'live',STRIPE_BILLING_LIVE_ENABLED:'true',STRIPE_BILLING_SANDBOX_ENABLED:'false',STRIPE_SECRET_KEY:'rk_live_synthetic',SUPABASE_URL:'https://zqiqjzxcpznhzjengfff.supabase.co',BILLING_APP_URL:'https://blumr.io/',STRIPE_ACCOUNT_ID:'acct_expected',STRIPE_LIVE_COHORT:user,STRIPE_TAX_REGISTRATIONS_VERIFIED:'true'});
+ const transport=f.io.fetch;
+ f.io.fetch=async(input,init)=>{
+  if(String(input).endsWith('/v1/account'))return Response.json({id:'acct_expected',charges_enabled:true});
+  const r=await transport(input,init);if(!String(input).startsWith('https://api.stripe.com/'))return r;
+  const body=await r.json();body.livemode=true;return Response.json(body);
+ };
+ for(const behavior of ['inclusive','unspecified',undefined]){
+  f.state.price.tax_behavior=behavior;
+  assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);
+  assert(!f.state.checkoutCreates.length);
+ }
+ f.state.price.tax_behavior='exclusive';f.state.failRPC='checkout_save';
+ assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);
+ f.state.failRPC=null;assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===200);
+ const [first,retry]=f.state.checkoutCreates;
+ assert(first.form['automatic_tax[enabled]']==='true'&&first.form.billing_address_collection==='required'&&first.form['customer_update[address]']==='auto');
+ assert(first.key===retry.key&&JSON.stringify(first.form)===JSON.stringify(retry.form));
+ delete f.env.STRIPE_TAX_REGISTRATIONS_VERIFIED;
+ assert((await handleBilling(request({action:'portal'}),f.io)).status===200,'Tax hold must not strand existing subscribers');
+});
+Deno.test('sandbox checkout keeps its established tax configuration',async()=>{
+ const f=fixture();assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===200);
+ const form=f.state.checkoutCreates[0].form;
+ assert(!Object.hasOwn(form,'automatic_tax[enabled]')&&!Object.hasOwn(form,'customer_update[address]'));
 });
