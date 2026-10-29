@@ -36,6 +36,7 @@ export async function runReadiness(mode,env=process.env){
   assert.deepEqual(await baseline(),before);console.log(JSON.stringify({case:'readiness_migration',checksum:hash,project:PROJECT,provider_usage:8}));return;
  }
  assert.equal(history.length,1,'Readiness migration required');assert.equal(history[0].hash,hash,'Migration source mismatch');
+ const priority='20261029180352_subscription_billing_receipt_priority';const prioritySource=await readFile(new URL('../supabase/migrations/'+priority+'.sql',import.meta.url),'utf8');const priorityHistory=await sql('select md5(array_to_string(statements,E\'\\n\')) as hash from supabase_migrations.schema_migrations where name=$1',[priority.slice(15)]);assert.equal(priorityHistory.length,1,'Receipt priority migration required');assert.equal(priorityHistory[0].hash,createHash('md5').update(prioritySource).digest('hex'),'Receipt priority migration mismatch');
  const keys=await management('/api-keys?reveal=true'),service=keys.find(k=>k.name==='service_role')?.api_key,anon=keys.find(k=>k.name==='anon')?.api_key;assert(service&&anon);
  const call=async(path,access,body,expected=[200,201,204])=>(await request(base+path,{method:'POST',headers:{apikey:access===service?service:anon,Authorization:`Bearer ${access}`,'Content-Type':'application/json',Origin:app},body:JSON.stringify(body)},expected));
  const risk=async(action,args={})=>(await call('/rest/v1/rpc/subscription_billing_risk_command',service,{p_action:action,p_args:args})).data;

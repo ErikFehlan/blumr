@@ -35,7 +35,7 @@ function fixture(){
   if(path.startsWith('prices/'))return Response.json(state.price);
   if(path==='checkout/sessions'){
    state.checkoutCreates.push({key:h.get('idempotency-key'),form:Object.fromEntries(form)});
-   assert(/^blumr_sandbox_[a-z]{8}$/.test(form.get('integration_identifier')||''));assert(!form.has('user_id')&&!form.has('customer_email')&&!form.has('payment_method_types[0]'));assert(form.get('allowed_payment_method_types[0]')==='card'&&form.get('subscription_data[billing_mode][type]')==='flexible');return Response.json({id:'cs_test_first',livemode:false,customer:'cus_first',mode:'subscription',status:state.sessionStatus,url:'https://checkout.stripe.com/c/pay/cs_test_first'});
+   assert(new RegExp('^blumr_'+(env.STRIPE_BILLING_MODE==='live'?'live':'sandbox')+'_[a-z]{8}$').test(form.get('integration_identifier')||''));assert(!form.has('user_id')&&!form.has('customer_email')&&!form.has('payment_method_types[0]'));assert(form.get('allowed_payment_method_types[0]')==='card'&&form.get('subscription_data[billing_mode][type]')==='flexible');return Response.json({id:'cs_test_first',livemode:false,customer:'cus_first',mode:'subscription',status:state.sessionStatus,url:'https://checkout.stripe.com/c/pay/cs_test_first'});
   }
   if(path==='checkout/sessions/cs_test_first')return Response.json({id:'cs_test_first',livemode:false,customer:'cus_first',status:state.sessionStatus,url:'https://checkout.stripe.com/c/pay/cs_test_first',subscription:'sub_first'});
   if(path==='billing_portal/configurations/bpc_test')return Response.json({id:'bpc_test',livemode:false,active:true,features:{subscription_update:{enabled:state.portalUpdates},subscription_cancel:{enabled:true,mode:'at_period_end'},payment_method_update:{enabled:true},invoice_history:{enabled:true}}});
@@ -190,8 +190,12 @@ Deno.test('live rollout checks account identity and limits acquisition to ten ex
  f.env.STRIPE_LIVE_COHORT=user;assert((await handleBilling(request({action:'status'}),f.io)).status===200);
  account='acct_other';assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);const count=f.state.rpc.length;assert((await worker(f)).status===503);assert(f.state.rpc.length===count);
  account='acct_expected';f.env.STRIPE_LIVE_COHORT=Array(11).fill(user).join(',');assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);
- f.env.STRIPE_LIVE_COHORT=user;const baseFetch=f.io.fetch;f.io.fetch=async(input,init)=>{if(String(input).includes('api.stripe.com')&&!String(input).endsWith('/account')){const r=await baseFetch(input,init);const body=await r.json();body.livemode=true;return Response.json(body);}return baseFetch(input,init);};
- // Status and acquisition have independent gates; a mode-mismatched object
- // must still fail before a checkout can be accepted.
+ f.env.STRIPE_LIVE_COHORT='00000000-0000-0000-0000-000000000002';assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===403);
+ f.env.STRIPE_LIVE_COHORT=user;
+ // A correct account/cohort still cannot accept sandbox objects in live mode.
  assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);
+ const baseFetch=f.io.fetch;f.io.fetch=async(input,init)=>{if(String(input).includes('api.stripe.com')&&!String(input).endsWith('/account')){const r=await baseFetch(input,init);const body=await r.json();body.livemode=true;return Response.json(body);}return baseFetch(input,init);};
+ assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===200);
+ assert(f.state.checkoutCreates.length===1&&f.state.checkoutCreates[0].form.integration_identifier==='blumr_live_scmgehri');
+ f.env.STRIPE_LIVE_COHORT='';assert((await handleBilling(request({action:'status'}),f.io)).status===200);assert((await handleBilling(request({action:'portal'}),f.io)).status===200);
 });
