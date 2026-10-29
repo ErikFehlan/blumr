@@ -37,6 +37,16 @@ Seven dependent functions were deployed at 2026-10-29T21:45:39.285Z with
 their existing JWT settings retained. Full dependency readback matched reviewed
 source. No migrations or runtime flags were reapplied. The updated deployment
 manifest records the new hashes and the successful backup used for this patch.
+Merged application release: `14466c9c7c8bfe3bd06d187f3fe3cbdd95d91d4b`.
+Post-merge closed runtime verification job `123754970050` in
+[run 40960666446](https://github.com/ErikFehlan/blumr/actions/runs/40960666446)
+passed against the deployed patch: eight migrations, nine bundles, 13 isolated
+ledger tables, matching reconciliation credentials, provider usage 173, all
+three workers paused and checkout disabled. All four required main workflows
+passed. Public check job `123755056092` matched all 70 served files and passed
+the browser navigation/sign-in probe. Cloudflare canonical deployment
+`dc60c36c-65ea-44e3-829d-2229b8cd4890` serves that application release.
+Later decision/evidence-only documentation commits do not change this deployed code.
 
 ## Closed controls to retain
 
@@ -86,8 +96,8 @@ After connection:
 2. List live products/prices/portal configurations/webhooks. Reuse exact matching
    blumr objects; do not guess IDs or repurpose another business's objects.
 3. Verify monthly USD, interval count 1, licensed, per-unit prices:
-   Basic 2900, Advanced 7900, Pro 15000 cents. Confirm price tax behavior before
-   setting it: explicit inclusive/exclusive behavior cannot subsequently change.
+   Basic 2900, Advanced 7900, Pro 15000 cents. The owner selected tax-exclusive pricing. Verify matching prices use
+   `tax_behavior=exclusive`; explicit inclusive/exclusive behavior cannot subsequently change.
 4. Create a separate restricted live runtime key with Charges/Refunds read,
    Invoices read, Prices read, Subscriptions read, Customers write, Checkout
    Sessions write and Customer Portal write. No refund/dispute write privileges.
@@ -126,17 +136,17 @@ charge.dispute.created
 radar.early_fraud_warning.created
 ```
 
-## Decisions awaiting the owner
+## Confirmed decisions and remaining inputs
 
 | Decision | Concrete proposal / unresolved fact |
 | --- | --- |
 | Pilot | Owner selected the owner's existing verified ordinary business account for a future Basic pilot (one account). Canonical Auth UUID and beta eligibility were resolved privately; no identity is committed here. Enrollment and checkout activation are not approved by this selection. |
-| First 24-hour operator | Propose Erik Fehlan using the existing administrator identity. Confirm availability and GitHub failure notifications before a release window. |
+| First 24-hour operator | Owner confirmed Erik Fehlan using the existing administrator identity. Confirm the release window and GitHub failure notifications before activation. |
 | Seller | Actual LLC legal name, formation jurisdiction and operating city/state/country remain unconfirmed. Employer and account display names are not legal-seller evidence. |
 | Support | Confirm a monitored business support/privacy mailbox and who checks it. Existing in-app reports alone are insufficient for billing lockout support. |
 | Policies | Owner chose the seven-day initial-payment refund approach for the review draft; renewal requests individually reviewed. This is drafting direction, not approved publication/effective terms. Review [policy drafts](subscription-policy-drafts.md), confirm retention, processors and jurisdiction, then approve publication separately. |
 | Tax | Confirm actual registration records/effective dates, business locations, pilot customer service locations and prior sales by jurisdiction. Registration absence in Stripe is not evidence of no obligation. |
-| Price presentation | Recommend tax-exclusive USD prices with tax shown before payment, or explicitly choose inclusive pricing. Neither is installed. |
+| Price presentation | Owner selected tax-exclusive USD prices with any required tax shown before payment. Live price configuration is still blocked by connection; registrations and calculation are separate unresolved work. |
 | Password protection | Propose Supabase Pro plus enabling leaked-password protection. Alternative: explicit time-bounded acceptance of the Free-plan limitation with an owner and review date. No upgrade or risk acceptance is authorized. |
 
 ### Tax findings and integration work

@@ -31,11 +31,11 @@ requires explicit participants and is capped at ten.
 | --- | --- |
 | Live Stripe account | Connect the business's live account; verify account identity and payment readiness before provisioning live objects. Only the sandbox is connected at this checkpoint. |
 | Pilot identities | One future Basic participant selected: the owner's existing verified business account. Canonical Auth UUID resolved privately. Do not enroll yet or convert the beta population automatically. |
-| Release operator | Named person monitoring receipts, delivery failures, refunds and disputes during the first 24 hours. |
+| Release operator | Owner confirmed Erik Fehlan for the first 24 hours using the existing administrator account. Release window and failure-notification delivery still need confirmation. |
 | Seller and support | Confirm legal seller name, operating location and monitored customer-support address. No LLC name or jurisdiction is assumed. |
 | Refund policy | Owner selected seven-day initial-payment refund requests, renewals reviewed individually, as the drafting direction. Final wording, exceptions and publication still need approval. No refunds are automated by the app. |
 | Terms and privacy | Approved public URLs and accurate service descriptions, including monthly renewal, cancellation timing, allowance limits and handling of customer documents. No draft wording is treated as published or binding. |
-| Tax | Confirm actual registrations, relevant jurisdictions, product tax classification and whether displayed prices include or exclude tax. Do not infer that no tax is due from an absent Stripe registration. |
+| Tax | Owner selected tax-exclusive price presentation. Actual registrations, relevant jurisdictions and product tax classification remain unconfirmed. Do not infer that no tax is due from an absent Stripe registration. |
 | Password protection | Decide whether to upgrade Supabase for leaked-password protection or explicitly accept that remaining launch limitation. No paid upgrade has been purchased. |
 
 ## Draft checkout-facing summary for review
@@ -48,7 +48,7 @@ candidates, notes and results remain available if new evaluations are paused.
 AI evaluations are not included in Basic.
 
 Before publishing, add the confirmed seller/support details, approved refund
-policy, tax-inclusive or tax-exclusive pricing statement, and links to the
+policy, the selected tax-exclusive pricing statement, and links to the
 approved terms and privacy notice. This is a product summary for review, not a
 completed legal policy.
 
@@ -77,8 +77,7 @@ See [the current activation package](subscription-activation-package.md) for fre
 environment evidence, exact connection/tool blockers, the selected one-account future
 pilot, tax findings, the approximately $35/month two-project Pro option, and the
 activation/rollback sequence. Pilot identities were resolved against existing
-verified Auth accounts but are kept out of this public repository. No enrollment, activation or
-monitoring assignment is approved.
+verified Auth accounts but are kept out of this public repository. Erik Fehlan is confirmed as the first-day monitoring owner. No enrollment or activation is approved.
 
 The source review found no published terms/privacy/refund pages or public support
 email in the served app. Concrete wording and the selected refund draft are in

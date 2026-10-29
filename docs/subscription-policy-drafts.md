@@ -57,9 +57,11 @@ Self-service plan switching is unavailable. Payment problems or a billing review
 may pause new evaluations. Saved candidates, notes and results are retained,
 subject to the approved retention/deletion policy.”
 
-Choose exactly one pricing sentence before publication:
-- Exclusive: “Prices exclude applicable taxes, which are shown before payment.”
-- Inclusive: “The advertised subscription price includes applicable taxes.”
+Owner selected tax-exclusive price presentation. Proposed pricing sentence:
+“Prices exclude applicable taxes, which are shown before payment.”
+
+This selection does not establish registrations or approve publication of the
+policy. Configure and verify applicable calculation before taking payment.
 
 These clauses describe the implemented plan catalog. They are not a complete
 legal agreement: seller, applicable territory, customer eligibility, content
