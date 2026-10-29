@@ -1,0 +1,38 @@
+name: Prepare closed production billing
+on:
+  pull_request:
+    branches: [main]
+    types: [labeled]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: criteria-backend-deploy
+  cancel-in-progress: false
+jobs:
+  configure:
+    if: >-
+      github.repository == 'ErikFehlan/blumr' &&
+      ((github.event_name == 'pull_request' && github.event.pull_request.number == 147 &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.head_ref == 'feat/subscription-foundation' &&
+        github.event.label.name == 'prepare-closed-billing-production') ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/feat/subscription-foundation'))
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test production boundaries without network access
+        run: node --test tests/billing-production-closed.test.mjs
+      - name: Install and verify closed billing and disabled AI configuration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
+        run: node scripts/billing-production-closed.mjs

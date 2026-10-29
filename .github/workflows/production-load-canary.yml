@@ -15,6 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   canary:
+    if: vars.PAID_AI_RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: criteria-backend
     timeout-minutes: 25

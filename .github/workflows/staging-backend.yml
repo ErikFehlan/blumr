@@ -9,7 +9,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   verify:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Paid AI is a separate release decision, including scheduled readiness.
+    if: >-
+      vars.PAID_AI_RELEASE_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: criteria-backend
     timeout-minutes: 40
