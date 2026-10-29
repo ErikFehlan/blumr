@@ -1,6 +1,7 @@
 // Read staging through the supplied Management client; restore only inside a
 // disposable PostgreSQL container with NO network. Never restore into Supabase.
 import assert from 'node:assert/strict';
+import {isDeepStrictEqual} from 'node:util';
 import {mkdtemp,writeFile,readFile,rm,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -13,7 +14,7 @@ declare t record;r jsonb;tables jsonb:='[]';sequences jsonb:='[]'; seq record;st
 begin
  for t in select c.oid,n.nspname as schema,c.relname as name,c.relrowsecurity,c.relforcerowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
   where c.relkind='r' and ((n.nspname='public' and c.relname like 'subscription_%') or n.nspname='blumr_billing_private') order by n.nspname,c.relname loop
-  execute format('select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text),''[]'') from %I.%I r',t.schema,t.name) into r;
+  execute format('select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text collate "C"),''[]'') from %I.%I r',t.schema,t.name) into r;
   tables:=tables||jsonb_build_array(jsonb_build_object('schema',t.schema,'name',t.name,'rows',r,'rls',t.relrowsecurity,'force_rls',t.relforcerowsecurity,
    'columns',(select jsonb_agg(jsonb_build_object('name',a.attname,'type',format_type(a.atttypid,a.atttypmod),'not_null',a.attnotnull,'identity',a.attidentity,'default',pg_get_expr(d.adbin,d.adrelid)) order by a.attnum) from pg_attribute a left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum where a.attrelid=t.oid and a.attnum>0 and not a.attisdropped),
    'constraints',(select coalesce(jsonb_agg(jsonb_build_object('name',k.conname,'type',k.contype,'definition',pg_get_constraintdef(k.oid)) order by k.conname),'[]') from pg_constraint k where k.conrelid=t.oid),
@@ -76,8 +77,8 @@ export async function recoverBillingLedger(sql){
   // pg_get_functiondef can differ in qualification, so compare bodies, settings,
   // identity, role privileges and every table row/policy/constraint/trigger.
   const canonical=s=>({...s,functions:s.functions.map(({definition,...f})=>f)});
-  assert.deepEqual(canonical(restored),canonical(snapshot),'Restored billing rows or security differ');
-  assert.deepEqual(canonical((await sql(ledgerSnapshotSQL))[0].snapshot),canonical(original),'Source changed during capture');
+  assert(isDeepStrictEqual(canonical(restored),canonical(snapshot)),'Restored billing rows or security differ; private content withheld');
+  assert(isDeepStrictEqual(canonical((await sql(ledgerSnapshotSQL))[0].snapshot),canonical(original)),'Source changed during capture; private content withheld');
   const proof={case:'billing_ledger_recovery',project:'momfzjmycveqginxmqib',tables:snapshot.tables.length,rows:snapshot.tables.reduce((n,t)=>n+t.rows.length,0),exact_rows_security_sequences:true,encrypted_roundtrip:true,network:'none',elapsed_seconds:Math.ceil((Date.now()-started)/1000)};
   await mkdir('test-results/billing-recovery',{recursive:true});await writeFile('test-results/billing-recovery/verification.json',JSON.stringify(proof,null,2));
   await writeFile('test-results/billing-recovery/billing-ledger.enc',await readFile(encrypted));await writeFile('test-results/billing-recovery/billing-ledger.enc.json',await readFile(encrypted+'.json'));console.log(JSON.stringify(proof));
