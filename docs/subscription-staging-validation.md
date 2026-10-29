@@ -36,9 +36,35 @@ idempotency key, and verifies RLS/access boundaries and migration history afterw
 Its five simulated tests passed. The [hosted run](https://github.com/ErikFehlan/blumr/actions/runs/40873532035)
 was denied with HTTP 403; a fresh database read confirmed that neither billing
 table nor the migration record exists. No alternate SQL write was attempted after
-that denial. Migration execution is now an explicit workflow-dispatch option,
-disabled by default, so PR updates do not repeatedly retry the denied write.
-The default CLI invocation and PR migration step perform read-only preflight checks.
+that denial. Migration execution is disabled for ordinary PR updates and requires
+an explicit trigger, so source changes do not repeatedly retry the denied write.
+The default CLI invocation and ordinary PR migration step perform read-only preflight checks.
+
+The October 29 access review identified the 403 cause: the active scoped token
+named `blumr GitHub deployment` grants Database read-write access but has no
+Migrations permission. It covers both staging and production. Supabase does not
+allow editing a token's scope after creation.
+
+A separate token named `blumr-staging-billing-migrations` is prepared in the
+dashboard, limited to `blumr-staging`, with Database and Migrations read-write
+permissions and a seven-day expiry. It has **not been created**. Database writes
+are needed only for the runner's checksum-guarded migration-history alignment;
+the schema change uses the Management migration endpoint. Store this credential
+as `SUPABASE_STAGING_MIGRATION_TOKEN` in the `criteria-backend` GitHub environment.
+The migration step uses only that secret, without falling back to the existing
+deployment token. This preserves the credential used by other deployment jobs.
+
+Once the dedicated token is installed, explicitly add the
+`apply-billing-staging-migration` label to PR #147. The workflow accepts that event
+only for the owned subscription branch; ordinary pushes and other labels cannot
+apply migrations. This label trigger is available before the workflow reaches
+the default branch. The existing manual workflow-dispatch option remains. Remove
+the label after recording the verified result. No write was retried during the
+access review, and the final migration is still pending.
+
+The [read-only hosted checkpoint](https://github.com/ErikFehlan/blumr/actions/runs/40877029819)
+passed on commit `2cfec83`: all prerequisites matched, the final migration was
+absent, workers were paused and provider usage remained at eight rows.
 
 ## Deployed functions and AI lock
 
@@ -110,8 +136,10 @@ one is present. The successful run confirmed **no Stripe server key is installed
 It never logs credential values. Runtime activation remains pending.
 
 The October 29 setup run again confirmed that no Stripe key is installed. The
-Stripe connector exposes no API-key creation operation; its dashboard was opened
-for this task and requires authentication. No key has been created or copied.
+Stripe connector exposes no API-key creation operation. Its dashboard is now
+authenticated in the correct sandbox, and a six-permission restricted key is
+prepared for final confirmation. GitHub is also authenticated and its destination
+secret form is prepared. No key has been created or copied.
 
 Complete the final migration before activation. Configure the variables listed in
 [the sandbox runbook](subscription-stripe-sandbox.md#hosted-staging-setup) through
@@ -157,8 +185,8 @@ enabling the webhook or cron. Do not paste keys into chat, repository files or l
 
 ## Still required before production consideration
 
-1. Restore a working authorized migration path (connector request-state repair or
-   Management migration access), then apply and verify the final migration.
+1. Create and securely install the prepared staging-only migration token, then
+   explicitly trigger and verify the final migration with the named PR label.
 2. Supply the missing restricted sandbox key through the secure environment store,
    rerun the configuration-only job, and verify the stable API contract before activation.
 3. Enable the sandbox webhook and worker, then use disposable verified users for
