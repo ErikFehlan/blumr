@@ -6,8 +6,10 @@ The billing implementation and staging readiness checks passed in Supabase
 Production was not changed. PR #147 remains a draft; live activation requires the
 inputs and approval in [production operations](subscription-production-operations.md).
 
-Implementation/test head: `a1eacbbe91435ed19621d686a36d896fd139ea32`.
-Subsequent documentation commits do not change executable artifacts.
+Hosted billing/recovery checkpoint: `a1eacbbe91435ed19621d686a36d896fd139ea32`.
+The final PR also applies the verified fixed-collation checksum ordering to the
+shared application backup inventory, with a native PostgreSQL regression test;
+the final commit and CI status are recorded in PR #147.
 
 ## Final staging state
 

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {backupSecuritySQL,backupManagedSchemaSQL} from '../scripts/backup-security.mjs';
+import {inventorySQL} from '../scripts/backup-inventory.mjs';
 const psql=sql=>execFileSync('psql',['-h','localhost','-U','postgres','-d','backup_privileges','-v','ON_ERROR_STOP=1','-At'],{input:sql,encoding:'utf8'}).trim();
 psql(`create schema auth;create schema storage;
  create function auth.uid() returns uuid language sql as 'select null::uuid';
@@ -19,3 +21,7 @@ const missing=JSON.parse(psql(backupSecuritySQL).split('\n').at(-1));assert.notD
 psql('set search_path=public,pg_catalog;'+managed);
 const after=JSON.parse(psql('set search_path=public,auth;'+backupSecuritySQL).split('\n').at(-1));assert.deepEqual(after,before);
 console.log('PASS: managed-schema policies and application triggers restore exactly regardless of target search path.');
+psql("insert into blumr_billing_private.risk_events values('evt_2'),('evt_10'),('evt_1');");
+const inventory=JSON.parse(psql(inventorySQL).split('\n').at(-1)).find(x=>x.schema==='blumr_billing_private'&&x.table==='risk_events');
+assert.equal(inventory.rows,3);assert.equal(inventory.checksum,createHash('md5').update('{"id":"evt_1"}\n{"id":"evt_10"}\n{"id":"evt_2"}').digest('hex'));
+console.log('PASS: private billing rows use portable byte-order backup checksums.');
