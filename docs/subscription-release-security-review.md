@@ -57,7 +57,31 @@ Do not use the ordinary main deployment path for this release without removing
 its paid model preflight and scheduler activation: those conflict with this
 release's explicit no-paid-AI requirement.
 
-The daily full backup failed October 12–29 in the remote roles dump. A new backup
-must complete encrypted archive recovery, isolated database restore, exact row
-and privilege checks, and every Storage byte before production DDL. Billing-only
-recovery evidence does not satisfy this full application backup gate.
+The daily full backup failed October 12–29 because the replacement scoped token
+did not include pooler-configuration discovery. The production Dashboard supplied
+the verified password-free session route; no token permissions or database
+passwords were changed. Full backup run **40945589186** passed on October 29:
+encrypted recovery, isolated PostgreSQL restore with outbound networks disconnected,
+exact row and privilege checks, and all 160 Storage objects (19,632,156 bytes).
+Encrypted artifact **12928364091** is retained until January 27, 2027; its uploaded
+ZIP SHA-256 is `bdf96959604b694953bd69489e6ccd310edfb3c37ba1fb0c0276820081077efb`.
+https://github.com/ErikFehlan/blumr/actions/runs/40945589186
+
+## Retired AI endpoints
+
+Two deployed routes outside the active application source (`analyze-candidate`
+and `analyze-patterns`) still contained direct provider calls without the modern
+budget/pause guard. The active frontend does not call either route. Both now
+serve a fixed disabled response, retain gateway JWT verification and contain no
+provider transport. Network- and environment-denied tests passed and deployed
+source readback confirmed the disabled implementation. Original bundle hashes:
+
+- `analyze-candidate`: `390307ef0a9d30404bcfecc36f3bfa5e420ffe222e029be8405ab4d279cd29bc`.
+- `analyze-patterns`: `5463fa52a9dc348e6c47401d4dd17d154daba7df45d227c22f5e222ded7bbb44`.
+
+Disabled bundle hashes are respectively
+`032a187f57647ac8ae23961cbaab41edc999b6ef54112326902821c67a730045` and
+`ce06a5d089af6b79a66fa4ecc85acd7b14aa12ee52dfb33baf95a9410e0a94b3`.
+The 173-row application provider ledger does not cover any historical calls that
+may have bypassed that ledger through retired endpoints; no such call was made
+as part of this review.

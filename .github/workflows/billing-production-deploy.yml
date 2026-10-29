@@ -1,0 +1,49 @@
+name: Deploy billing with production checkout closed
+on:
+  pull_request:
+    branches: [main]
+    types: [labeled]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: criteria-backend-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: >-
+      github.repository == 'ErikFehlan/blumr' && github.event.pull_request.number == 147 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feat/subscription-foundation' &&
+      github.event.label.name == 'deploy-closed-billing-production'
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.119.0
+      - name: Verify release gates without network access
+        run: node --test tests/billing-production-*.test.mjs tests/backup-connection.test.js
+      - name: Require verified backup and CI, apply exact migrations, deploy disabled handlers
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.event.pull_request.head.sha }}
+          SUPABASE_TELEMETRY_DISABLED: 'true'
+          DO_NOT_TRACK: '1'
+        run: node scripts/billing-production-deploy.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: closed-production-billing-${{ github.run_id }}
+          path: test-results/closed-billing-production/
+          retention-days: 90
+          if-no-files-found: error

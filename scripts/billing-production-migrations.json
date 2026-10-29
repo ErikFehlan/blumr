@@ -1,0 +1,58 @@
+[
+  {
+    "version": "20261028134006",
+    "name": "subscription_foundation",
+    "file": "20261028134006_subscription_foundation.sql",
+    "md5": "93711b222f884bf45212204e598306c9",
+    "cli_md5": "0a9a51f53c4526d219125ab1cc57ac37"
+  },
+  {
+    "version": "20261028142020",
+    "name": "subscription_screening_enforcement",
+    "file": "20261028142020_subscription_screening_enforcement.sql",
+    "md5": "e4c09c9a5f17aec92717ac87f7213a2f",
+    "cli_md5": "b228a36432e9fc0914ca845182e2dc3e"
+  },
+  {
+    "version": "20261028151317",
+    "name": "subscription_feedback_usage",
+    "file": "20261028151317_subscription_feedback_usage.sql",
+    "md5": "a3e8b8774c844d275512cc35507e565a",
+    "cli_md5": "5ecf25e4ff050b3f91a441ec3a46adc2"
+  },
+  {
+    "version": "20261028155821",
+    "name": "subscription_admin_grants",
+    "file": "20261028155821_subscription_admin_grants.sql",
+    "md5": "f93009578bafaf61d4fee52039f248ea",
+    "cli_md5": "5bdcd57bf8b91401ab09d60bf9803c12"
+  },
+  {
+    "version": "20261028174343",
+    "name": "subscription_stripe_sandbox",
+    "file": "20261028174343_subscription_stripe_sandbox.sql",
+    "md5": "b575e919edfae10068cc4e76a2dd050c",
+    "cli_md5": "15dedaa59d54fc1b6239d923915c0595"
+  },
+  {
+    "version": "20261029171215",
+    "name": "subscription_billing_readiness",
+    "file": "20261029171215_subscription_billing_readiness.sql",
+    "md5": "f8bbee79a76b535d08c14207a35d8f28",
+    "cli_md5": "e2c8b1e74f26b8b37c83c130f1ab2295"
+  },
+  {
+    "version": "20261029180352",
+    "name": "subscription_billing_receipt_priority",
+    "file": "20261029180352_subscription_billing_receipt_priority.sql",
+    "md5": "9e32779409b544122402971ab7424a80",
+    "cli_md5": "cf29a3e64513db21d8dd62309277a661"
+  },
+  {
+    "version": "20261029194000",
+    "name": "subscription_billing_reviewer_identity",
+    "file": "20261029194000_subscription_billing_reviewer_identity.sql",
+    "md5": "d1d6d608d595105fbaf2931af95d3512",
+    "cli_md5": "1c046dcdaa5627a2cbd557e713019e42"
+  }
+]

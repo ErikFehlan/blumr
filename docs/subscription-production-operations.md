@@ -1,7 +1,8 @@
 # Limited billing rollout: release candidate
 
-This is the prepared operating procedure for PR #147, not authorization to deploy
-or activate production. Paid AI remains disabled independently of billing.
+The release owner has authorized production-readiness work and installation with
+checkout closed. First live checkout remains a separate release decision. Paid AI
+remains disabled independently of billing.
 The October 29 staging results are in `subscription-staging-results.md`.
 
 ## Configuration prepared for approval
@@ -106,7 +107,8 @@ payment/dispute before deciding. Resolve with service RPC
 `subscription_billing_risk_command('review', args)` where args contains:
 `object`, `invoice`, current `revision`, unique UUID `request`, current app-admin
 Auth UUID `actor`, `decision` (`allow` or `keep_hold`), and a 10–500-character
-`reason`. The actor must be present in `app_admins` by canonical Auth email.
+`reason`. The actor must match `app_admins.user_id`, be a nondeleted Auth user,
+and pass `has_beta_access`; an email match alone grants no authority.
 Concurrent/stale revisions return conflict. Repeating an identical request is
 idempotent; every decision is append-only audited. A larger refund or newly
 blocking event reopens the case. Do not use the synthetic staging operator in
@@ -139,11 +141,13 @@ Credential-bearing redirects are refused and errors/logs omit provider bodies.
 The independent backup inventory/security checks now include the private billing
 and subscription schemas and their triggers/functions.
 
-The staging advisor's 73 pre-existing authenticated definer notices and disabled
-leaked-password-protection warning remain separate project findings. No new
-billing browser-callable definer warning was introduced; service-only tables
-intentionally have RLS without browser policies. Do not describe the entire app
-as security-clean or accept those findings implicitly. Their existing review and
-password-protection setting must be confirmed by the release owner before live
-activation: https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable
+All 73 pre-existing authenticated definer notices were individually reviewed;
+the deployed definition fingerprints, authorization categories and production
+negative probes are recorded in `subscription-release-security-review.md` and
+`subscription-security-review.json`. No new billing browser-callable definer
+warning was introduced; service-only tables intentionally have RLS without
+browser policies. Leaked-password protection remains unavailable on the current
+Free plan and requires a separate paid-plan/launch decision. Do not describe the
+entire application as security-clean. References:
+https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable
 and https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
