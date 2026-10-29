@@ -12,7 +12,7 @@ has not changed. All work below targets Supabase project `momfzjmycveqginxmqib`
 | `20261028142020_subscription_screening_enforcement` | Applied; stored SQL matches repository |
 | `20261028151317_subscription_feedback_usage` | Applied; stored SQL matches repository |
 | `20261028155821_subscription_admin_grants` | Applied; stored SQL matches repository |
-| `20261028174343_subscription_stripe_sandbox` | Pending |
+| `20261028174343_subscription_stripe_sandbox` | Applied; stored SQL matches repository |
 
 The migration connector assigned execution timestamps to the applied records.
 After comparing exact SQL lengths and MD5 checksums, history versions were aligned
@@ -20,51 +20,36 @@ to the repository filenames using guarded updates. The admin migration's origina
 version was `20261028203658`; its exact SQL MD5 is
 `f93009578bafaf61d4fee52039f248ea`. No unapplied migration was marked applied.
 
-The final billing migration calls failed with `Invalid or expired requestState`
-and expired approval notices. A later call was interrupted after roughly 14 minutes;
-read-only checks afterward confirmed no billing schema/history was installed.
-Supabase's app permission is already **Allow all actions**. Further repeated calls
-were stopped. This is an unresolved connector handoff, not an SQL validation
-success or a request for broader authority.
+The final billing migration was applied on October 29 at 10:44 a.m. EDT by the
+[guarded staging run](https://github.com/ErikFehlan/blumr/actions/runs/40894500135)
+on commit `372c1b0ac06bbf19501ccf6d236fdc95fb000d5b`. Its stored SQL MD5 is
+`b575e919edfae10068cc4e76a2dd050c`, and its history version is the canonical
+`20261028174343`. An independent database read verified all five migration hashes,
+both private billing tables with RLS, and the service-only billing RPC boundary.
 
-On October 29 the connector again returned the same expired-request error. A
-staging-only deployment runner was prepared to use Supabase's documented
-`POST /v1/projects/{ref}/database/migrations` endpoint with the existing
-`criteria-backend` credential. It pins the reviewed SQL checksum, verifies all
-four prerequisites, requires zero subscribers and paused workers, uses a stable
-idempotency key, and verifies RLS/access boundaries and migration history afterward.
-Its five simulated tests passed. The [hosted run](https://github.com/ErikFehlan/blumr/actions/runs/40873532035)
-was denied with HTTP 403; a fresh database read confirmed that neither billing
-table nor the migration record exists. No alternate SQL write was attempted after
-that denial. Migration execution is disabled for ordinary PR updates and requires
-an explicit trigger, so source changes do not repeatedly retry the denied write.
-The default CLI invocation and ordinary PR migration step perform read-only preflight checks.
+The earlier connector failed with `Invalid or expired requestState`. The first
+Management migration request returned HTTP 403 because the existing shared
+deployment token lacked Migrations permission. No schema write occurred through
+either failed path. After explicit user confirmation, a separate token named
+`blumr-staging-billing-migrations` was created for **blumr-staging only**, with
+Database and Migrations read-write permissions and expiry on **November 5, 2026**.
+It is stored as `SUPABASE_STAGING_MIGRATION_TOKEN` in GitHub's `criteria-backend`
+environment. The shared deployment credential was not changed. Credential values
+were not placed in chat, source, screenshots or logs.
 
-The October 29 access review identified the 403 cause: the active scoped token
-named `blumr GitHub deployment` grants Database read-write access but has no
-Migrations permission. It covers both staging and production. Supabase does not
-allow editing a token's scope after creation.
+The runner uses Supabase's Management migration endpoint, pins the reviewed SQL,
+verifies all four prerequisites, requires zero subscribers and paused workers,
+and uses stable idempotency. Database writes are limited to the checksum-guarded
+history-version alignment after the migration endpoint applies the schema.
+The write step uses only the dedicated secret. The explicit
+`apply-billing-staging-migration` label triggered the verified run on PR #147 and
+was removed afterward. Ordinary PR updates and the default CLI invocation remain
+read-only; no production merge is needed to trigger this staging workflow.
 
-A separate token named `blumr-staging-billing-migrations` is prepared in the
-dashboard, limited to `blumr-staging`, with Database and Migrations read-write
-permissions and a seven-day expiry. It has **not been created**. Database writes
-are needed only for the runner's checksum-guarded migration-history alignment;
-the schema change uses the Management migration endpoint. Store this credential
-as `SUPABASE_STAGING_MIGRATION_TOKEN` in the `criteria-backend` GitHub environment.
-The migration step uses only that secret, without falling back to the existing
-deployment token. This preserves the credential used by other deployment jobs.
-
-Once the dedicated token is installed, explicitly add the
-`apply-billing-staging-migration` label to PR #147. The workflow accepts that event
-only for the owned subscription branch; ordinary pushes and other labels cannot
-apply migrations. This label trigger is available before the workflow reaches
-the default branch. The existing manual workflow-dispatch option remains. Remove
-the label after recording the verified result. No write was retried during the
-access review, and the final migration is still pending.
-
-The [read-only hosted checkpoint](https://github.com/ErikFehlan/blumr/actions/runs/40877029819)
-passed on commit `2cfec83`: all prerequisites matched, the final migration was
-absent, workers were paused and provider usage remained at eight rows.
+After migration, subscription accounts, periods, billing customers and billing
+events were all empty. All three AI/billing workers remained paused and provider
+usage stayed at eight rows. The same run verified `AI_PROVIDER_CALLS_DISABLED=true`,
+both feature flags false, and no installed Stripe server key.
 
 ## Deployed functions and AI lock
 
@@ -172,29 +157,37 @@ enabling the webhook or cron. Do not paste keys into chat, repository files or l
   redaction, and refusal to mutate active subscription/worker state.
 - Five additional migration-runner tests verify project/source isolation,
   prerequisite checks, idempotency, recovery from a lost response and read-only mode.
-- Security advisors: all eight applied subscription tables have RLS; zero exposed
-  subscription definer functions are executable by browser roles. Three new
-  no-policy notices are expected for service-only output/reservation/audit tables.
+- Security advisors rerun after the final migration: all ten subscription/billing
+  tables have RLS; zero exposed subscription definer functions are executable by
+  browser roles. Browser roles cannot use the private billing schema or execute
+  `subscription_billing_command`; the public wrapper is security-invoker and
+  executable by service_role. Five informational no-policy notices are expected
+  for service-only output/reservation/audit/customer/event tables.
+  [No-policy guidance](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
 - Existing project advisories remain: 73 authenticated definer notices and leaked
   password protection warning. They predate these changes; the whole project has
   not been declared security-clean. [Definer guidance](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
 - Performance advisors: new informational missing-FK-index notices for plan-code
   and current-period references, plus unused new indexes. The catalog is immutable
   and small; current-period lookup has the account primary key. Reassess with
-  staging workload evidence before adding redundant indexes.
+  staging workload evidence before adding redundant indexes. The post-migration
+  run also reports the unused pending-billing-events index, expected before any
+  sandbox events are received; no subscription/billing performance warnings.
+- All five CI workflows passed on commit `372c1b0`, including application/browser
+  journeys, subscription/PostgreSQL, criteria backend, rules screening, and the
+  disabled staging configuration. The explicit migration run also passed all
+  nine setup/migration safety tests and its apply-and-verify step.
 
 ## Still required before production consideration
 
-1. Create and securely install the prepared staging-only migration token, then
-   explicitly trigger and verify the final migration with the named PR label.
-2. Supply the missing restricted sandbox key through the secure environment store,
+1. Supply the missing restricted sandbox key through the secure environment store,
    rerun the configuration-only job, and verify the stable API contract before activation.
-3. Enable the sandbox webhook and worker, then use disposable verified users for
+2. Enable the sandbox webhook and worker, then use disposable verified users for
    real hosted Checkout → test payment → webhook → correct plan/allowances.
-4. Verify all tiers, renewals, failed payments/recovery, period-end cancellation,
+3. Verify all tiers, renewals, failed payments/recovery, period-end cancellation,
    duplicate/out-of-order receipts, expiry and temporary outages. Align test-clock
    scenarios with application time; never weaken the future-period guard.
-5. Repeat advisors against the complete schema, verify no added provider usage,
+4. Repeat advisors after hosted lifecycle tests, verify no added provider usage,
    rehearse recovery with paid test subscriptions, and clean up synthetic fixtures.
 
 Do not drop billing tables or erase usage to roll back. After accepting any test
