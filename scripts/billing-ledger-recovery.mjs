@@ -33,7 +33,7 @@ end$$;
 select pg_temp.billing_snapshot() as snapshot;`;
 export async function recoverBillingLedger(sql){
  const started=Date.now(),work=await mkdtemp(join(tmpdir(),'blumr-billing-restore-')),container='blumr-billing-recovery-'+process.pid;
- const run=(cmd,args,input)=>{try{return execFileSync(cmd,args,{input,encoding:'utf8',stdio:['pipe','pipe','pipe'],timeout:180000,maxBuffer:50*1024*1024});}catch(e){throw Error('Isolated billing recovery command failed: '+cmd+'; private output withheld');}};
+ const run=(cmd,args,input)=>{try{return execFileSync(cmd,args,{input,encoding:'utf8',stdio:['pipe','pipe','pipe'],timeout:180000,maxBuffer:50*1024*1024});}catch(e){const diagnostic=String(e.stderr||'').split('\n').find(line=>/ERROR:/.test(line));throw Error('Isolated billing recovery command failed: '+cmd+' '+args.slice(0,2).join(' ')+(diagnostic?'; '+diagnostic.slice(0,250):'; private output withheld'));}};
  const quote=table=>ident(table.schema)+'.'+ident(table.name);
  let created=false;
  try{
@@ -50,7 +50,7 @@ export async function recoverBillingLedger(sql){
   // authentication sessions, app documents and running schedulers are excluded.
   for(const t of snapshot.tables){schema.push('create table '+quote(t)+' ('+t.columns.map(c=>ident(c.name)+' '+c.type+(c.identity?' generated '+(c.identity==='a'?'always':'by default')+' as identity':c.default?' default '+c.default:'')+(c.not_null?' not null':'')).join(',')+');');}
   for(const t of snapshot.tables)for(const c of t.constraints.filter(c=>c.type!=='f'))schema.push('alter table '+quote(t)+' add constraint '+ident(c.name)+' '+c.definition+';');
-  psql(schema.join('\n'));
+  console.log('Restore: create schema');psql(schema.join('\n'));
   const identities={users:new Set(),workspaces:new Set(),candidates:new Set()};
   for(const t of snapshot.tables)for(const r of t.rows)for(const [key,value] of Object.entries(r)){if(value&&['user_id','actor_id','reviewed_by'].includes(key))identities.users.add(value);if(value&&key==='workspace_id')identities.workspaces.add(value);if(value&&key==='candidate_id')identities.candidates.add(value);}
   for(const m of snapshot.members){identities.users.add(m.user_id);identities.workspaces.add(m.workspace_id);}
@@ -58,7 +58,7 @@ export async function recoverBillingLedger(sql){
   for(const t of snapshot.tables)if(t.rows.length)data+='insert into '+quote(t)+' overriding system value select * from jsonb_populate_recordset(null::'+quote(t)+','+literal(JSON.stringify(t.rows))+'::jsonb);';
   for(const m of snapshot.members)data+='insert into public.workspace_members values('+literal(m.workspace_id)+','+literal(m.user_id)+');';
   for(const seq of snapshot.sequences)data+='select setval('+literal(seq.schema+'.'+seq.name)+','+seq.state.last_value+','+seq.state.is_called+');';
-  data+='commit;';psql(data);
+  data+='commit;';console.log('Restore: load billing rows');psql(data);
   const security=['set check_function_bodies=off;'];
   for(const f of snapshot.functions){const signature=ident(f.schema)+'.'+ident(f.name)+'('+f.identity+')';security.push(f.definition+';','revoke all on function '+signature+' from public,anon,authenticated,service_role;');for(const role of ['anon','authenticated','service_role'])if(f[role])security.push('grant execute on function '+signature+' to '+role+';');}
   for(const t of snapshot.tables){
@@ -70,7 +70,7 @@ export async function recoverBillingLedger(sql){
    for(const p of t.policies)security.push('create policy '+ident(p.name)+' on '+quote(t)+' as '+p.permissive+' for '+p.cmd+' to '+p.roles.map(r=>r==='public'?'public':ident(r)).join(',')+(p.using?' using ('+p.using+')':'')+(p.check?' with check ('+p.check+')':'')+';');
    security.push(...t.triggers.map(x=>x+';'));
   }
-  psql(security.join('\n'));
+  console.log('Restore: apply security');psql(security.join('\n'));
   const restored=JSON.parse(psql(ledgerSnapshotSQL).trim().split('\n').at(-1));
   // pg_get_functiondef can differ in qualification, so compare bodies, settings,
   // identity, role privileges and every table row/policy/constraint/trigger.

@@ -76,7 +76,7 @@ export async function runReadiness(mode,env=process.env){
    // A bounded invalid sandbox credential simulates a provider authentication
    // outage; restore the original key in finally, never weakening the AI guard.
    await schedule();
-   const receipt='evt_readiness_outage_'+Date.now();await call('/rest/v1/rpc/subscription_billing_command',service,{p_action:'enqueue',p_args:{id:receipt,type:'invoice.paid',customer:'cus_VWz64PllM8UJOK',hash:createHash('sha256').update(receipt).digest('hex')}});
+   const receipt='evt_readinessoutage'+Date.now();await call('/rest/v1/rpc/subscription_billing_command',service,{p_action:'enqueue',p_args:{id:receipt,type:'invoice.paid',customer:'cus_VWz64PllM8UJOK',hash:createHash('sha256').update(receipt).digest('hex')}});
    const ledger=(await sql("select jsonb_build_object('accounts',(select jsonb_agg(to_jsonb(a)-'admin_revision' order by id) from public.subscription_accounts a),'periods',(select jsonb_agg(to_jsonb(p) order by id) from public.subscription_periods p)) as value"))[0].value;
    try{await management('/secrets','POST',[{name:'STRIPE_SECRET_KEY',value:'rk_test_readinessUnavailable'}]);await worker([503]);assert.equal((await sql('select processed_at is null as pending from blumr_billing_private.events where id=$1',[receipt]))[0].pending,true);}
    finally{await management('/secrets','POST',[{name:'STRIPE_SECRET_KEY',value:key}]);}
