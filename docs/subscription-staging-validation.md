@@ -48,8 +48,9 @@ read-only; no production merge is needed to trigger this staging workflow.
 
 After migration, subscription accounts, periods, billing customers and billing
 events were all empty. All three AI/billing workers remained paused and provider
-usage stayed at eight rows. The same run verified `AI_PROVIDER_CALLS_DISABLED=true`,
-both feature flags false, and no installed Stripe server key.
+usage stayed at eight rows. The same run verified `AI_PROVIDER_CALLS_DISABLED=true`
+and both feature flags false. The Stripe key was installed separately afterward,
+as recorded below.
 
 ## Deployed functions and AI lock
 
@@ -114,27 +115,37 @@ URL. Both billing and foundation flags remain false; the AI disable flag is true
 The first run reached the secret-setting API but mishandled its empty HTTP 201
 response; response handling was corrected before successful verification.
 
-Stripe's connector does not issue a restricted server API key. The workflow can
-install a sandbox key from the optional `STRIPE_BILLING_SANDBOX_KEY` environment
-secret; otherwise it preserves any existing runtime key and reports only whether
-one is present. The successful run confirmed **no Stripe server key is installed**.
-It never logs credential values. Runtime activation remains pending.
+The restricted sandbox key is now **created and installed**. After explicit user
+confirmation, `blumr-staging-billing` was created in Stripe sandbox
+`acct_1UVYzGClb9pZVTfu` with exactly six permissions:
 
-The October 29 setup run again confirmed that no Stripe key is installed. The
-Stripe connector exposes no API-key creation operation. Its dashboard is now
-authenticated in the correct sandbox, and a six-permission restricted key is
-prepared for final confirmation. GitHub is also authenticated and its destination
-secret form is prepared. No key has been created or copied.
+| Resource | Permission |
+| --- | --- |
+| Checkout Sessions | Write |
+| Customer Portal | Write |
+| Customers | Write |
+| Invoices | Read |
+| Prices | Read |
+| Subscriptions | Read |
 
-Complete the final migration before activation. Configure the variables listed in
-[the sandbox runbook](subscription-stripe-sandbox.md#hosted-staging-setup) through
-Supabase's secure secret store. Prefer a staging-only `rk_test_` key, granting only
-the customer/Checkout/portal writes and customer/price/subscription/invoice/portal
-reads used by the adapter. Add it as `STRIPE_BILLING_SANDBOX_KEY` in the GitHub
-`criteria-backend` environment secret store, then rerun the configuration job to
-transfer it as `STRIPE_SECRET_KEY`. The two existing Vault secrets have already
-been transferred without logging them. Keep `AI_PROVIDER_CALLS_DISABLED=true`. Verify configuration before
-enabling the webhook or cron. Do not paste keys into chat, repository files or logs.
+The `rk_test_` credential was transferred directly to GitHub's `criteria-backend`
+environment as `STRIPE_BILLING_SANDBOX_KEY`. It was not put in source, chat,
+screenshots or logs. Existing GitHub secrets were preserved.
+
+The [configuration job, attempt 2](https://github.com/ErikFehlan/blumr/actions/runs/40894882390/attempts/2)
+passed on October 29 at 11:03 a.m. EDT. It installed eleven runtime settings in
+blumr-staging, including the key as `STRIPE_SECRET_KEY`, and verified
+`stripe_key_present:true`, `stripe_key_installed:true`, billing/foundation false,
+and `AI_PROVIDER_CALLS_DISABLED=true`. The migration check was read-only and its
+write step was skipped. A separate database read confirmed zero subscription
+accounts, billing customers and billing events, all three workers paused, and
+provider usage unchanged at eight rows.
+
+Runtime key installation is complete; exercising its permissions through the
+hosted Stripe API contract and full billing lifecycle remains outstanding. Keep
+`AI_PROVIDER_CALLS_DISABLED=true` during those tests. Verify configuration before
+enabling the sandbox webhook or cron. See
+[the sandbox runbook](subscription-stripe-sandbox.md#hosted-staging-setup).
 
 ## Checks completed
 
@@ -180,8 +191,7 @@ enabling the webhook or cron. Do not paste keys into chat, repository files or l
 
 ## Still required before production consideration
 
-1. Supply the missing restricted sandbox key through the secure environment store,
-   rerun the configuration-only job, and verify the stable API contract before activation.
+1. Verify the installed restricted key against the stable Stripe API contract before activation.
 2. Enable the sandbox webhook and worker, then use disposable verified users for
    real hosted Checkout → test payment → webhook → correct plan/allowances.
 3. Verify all tiers, renewals, failed payments/recovery, period-end cancellation,
