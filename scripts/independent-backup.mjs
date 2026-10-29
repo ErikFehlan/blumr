@@ -22,7 +22,7 @@ async function command(binary,args,{cwd=work,input,timeout=600000,localDiagnosti
   const timer=setTimeout(()=>child.kill('SIGKILL'),timeout);
   child.on('error',reject);child.stdin.on('error',error=>{if(error.code!=='EPIPE')reject(error);});
   child.on('close',code=>{clearTimeout(timer);
-   if(code!==0&&remoteDiagnostics)console.error('Read-only dump failure categories: '+JSON.stringify(backupFailureCategories(stderr)));
+   if(code!==0&&remoteDiagnostics)console.error('Read-only dump failure categories: '+JSON.stringify(backupFailureCategories(stderr+'\n'+stdout)));
    if(code!==0&&localDiagnostics)console.error(stderr.split('\n').filter(line=>!/password|secret|token|key|postgresql:\/\/|eyJ[A-Za-z0-9_-]+\./i.test(line)).slice(-35).join('\n'));
    if(code!==0&&databaseDiagnostics){const category=['does not exist','already exists','permission denied','duplicate key','foreign key constraint','check constraint','syntax error','cannot change','invalid input','authentication failed','no password supplied','connection refused'].find(x=>stderr.includes(x))||'unclassified';const objects=[...stderr.matchAll(/(?:relation|column|constraint|function|sequence|index|table|role) "([a-z_][a-z0-9_.]*)"/gi)].map(m=>m[1]);console.error('Isolated restore diagnostic: '+JSON.stringify({category,objects}));}
    code===0?resolve(stdout):reject(Error(`${binary} ${args.slice(0,2).join(' ')} operation failed (exit ${code}); private output was withheld`));});
