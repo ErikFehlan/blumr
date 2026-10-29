@@ -13,7 +13,7 @@ jobs:
     if: >-
       github.repository == 'ErikFehlan/blumr' && github.event.pull_request.number == 147 &&
       github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/subscription-foundation' &&
-      contains(fromJSON('["billing-readiness-migrate","billing-readiness-preflight","billing-readiness-fixtures","billing-readiness-edges","billing-readiness-risk","billing-readiness-monitor","billing-readiness-restore","billing-readiness-stop"]'), github.event.label.name)
+      contains(fromJSON('["billing-readiness-migrate","billing-readiness-preflight","billing-readiness-fixtures","billing-readiness-verify","billing-readiness-capacity","billing-readiness-edges","billing-readiness-risk","billing-readiness-monitor","billing-readiness-restore","billing-readiness-stop"]'), github.event.label.name)
     environment: criteria-backend
     runs-on: ubuntu-latest
     timeout-minutes: 15

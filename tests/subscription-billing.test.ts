@@ -160,7 +160,7 @@ Deno.test('live activation requires explicit project, mode, restricted key and a
  }
 });
 Deno.test('risk webhooks durably store only IDs and hash without trusting customer metadata',async()=>{
- for(const [type,object] of [['charge.refunded',{id:'ch_test',customer:'cus_attacker'}],['charge.dispute.created',{id:'dp_test',charge:'ch_test'}],['radar.early_fraud_warning.created',{id:'issfr_test',charge:'ch_test'}]] as const){
+ for(const [type,object] of [['charge.refunded',{id:'ch_test',customer:'cus_attacker'}],['charge.dispute.created',{id:'du_test',charge:'ch_test'}],['charge.dispute.created',{id:'dp_test',charge:'ch_test'}],['radar.early_fraud_warning.created',{id:'issfr_test',charge:'ch_test'}]] as const){
   const f=fixture();assert((await webhook({...event(),type,data:{object}},f.io)).status===200);
   const call=f.state.riskCalls[0];assert(call.action==='enqueue'&&call.args.charge==='ch_test');assert(!JSON.stringify(call).includes('attacker'));assert(!f.state.requests.some((r:any)=>r.url.includes('api.stripe')));
  }

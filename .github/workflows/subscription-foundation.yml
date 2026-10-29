@@ -8,6 +8,8 @@ on:
       - 'tests/*subscription*'
       - 'tests/fixtures/subscription*'
       - 'assets/subscription*.js'
+      - 'scripts/billing*.mjs'
+      - 'tests/billing*.mjs'
       - 'scripts/billing-staging-guard.ts'
       - '.github/workflows/subscription-foundation.yml'
 permissions:
@@ -30,6 +32,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Validate hosted runner boundaries and monitor thresholds
+        run: node --test tests/billing-*.test.mjs
       - name: Validate with simulated providers and denied network access
         run: deno test --no-prompt --deny-net --allow-env tests/subscription-staging-guard.test.ts tests/subscription-billing.test.ts tests/subscription-routing.test.ts tests/subscription-offline.test.ts tests/subscription-workers.test.ts tests/subscription-screening.test.ts tests/subscription-feedback.test.ts tests/security-backend.test.ts tests/priority-drafts.test.ts tests/hiring-priorities-worker.test.ts
       - name: Verify native SQL and simultaneous allowance reservations

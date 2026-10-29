@@ -169,7 +169,7 @@ export async function handleStripeWebhook(request:Request,io:IO=runtime){
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(raw))),b=>b.toString(16).padStart(2,'0')).join('');
   const client=ioClient(io,cfg);
   if(riskEventTypes.has(event.type)){
-   const obj=event.data?.object;const object=id(obj?.id,event.type==='charge.refunded'?'ch':event.type==='charge.dispute.created'?'dp':'issfr');
+   const obj=event.data?.object;const object=id(obj?.id,event.type==='charge.refunded'?'ch':event.type==='charge.dispute.created'?'(?:du|dp)':'issfr');
    const charge=event.type==='charge.refunded'?object:id(objectId(obj.charge),'ch');
    await client.risk('enqueue',{id:id(event.id,'evt'),type:event.type,object,charge,hash});
   }else{const customer=id(objectId(event.data?.object?.customer),'cus');await client.rpc('enqueue',{id:id(event.id,'evt'),customer,type:event.type,hash});}

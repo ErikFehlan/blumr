@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {assertBillingHealth} from './billing-health.mjs';
 import {recoverBillingLedger} from './billing-ledger-recovery.mjs';
 import {createHash,createHmac} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
@@ -6,7 +7,7 @@ export const PROJECT='momfzjmycveqginxmqib',RUN='20261029-v1';
 const base=`https://${PROJECT}.supabase.co`,app='https://feat-subscription-foundation.blumr.pages.dev';
 const migration='20261029171215_subscription_billing_readiness',version='2026-09-30.endive';
 export async function runReadiness(mode,env=process.env){
- assert(['migrate','preflight','fixtures','edges','risk','monitor','restore','stop'].includes(mode),'Invalid readiness mode');
+ assert(['migrate','preflight','fixtures','verify','capacity','edges','risk','monitor','restore','stop'].includes(mode),'Invalid readiness mode');
  assert.equal(env.SUPABASE_PROJECT_REF,PROJECT);assert(env.SUPABASE_ACCESS_TOKEN?.trim(),'Staging management credential required');
  assert(/^rk_test_[A-Za-z0-9]+$/.test(env.STRIPE_BILLING_SANDBOX_KEY||''),'Restricted sandbox key required');
  const key=env.STRIPE_BILLING_SANDBOX_KEY,sessions=[];
@@ -77,6 +78,8 @@ export async function runReadiness(mode,env=process.env){
     }
     console.log(JSON.stringify({case:'readiness_fixture',fixture,user,customer:customerId}));
    }
+  }else if(mode==='verify'){
+   const result=await sql(await readFile(new URL('./billing-readiness-verify.sql',import.meta.url),'utf8'));console.log(JSON.stringify({case:'hosted_readiness_assertions',...result[0].verification}));
   }else if(mode==='preflight'){
    // Verify the one additional read permission with a known sandbox charge.
    const charge=await stripe('charges/ch_3UVvZJClb9pZVTfu1mjE8b5s');assert.equal(charge.livemode,false);assert.equal(charge.customer,'cus_VWzIFSxAUnfCza');
@@ -116,9 +119,16 @@ export async function runReadiness(mode,env=process.env){
    console.log(JSON.stringify({case:'provider_outage_recovery',ledger_preserved:true,retry_succeeded:true}));
   }else if(mode==='risk'){
    await enable(true);await worker();console.log(JSON.stringify({case:'risk_health',...await risk('health')}));
+   }else if(mode==='capacity'){
+   await enable(true);const mappings=await sql('select user_id,customer_id from blumr_billing_private.customers');assert(mappings.length<=10);
+   const stamp=Date.now();for(let i=0;i<50;i++)await call('/rest/v1/rpc/subscription_billing_command',service,{p_action:'enqueue',p_args:{id:'evt_readinessload'+stamp+'n'+i,type:'invoice.paid',customer:mappings[i%mappings.length].customer_id,hash:createHash('sha256').update(stamp+':'+i).digest('hex')}});
+   await schedule();const start=Date.now();const beforePeriods=(await sql('select count(*)::int as n from public.subscription_periods'))[0].n;
+   for(let wave=0;wave<2;wave++)await Promise.all(Array.from({length:5},()=>worker()));
+   const health=await risk('health');assert.equal(health.pending_receipts,0);assert.equal(health.worker_errors,0);assert.equal((await sql('select count(*)::int as n from public.subscription_periods'))[0].n,beforePeriods);assert(Date.now()-start<60000);
+   console.log(JSON.stringify({case:'bounded_worker_capacity',customers:mappings.length,receipts:50,parallelism:5,elapsed_ms:Date.now()-start,duplicate_periods:0}));
   }else if(mode==='monitor'){
    const health=await risk('health');console.log(JSON.stringify({case:'billing_health',...health}));
-   assert(health.oldest_risk_seconds<300&&health.oldest_receipt_seconds<300&&health.worker_errors===0&&health.risk_errors===0&&health.overdue_customers===0&&health.unreviewed_risks===0,'Billing requires operator review');
+   assertBillingHealth(health);
   }else if(mode==='stop'){
    const mappings=await sql('select customer_id from blumr_billing_private.customers');
    for(const m of mappings){const list=await stripe('subscriptions?customer='+m.customer_id+'&status=all&limit=100');assert(!list.has_more&&list.data.every(s=>['canceled','incomplete_expired'].includes(s.status)),'Cancel test subscriptions first');}

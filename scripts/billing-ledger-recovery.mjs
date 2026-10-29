@@ -24,7 +24,7 @@ begin
  end loop;
  for seq in select schemaname,sequencename from pg_sequences where schemaname='public' and sequencename like 'subscription_%' order by sequencename loop
   execute format('select jsonb_build_object(''last_value'',last_value,''is_called'',is_called) from %I.%I',seq.schemaname,seq.sequencename) into state;
-  sequences:=sequences||jsonb_build_array(jsonb_build_object('schema',seq.schemaname,'name',seq.sequencename,'state',state));
+  sequences:=sequences||jsonb_build_array(jsonb_build_object('schema',seq.schemaname,'name',seq.sequencename,'state',state,'access',(select jsonb_agg(jsonb_build_object('role',role,'usage',has_sequence_privilege(role,format('%I.%I',seq.schemaname,seq.sequencename),'USAGE'),'select',has_sequence_privilege(role,format('%I.%I',seq.schemaname,seq.sequencename),'SELECT'),'update',has_sequence_privilege(role,format('%I.%I',seq.schemaname,seq.sequencename),'UPDATE'))) from unnest(array['anon','authenticated','service_role']) role)));
  end loop;
  return jsonb_build_object('tables',tables,'sequences',sequences,
   'functions',(select jsonb_agg(jsonb_build_object('schema',n.nspname,'name',p.proname,'identity',pg_get_function_identity_arguments(p.oid),'definition',pg_get_functiondef(p.oid),'source',md5(p.prosrc),'config',p.proconfig,'definer',p.prosecdef,'anon',has_function_privilege('anon',p.oid,'EXECUTE'),'authenticated',has_function_privilege('authenticated',p.oid,'EXECUTE'),'service_role',has_function_privilege('service_role',p.oid,'EXECUTE')) order by n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.prokind='f' and (n.nspname in ('blumr_billing_private','blumr_subscriptions_private') or (n.nspname='public' and (p.proname like '%subscription%' or p.proname in ('is_app_admin','has_beta_access'))))),
@@ -60,6 +60,7 @@ export async function recoverBillingLedger(sql){
   for(const seq of snapshot.sequences)data+='select setval('+literal(seq.schema+'.'+seq.name)+','+seq.state.last_value+','+seq.state.is_called+');';
   data+='commit;';console.log('Restore: load billing rows');psql(data);
   const security=['set check_function_bodies=off;'];
+  for(const seq of snapshot.sequences){const name=quote(seq);security.push('revoke all on sequence '+name+' from public,anon,authenticated,service_role;');for(const a of seq.access){const grants=['usage','select','update'].filter(k=>a[k]);if(grants.length)security.push('grant '+grants.join(',')+' on sequence '+name+' to '+a.role+';');}}
   for(const f of snapshot.functions){const signature=ident(f.schema)+'.'+ident(f.name)+'('+f.identity+')';security.push(f.definition+';','revoke all on function '+signature+' from public,anon,authenticated,service_role;');for(const role of ['anon','authenticated','service_role'])if(f[role])security.push('grant execute on function '+signature+' to '+role+';');}
   for(const t of snapshot.tables){
    for(const c of t.constraints.filter(c=>c.type==='f'))security.push('alter table '+quote(t)+' add constraint '+ident(c.name)+' '+c.definition+';');

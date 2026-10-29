@@ -1,0 +1,28 @@
+name: Monitor limited billing rollout
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: billing-health
+  cancel-in-progress: false
+jobs:
+  monitor:
+    if: github.ref == 'refs/heads/main' && vars.BILLING_MONITOR_ENABLED == 'true'
+    environment: criteria-backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check billing lag, failed reconciliation and unresolved risk
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BILLING_MONITOR_ENABLED: 'true'
+        run: node scripts/billing-production-monitor.mjs
