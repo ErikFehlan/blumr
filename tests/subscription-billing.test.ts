@@ -1,4 +1,4 @@
-import {handleBilling,handleStripeWebhook,handleBillingReconcile,reconcile,verifySignature,STRIPE_VERSION,type IO} from '../supabase/functions/_shared/stripe-billing.ts';
+import {handleBilling,handleStripeWebhook,handleBillingReconcile,reconcile,reconcileRisk,verifySignature,STRIPE_VERSION,type IO} from '../supabase/functions/_shared/stripe-billing.ts';
 import captured from './fixtures/subscription-stripe-sandbox.json' with {type:'json'};
 function assert(value:unknown,message='Assertion failed'):asserts value{if(!value)throw Error(message);}
 const now=Date.parse('2026-10-28T12:00:00Z'),user='00000000-0000-0000-0000-000000000001';
@@ -12,7 +12,9 @@ function fixture(){
   const url=String(input);state.requests.push({url,init});
   if(url.endsWith('/auth/v1/user'))return Response.json({id:user,email_confirmed_at:state.verified?'2026-01-01':null},{status:state.auth?200:401});
   if(url.includes('/rest/v1/rpc/')){
-   const {p_action:action,p_args:args}=JSON.parse(String(init?.body));state.rpc.push({action,args});
+   const {p_action:action,p_args:args}=JSON.parse(String(init?.body));
+   if(url.includes('billing_risk_command')){state.riskCalls||=[];state.riskCalls.push({action,args});return Response.json(action==='session'?{valid:state.sessionValid!==false}:action==='claim_next'?null:{queued:true});}
+   state.rpc.push({action,args});
    if(state.failRPC===action)return Response.json({code:'XX000'},{status:503});
    let result:any={};
    if(action==='status')result={eligible:true,customer:!!state.row.customer_id,subscription:!!state.row.subscription_id,pending:!!state.row.checkout_id};
@@ -43,7 +45,7 @@ function fixture(){
  }};
  return {env,state,io};
 }
-const request=(body:unknown,token='verified-token')=>new Request('https://edge.test/billing',{method:'POST',headers:{Authorization:'Bearer '+token,Origin:'https://blumr.pages.dev'},body:JSON.stringify(body)});
+const request=(body:unknown,token='header.'+btoa(JSON.stringify({session_id:'00000000-0000-0000-0000-000000000009'}))+'.signature')=>new Request('https://edge.test/billing',{method:'POST',headers:{Authorization:'Bearer '+token,Origin:'https://blumr.pages.dev'},body:JSON.stringify(body)});
 async function sign(raw:string,secret='whsec_synthetic',seconds=now/1000){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);const bytes=new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(seconds+'.'+raw)));return 't='+seconds+',v1='+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
 const event=()=>({id:'evt_first',type:'invoice.paid',api_version:STRIPE_VERSION,livemode:false,data:{object:{customer:'cus_first',metadata:{user_id:'attacker'}}}});
 async function webhook(body:unknown,io:IO,signature?:string){const raw=JSON.stringify(body);return handleStripeWebhook(new Request('https://edge.test/webhook',{method:'POST',headers:{'stripe-signature':signature||await sign(raw)},body:raw}),io);}
@@ -138,12 +140,45 @@ Deno.test('captured Stripe sandbox paid invoice satisfies canonical reconciliati
   if(path==='invoices/'+captured.invoice.id)return captured.invoice;
   throw Error('Unexpected request '+path);
  }};
- const cfg={key:'sk_test_fixture',base:'https://example.test',service:'fixture',anon:'fixture',app:'https://example.test/',origin:'https://example.test',prices:{basic:s.items.data[0].price.id,advanced:'price_advanced',pro:'price_pro'},portal:'bpc_fixture'};
- await reconcile({user_id:user,lease_id:'fixture',customer_id:s.customer,checkout_id:s.metadata.blumr_checkout},client,cfg);
+ const cfg={live:false,account:undefined,key:'sk_test_fixture',base:'https://example.test',service:'fixture',anon:'fixture',app:'https://example.test/',origin:'https://example.test',prices:{basic:s.items.data[0].price.id,advanced:'price_advanced',pro:'price_pro'},portal:'bpc_fixture'};
+ await reconcile({user_id:user,lease_id:'fixture',customer_id:s.customer,checkout_id:s.metadata.blumr_checkout},{...client,risk:async()=>({})},cfg);
  const applied=calls.find(c=>c.action==='apply')?.args;assert(applied.paid===true&&applied.plan==='basic-v1');assert(applied.start===new Date(s.items.data[0].current_period_start*1000).toISOString());assert(calls.at(-1)?.action==='finish');
 });
 
 Deno.test('restricted sandbox keys work and live restricted keys fail before network access',async()=>{
  const f=fixture();f.env.STRIPE_SECRET_KEY='rk_test_synthetic';assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===200);
  const live=fixture();live.env.STRIPE_SECRET_KEY='rk_live_forbidden';assert((await handleBilling(request({action:'checkout',tier:'basic'}),live.io)).status===503);assert(live.state.requests.length===0);
+});
+
+Deno.test('signed-out Auth session is rejected before checkout/portal mutation',async()=>{
+ const f=fixture();f.state.sessionValid=false;assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===401);assert(!f.state.rpc.length);
+ assert((await handleBilling(request({action:'portal'},'malformed'),f.io)).status===401);assert(!f.state.rpc.length);
+});
+Deno.test('live activation requires explicit project, mode, restricted key and account guard',async()=>{
+ for(const alter of [(e:any)=>e.STRIPE_BILLING_MODE='unknown',(e:any)=>{e.STRIPE_BILLING_MODE='live';e.STRIPE_BILLING_LIVE_ENABLED='true';e.STRIPE_SECRET_KEY='rk_live_synthetic';},(e:any)=>e.SUPABASE_URL='https://zqiqjzxcpznhzjengfff.supabase.co']){
+  const f=fixture();alter(f.env);assert((await handleBilling(request({action:'checkout',tier:'basic'}),f.io)).status===503);assert(!f.state.requests.length);
+ }
+});
+Deno.test('risk webhooks durably store only IDs and hash without trusting customer metadata',async()=>{
+ for(const [type,object] of [['charge.refunded',{id:'ch_test',customer:'cus_attacker'}],['charge.dispute.created',{id:'dp_test',charge:'ch_test'}],['radar.early_fraud_warning.created',{id:'issfr_test',charge:'ch_test'}]] as const){
+  const f=fixture();assert((await webhook({...event(),type,data:{object}},f.io)).status===200);
+  const call=f.state.riskCalls[0];assert(call.action==='enqueue'&&call.args.charge==='ch_test');assert(!JSON.stringify(call).includes('attacker'));assert(!f.state.requests.some((r:any)=>r.url.includes('api.stripe')));
+ }
+});
+Deno.test('risk graph verifies canonical ownership and only current full refunds hold access',async()=>{
+ const cfg:any={live:false},calls:any[]=[];let refunded=1000,wrong=false;
+ const client:any={risk:async(a:string,args:any)=>calls.push({a,args}),stripe:async(path:string)=>{
+  if(path==='charges/ch_test')return {id:'ch_test',livemode:false,paid:true,customer:'cus_first',payment_intent:'pi_test',currency:'usd',amount:2900,amount_refunded:refunded};
+  if(path.startsWith('invoice_payments?'))return {has_more:false,data:[{livemode:false,status:'paid',payment:{type:'payment_intent',payment_intent:'pi_test'},invoice:'in_first'}]};
+  if(path==='invoices/in_first')return {...invoice(),customer:wrong?'cus_wrong':'cus_first'};
+  if(path==='subscriptions/sub_first')return subscription();throw Error('Unexpected graph request');
+ }};
+ const receipt={id:'evt_risk',lease_id:'lease',charge_id:'ch_test',event_type:'charge.refunded'};
+ await reconcileRisk(receipt,client,cfg);assert(calls.at(-1).args.cases[0].hold===false);
+ refunded=2900;await reconcileRisk(receipt,client,cfg);assert(calls.at(-1).args.cases[0].hold===true);
+ for(const event_type of ['charge.dispute.created','radar.early_fraud_warning.created']){await reconcileRisk({...receipt,event_type},client,cfg);assert(calls.at(-1).args.cases[0].hold===true);}
+ wrong=true;const count=calls.length;let rejected=false;try{await reconcileRisk(receipt,client,cfg);}catch{rejected=true;}assert(rejected&&calls.length===count);
+});
+Deno.test('billing transport refuses credential-bearing redirects',async()=>{
+ const f=fixture();await handleBilling(request({action:'checkout',tier:'basic'}),f.io);assert(f.state.requests.every((r:any)=>r.init.redirect==='error'));
 });

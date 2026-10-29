@@ -1,0 +1,35 @@
+name: Validate billing production readiness in staging
+on:
+  pull_request:
+    branches: [main]
+    types: [labeled]
+permissions:
+  contents: read
+jobs:
+  readiness:
+    concurrency:
+      group: billing-staging-setup
+      cancel-in-progress: false
+    if: >-
+      github.repository == 'ErikFehlan/blumr' && github.event.pull_request.number == 147 &&
+      github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/subscription-foundation' &&
+      contains(fromJSON('["billing-readiness-migrate","billing-readiness-preflight","billing-readiness-edges","billing-readiness-risk","billing-readiness-monitor","billing-readiness-restore","billing-readiness-stop"]'), github.event.label.name)
+    environment: criteria-backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate staging-only billing readiness
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_STAGING_MIGRATION_TOKEN: ${{ secrets.SUPABASE_STAGING_MIGRATION_TOKEN }}
+          STRIPE_BILLING_SANDBOX_KEY: ${{ secrets.STRIPE_BILLING_SANDBOX_KEY }}
+          SUPABASE_PROJECT_REF: momfzjmycveqginxmqib
+          READINESS_LABEL: ${{ github.event.label.name }}
+        run: node scripts/billing-readiness-staging.mjs "${READINESS_LABEL#billing-readiness-}"

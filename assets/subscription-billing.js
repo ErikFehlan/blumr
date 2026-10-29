@@ -6,8 +6,9 @@
   function render(message=''){
    panel.hidden=!state?.enabled;
    if(!state?.enabled){panel.replaceChildren();return;}
-   panel.innerHTML='<h3>Sandbox billing</h3><p class="rf-sub">Test payments only. Your plan updates after payment is verified. Use Refresh billing after returning.</p>'+
-    (state.subscription?'<p>Your subscription is managed in billing.'+(state.cancel_at_period_end?' Cancellation is scheduled for the end of your paid period.':'')+'</p>':state.eligible?'<label for="billingTier">Monthly plan</label> <select id="billingTier"><option value="basic">Basic · $29 · 1,000 rules evaluations</option><option value="advanced">Advanced · $79 · 1,000 rules + 100 shortlist AI</option><option value="pro">Pro · $150 · 1,000 rules + 500 deep AI</option></select> <button class="rf-btn" data-billing-action="checkout">'+(state.pending?'Resume sandbox checkout':'Start sandbox checkout')+'</button>':'<p>Your account cannot start a new subscription.</p>')+
+   const live=state.mode==='live';
+   panel.innerHTML='<h3>'+(live?'Billing':'Sandbox billing')+'</h3><p class="rf-sub">'+(live?'':'Test payments only. ')+ ' Your plan updates after payment is verified. Use Refresh billing after returning.</p>'+
+    (state.subscription?'<p>Your subscription is managed in billing.'+(state.cancel_at_period_end?' Cancellation is scheduled for the end of your paid period.':'')+'</p>':state.eligible?'<label for="billingTier">Monthly plan</label> <select id="billingTier"><option value="basic">Basic · $29 · 1,000 rules evaluations</option><option value="advanced">Advanced · $79 · 1,000 rules + 100 shortlist AI</option><option value="pro">Pro · $150 · 1,000 rules + 500 deep AI</option></select> <button class="rf-btn" data-billing-action="checkout">'+(state.pending?(live?'Resume checkout':'Resume sandbox checkout'):(live?'Start checkout':'Start sandbox checkout'))+'</button>':'<p>Your account cannot start a new subscription.</p>')+
     (state.customer?' <button class="rf-btn" data-billing-action="portal">Manage billing</button>':'')+
     ' <button class="rf-btn" data-billing-action="refresh">Refresh billing</button><p role="status" data-billing-status></p>';
    if(state.pending_tier&&panel.querySelector('#billingTier'))panel.querySelector('#billingTier').value=state.pending_tier;
@@ -31,7 +32,7 @@
    if(action==='refresh'){await load();await api.refresh?.();return;}
    const tier=panel.querySelector('#billingTier')?.value,service=api.service(),g=generation;
    if(!service?.billing)return;
-   busy=true;panel.querySelectorAll('button,select').forEach(el=>el.disabled=true);panel.querySelector('[data-billing-status]').textContent='Opening secure sandbox billing…';
+   busy=true;panel.querySelectorAll('button,select').forEach(el=>el.disabled=true);panel.querySelector('[data-billing-status]').textContent=state?.mode==='live'?'Opening secure billing…':'Opening secure sandbox billing…';
    try{
     const response=await service.billing(action,tier);
     if(g!==generation||service!==api.service())return;

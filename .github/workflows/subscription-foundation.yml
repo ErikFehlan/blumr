@@ -50,3 +50,5 @@ jobs:
           createdb -h localhost -U postgres subscription_billing
           psql -h localhost -U postgres -d subscription_billing -f tests/subscription-billing.sql
           node tests/subscription-billing-concurrency.mjs
+          createdb -h localhost -U postgres subscription_readiness
+          psql -h localhost -U postgres -d subscription_readiness -f tests/subscription-billing-readiness.sql
