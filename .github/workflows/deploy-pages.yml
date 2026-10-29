@@ -171,11 +171,54 @@ jobs:
     if: >-
       always() && !cancelled() && needs.validate.result == 'success' &&
       (needs.staging.result == 'success' ||
-       (github.event_name == 'pull_request' && needs.staging.result == 'skipped'))
+       ((github.event_name == 'pull_request' || vars.PAID_AI_RELEASE_ENABLED != 'true') && needs.staging.result == 'skipped'))
     uses: ./.github/workflows/core-backend.yml
     with:
       staging_verified: ${{ needs.staging.result == 'success' }}
     secrets: inherit
+
+  closed-billing:
+    needs: [validate, core-backend]
+    if: >-
+      always() && !cancelled() && github.ref == 'refs/heads/main' &&
+      vars.PAID_AI_RELEASE_ENABLED != 'true' &&
+      needs.validate.result == 'success' && needs.core-backend.result == 'success'
+    uses: ./.github/workflows/billing-production-verify.yml
+    secrets: inherit
+
+  closed-site:
+    needs: closed-billing
+    if: github.ref == 'refs/heads/main' && vars.PAID_AI_RELEASE_ENABLED != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify Cloudflare published this commit and every public asset matches
+        id: publication
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/live-site-release.mjs
+      - name: Install public browser probe
+        if: steps.publication.outputs.ready == 'true'
+        run: npm install --no-save --package-lock=false playwright@1.58.2
+      - name: Check public pages and sign-in form without creating accounts or calling AI
+        if: steps.publication.outputs.ready == 'true'
+        run: node tests/live-site-probe.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: closed-production-public-probe
+          path: test-results/live
+          if-no-files-found: ignore
 
   live-site:
     if: github.ref == 'refs/heads/main'

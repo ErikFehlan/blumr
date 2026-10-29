@@ -6,6 +6,7 @@ import {promisify} from 'node:util';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {configureClosedProduction,productionProject} from './billing-production-closed.mjs';
+import {prepareProductionWorker} from './billing-production-worker.mjs';
 import {backupPoolerURL} from './backup-connection.mjs';
 import {backupFailureCategories} from './backup-diagnostics.mjs';
 const exec=promisify(execFile),md5=s=>createHash('md5').update(s).digest('hex');
@@ -38,6 +39,7 @@ export async function deployClosedProduction({env=process.env}={}){
  const request=async(url,options={})=>{
   let r;try{r=await fetch(url,{...options,redirect:'error',signal:AbortSignal.timeout(60000)});}catch{throw Error('Release request failed; private response withheld.');}
   if(!r.ok)throw Error(`Release request failed (HTTP ${r.status}); private response withheld.`);
+  if(url.endsWith('/secrets')&&options.method==='POST'&&[201,204].includes(r.status))return null;
   return r.json();
  };
  const github=path=>request('https://api.github.com/repos/ErikFehlan/blumr'+path,{headers:{Authorization:'Bearer '+env.GITHUB_TOKEN,Accept:'application/vnd.github+json'}});
@@ -80,6 +82,7 @@ export async function deployClosedProduction({env=process.env}={}){
   const final=await history();validateHistory(final,manifest,{complete:true});
   if(manifest.some(m=>final.find(r=>r.version===m.version).md5!==m.md5))throw Error('Migration parity verification failed.');
   await configureClosedProduction({env,verifyOnly:true});
+  await prepareProductionWorker({env});
   for(const name of releasedFunctions){await cli(['functions','deploy',name,'--use-api','--project-ref',productionProject]);console.log('Deployed closed-release function: '+name);}
   const status=await request(`https://${productionProject}.supabase.co/functions/v1/billing-sandbox`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'status'})});
   if(status.enabled!==false)throw Error('Production billing unexpectedly reports enabled.');

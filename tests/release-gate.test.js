@@ -1,4 +1,15 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
+test('closed publication requires four validators, core validation and explicit production evidence',async()=>{
+ const {releaseDecision}=await import('../scripts/cloudflare-release-gate.mjs');
+ const checks=['validate','validate','validate','validate','core-backend / validate','closed-billing / verify'].map(name=>({name,status:'completed',conclusion:'success'}));
+ assert.equal(releaseDecision(checks),'passed');
+ assert.equal(releaseDecision(checks.slice(1)),'pending');
+ assert.equal(releaseDecision(checks.map(c=>c.name==='closed-billing / verify'?{...c,conclusion:'failure'}:c)),'failed');
+ assert.notEqual(releaseDecision(checks.map(c=>c.name==='closed-billing / verify'?{...c,conclusion:'skipped'}:c)),'passed');
+ const waiting=[...checks.filter(c=>c.name!=='closed-billing / verify'),...['core-backend / deploy','staging / verify'].map(name=>({name,status:'completed',conclusion:'skipped'}))];
+ assert.equal(releaseDecision(waiting),'pending');
+ assert.equal(releaseDecision([...waiting,{name:'closed-billing / verify',status:'completed',conclusion:'success'}]),'passed');
+});
 test('production publication requires staging and both validators plus deployed backend',async()=>{
  const {releaseDecision,enforceRelease}=await import('../scripts/cloudflare-release-gate.mjs');
  const names=['validate','validate','core-backend / validate','core-backend / deploy','staging / verify'];

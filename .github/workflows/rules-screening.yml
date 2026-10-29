@@ -1,5 +1,7 @@
 name: Validate rules screening foundation
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
     paths:

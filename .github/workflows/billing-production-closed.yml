@@ -36,3 +36,13 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
         run: node scripts/billing-production-closed.mjs
+      - name: Prepare the inactive reconciliation worker after migrations are installed
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
+        run: node scripts/billing-production-worker.mjs
+      - name: Verify deployed source, worker credentials and closed permissions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: zqiqjzxcpznhzjengfff
+        run: node scripts/billing-production-verify.mjs

@@ -46,16 +46,26 @@ https://supabase.com/docs/guides/auth/password-security
 ## Closed release baseline
 
 Production has 13 approved beta accounts, 15 active beta workspace plans and no
-subscription accounts/tables before installation. The subscription screening SQL
+subscription accounts. Before installation no subscription tables existed. The subscription screening SQL
 checks `subscription_scope_managed`; unenrolled beta users keep their existing
 workflow and are not converted into paid accounts by migration.
 
 Production AI was paused for the authorized release work: `security_limits.ai_paused`
 is true and both `ancalagon-criteria-worker` and `ancalagon-job-reassessment` are
 inactive. Provider usage baseline is 173. Staging remains paused at 8 calls.
-Do not use the ordinary main deployment path for this release without removing
-its paid model preflight and scheduler activation: those conflict with this
-release's explicit no-paid-AI requirement.
+Paid model preflights and scheduler activation now require the separate
+`PAID_AI_RELEASE_ENABLED=true` gate. The closed main release instead verifies
+the exact deployed backend and disabled configuration before Cloudflare publishes,
+then compares served assets and runs a public browser probe without AI or fixtures.
+
+Closed backend deployment **40951227952** installed all eight reviewed migrations
+and nine functions. Source readback matched all 51 dependency files; bundle hashes
+and file fingerprints are in `subscription-production-deployment.json`. Checkout
+returns disabled, the cohort is empty and subscription enforcement remains off.
+The post-installation advisor scan at 20:46 UTC retains the same 73 previously
+reviewed definer warnings and the Free-plan password warning. Its 34 RLS-without-
+policy notices include intentionally service-only tables. All 13 new ledger tables
+have RLS and deny anonymous SELECT and authenticated INSERT/UPDATE/DELETE.
 
 The daily full backup failed October 12–29 because the replacement scoped token
 did not include pooler-configuration discovery. The production Dashboard supplied

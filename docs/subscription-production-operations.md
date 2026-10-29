@@ -5,7 +5,24 @@ checkout closed. First live checkout remains a separate release decision. Paid A
 remains disabled independently of billing.
 The October 29 staging results are in `subscription-staging-results.md`.
 
-## Configuration prepared for approval
+## Installed closed release
+
+Backend run [40951227952](https://github.com/ErikFehlan/blumr/actions/runs/40951227952)
+installed the eight migrations and nine functions at release `a3c3927`, after
+verified full-application backup run `40945589186`. All 51 deployed dependency
+files match reviewed source. `subscription-production-deployment.json` pins the
+deployed bundle hashes; the closed-release verification checks that record,
+migration hashes, RLS/grants, paused workers, matching Vault/runtime credentials,
+disabled checkout and the unchanged 173-row provider ledger before publication.
+
+The frontend release now has a closed path: four code validators, core validation
+and read-only production verification must pass before Cloudflare publishes.
+Served file hashes and public browser navigation are checked afterward. Paid AI
+preflights, fixture flows and scheduler activation remain gated off. This does not
+authorize first live checkout; the missing business inputs are recorded in
+`subscription-launch-inputs.md`.
+
+## Activation configuration
 
 Deploy the additive subscription migrations in repository order and the reviewed
 billing, enforcement and frontend artifacts. Take a verified independent backup
