@@ -37,7 +37,6 @@ async function openBrowser({f,user,report={}}={}){
    if(url.pathname.startsWith('/__vendor/')){
     const name=url.pathname.slice('/__vendor/'.length),pkg=n=>path.dirname(require.resolve(n+'/package.json'));
     let file;if(name==='pdf.mjs'||name==='pdf.worker.min.mjs')file=path.join(pkg('pdfjs-dist'),'build',name);
-    else if(name==='mammoth.js')file=path.join(pkg('mammoth'),'mammoth.browser.min.js');
     else if(name==='tesseract.min.js'||name==='worker.min.js')file=path.join(pkg('tesseract.js'),'dist',name);
     else if(/^core\/tesseract-core[-a-z]*\.wasm(?:\.js)?$/.test(name))file=path.join(pkg('tesseract.js-core'),path.basename(name));
     else if(name==='tessdata/eng.traineddata.gz')file=path.join(require('@tesseract.js-data/eng').langPath,'eng.traineddata.gz');
@@ -50,7 +49,7 @@ async function openBrowser({f,user,report={}}={}){
    if(url.pathname==='/__fixture-supabase.js'){res.setHeader('Content-Type','application/javascript');res.end(fs.readFileSync(path.join(path.dirname(require.resolve('@supabase/supabase-js/package.json')),'dist/umd/supabase.js')));return;}
    const file=path.resolve(root,'.'+(url.pathname==='/'?'/index.html':url.pathname));
    if(!file.startsWith(root+path.sep)){res.statusCode=404;res.end();return;}
-   res.setHeader('Content-Type',/\.(js|mjs)$/.test(file)?'application/javascript':file.endsWith('.css')?'text/css':'text/html');let contents=fs.readFileSync(file);if(file.endsWith('/index.html'))contents=contents.toString().replace(/<script src="https:\/\/cdn.jsdelivr.net\/npm\/@supabase\/supabase-js@2.116.0"[^>]*><\/script>/,'<script src="/__fixture-supabase.js"></script>');if(file.endsWith('/assets/app.js'))contents=contents.toString().replaceAll('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs/+esm','/__vendor/pdf.mjs').replaceAll('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs','/__vendor/pdf.worker.min.mjs').replaceAll('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js','/__vendor/mammoth.js').replaceAll('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js','/__vendor/tesseract.min.js');res.end(contents);
+   res.setHeader('Content-Type',/\.(js|mjs)$/.test(file)?'application/javascript':file.endsWith('.css')?'text/css':'text/html');let contents=fs.readFileSync(file);if(file.endsWith('/index.html'))contents=contents.toString().replace(/<script src="https:\/\/cdn.jsdelivr.net\/npm\/@supabase\/supabase-js@2.116.0"[^>]*><\/script>/,'<script src="/__fixture-supabase.js"></script>');if(file.endsWith('/assets/app.js'))contents=contents.toString().replaceAll('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs/+esm','/__vendor/pdf.mjs').replaceAll('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs','/__vendor/pdf.worker.min.mjs').replaceAll('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js','/__vendor/tesseract.min.js');res.end(contents);
   }catch(error){bridgeErrors.push(error.message);if(process.env.BULK_DEBUG)console.error('Fixture request failed '+req.url+': '+error.message);res.statusCode=500;res.end(JSON.stringify({message:'Fixture bridge failed'}));}
  }).listen(0,'127.0.0.1');
  await new Promise(resolve=>server.once('listening',resolve));

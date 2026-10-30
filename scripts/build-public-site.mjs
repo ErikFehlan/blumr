@@ -10,7 +10,7 @@ export async function buildPublic({branch,sha,url,key,gate=enforceRelease,direct
  if(branch==='main')await gate({sha,token:process.env.GITHUB_TOKEN});
  else stagingCredentials(url,key);
  await rm(directory,{recursive:true,force:true});await mkdir(directory,{recursive:true});
- for(const file of ['index.html','about.html','how-it-works.html','why-blumr-works.html','pricing.html'])await cp(file,directory+'/'+file);
+ for(const file of ['index.html','about.html','how-it-works.html','why-blumr-works.html','pricing.html','_headers'])await cp(file,directory+'/'+file);
  await cp('assets',directory+'/assets',{recursive:true});
  if(branch!=='main'){
   const path=directory+'/assets/auth.js';let auth=await readFile(path,'utf8');
