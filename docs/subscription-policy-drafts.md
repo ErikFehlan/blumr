@@ -160,3 +160,50 @@ SLA, statutory retention period and international-transfer terms remain unresolv
 Proposed checkout approval control: publish approved versioned terms/privacy pages
 and configure explicit terms acceptance before opening paid checkout. No nonexistent
 policy URL is installed and no binding page is published by this PR.
+
+## October 30: concrete choices for final review
+
+These are proposals, not confirmed decisions. A request to finish setup is not
+treated as approval of new binding wording. Existing beta accounts remain in
+place and are not converted to a paid agreement by this document.
+
+| Topic | Proposed decision |
+| --- | --- |
+| Customers | Paid access is for adults authorized to act for a business. Confirm selling territories; recruiters and candidates may be in different jurisdictions. |
+| Initial refunds | Keep the selected seven-day request window. Use receipt at the monitored support mailbox to determine timeliness. The full first subscription payment is eligible; no usage-based exclusion is proposed. Required legal rights remain unaffected. |
+| Renewals | Review renewal requests individually; do not automate refunds. Cancellation remains at period end. |
+| Support | Erik records receipt time and communicates the review result. Publish no fixed response or settlement deadline until capacity and provider timing are confirmed. |
+| Content rights | Customers retain their rights in uploads and authorize processing needed for the service. Do not claim the LLC owns all application IP without confirming ownership/licensing. |
+| Employment decisions | Customers review evidence and make decisions. No automated hiring/rejection, guaranteed accuracy or claim that scores establish legal compliance is proposed. |
+| Governing law | Propose Ohio law, preserving nonwaivable legal rights. This contract choice does not establish formation in Ohio. No arbitration or class-action waiver is proposed. |
+| Retention | Active content stays for the service until authorized deletion or another documented purpose ends. Independent recovery backups expire on the existing 90-day schedule. Confirm a necessary billing/security retention schedule before publication. |
+
+Additional proposed service-use clause:
+
+“Use blumr only for lawful recruiting activities and with information you are
+authorized to provide. Keep account credentials private and notify us of
+suspected unauthorized access. Do not use the service to make unlawful
+discriminatory decisions, obtain another customer's information or interfere
+with the service. Review evidence and correct inaccurate information before
+relying on an assessment. We may restrict activity needed to address misuse,
+a security incident or a billing issue, subject to applicable law.”
+
+Additional proposed privacy explanation:
+
+“The recruiting business that provides candidate information determines why it
+uses that information. Contact that business about its recruiting decisions or
+the information it submitted. You may also contact erik@blumr.io for assistance
+with a privacy request. We may need to verify identity and account authority
+before disclosing or deleting information. Do not email passwords, government
+identifiers or payment-card numbers to support.”
+
+Current production metadata confirms the Supabase project region `us-east-2`.
+This does not establish that every provider, backup, support operation or AI
+processing step stays in Ohio or the United States. No blanket residency promise
+is proposed.
+
+Owner review still covers actual wording, territories, service/IP authority,
+processor arrangements and retention. After approval, publish versioned pages,
+test footer/signup links, set Stripe business/portal policy URLs, require explicit
+live Checkout terms acceptance, and verify recorded consent without a test charge.
+No draft URL is substituted for an approved public policy.

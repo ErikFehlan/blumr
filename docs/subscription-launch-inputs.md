@@ -87,3 +87,28 @@ email in the served app. Concrete wording and the selected refund draft are in
 Live Stripe identity is verified. Both the owner and live account confirm no tax
 registrations yet; required registrations remain a launch blocker. See the
 activation package for key/webhook limitations and the deployed tax safeguard.
+
+## October 30 completion attempt
+
+Main remains `611b5f89834fadfeb4e3ff0295c8448dbe374231`, with successful deployment
+and [verification run 40969823303](https://github.com/ErikFehlan/blumr/actions/runs/40969823303).
+Fresh endpoint checks reported billing disabled and rejected checkout. No release
+flag, beta enrollment, policy publication or government registration changed.
+
+The owner requested completion. Automatic approval review rejected the browser
+action for production key access and the final Supabase Pro confirmation because
+those actions need explicit confirmations. Neither succeeded. The key plan still
+uses the same eight documented permissions; no live key was generated/installed.
+
+Supabase sign-in was restored through the secure GitHub flow. The organization
+still reports Free. Its review dialog again quotes $25 today and a $35 monthly
+estimate for both projects, before variable usage/applicable tax. The billing
+page currently shows no saved payment method, which may require secure owner
+entry after purchase approval. Leaked-password protection remains unresolved.
+
+The [tax worksheet](subscription-tax-registration-review.md) maps the current
+official application to missing owner facts. The expanded
+[policy draft](subscription-policy-drafts.md#october-30-concrete-choices-for-final-review)
+provides concrete refund, content-use, employment-decision, law and retention
+proposals. They remain unapproved and unpublished. The browser security block
+at Ohio's registry is not evidence that the LLC lacks a formation record.
