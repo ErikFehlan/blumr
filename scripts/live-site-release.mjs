@@ -6,7 +6,7 @@ const sha=process.env.EXPECTED_SHA,repo=process.env.GITHUB_REPOSITORY,token=proc
 if(repo!=='ErikFehlan/blumr'||!/^[a-f0-9]{40}$/.test(sha||'')||!token)throw Error('Invalid trusted release context');
 const output=value=>appendFile(process.env.GITHUB_OUTPUT,`ready=${value}\n`);
 async function github(path){const r=await fetch(`https://api.github.com/repos/${repo}/${path}`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('Release lookup failed: '+r.status);return r.json();}
-const paths=['index.html','about.html','why-blumr-works.html','pricing.html',...(await readdir('assets')).filter(f=>/\.(js|css)$/.test(f)).map(f=>'assets/'+f)];
+const paths=['index.html','about.html','why-blumr-works.html','pricing.html','assets/vendor/mammoth-1.13.0.min.js','assets/resume-word-frame.html',...(await readdir('assets')).filter(f=>/\.(js|css)$/.test(f)).map(f=>'assets/'+f)];
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 let ready=false;
 for(let attempt=0;attempt<12;attempt++){
@@ -23,6 +23,10 @@ for(let attempt=0;attempt<12;attempt++){
      const url=new URL(path==='index.html'?'':path,APP_URL);url.searchParams.set('live-check',sha);
      const r=await fetch(url,{signal:AbortSignal.timeout(15000),cache:'no-store'});
      if(!r.ok||new URL(r.url).origin!==new URL(APP_URL).origin)throw Error('Live asset unavailable');
+     if(path==='index.html'){
+      if(!/frame-ancestors 'self'/.test(r.headers.get('content-security-policy')||'')||r.headers.get('x-frame-options')!=='SAMEORIGIN'||!/^max-age=15552000(?:;|$)/.test(r.headers.get('strict-transport-security')||''))throw Error('Live browser security headers missing');
+     }
+     if(path==='assets/resume-word-worker.js'&&!/connect-src 'none'/.test(r.headers.get('content-security-policy')||''))throw Error('Word worker network policy missing');
      if(digest(Buffer.from(await r.arrayBuffer()))!==digest(await readFile(path)))throw Error('Live assets have not reached this commit');
     }));
    }

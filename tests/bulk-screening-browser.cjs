@@ -53,7 +53,6 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.route('https://**',r=>r.abort());
   const pdfDir=path.dirname(require.resolve('pdfjs-dist/package.json'));
   await page.route('**/pdfjs-dist@4.10.38/**',r=>r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(pdfDir,'build',r.request().url().includes('worker')?'pdf.worker.min.mjs':'pdf.mjs'),'utf8')}));
-  await page.route('**/mammoth@1.8.0/mammoth.browser.min.js',r=>r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(path.dirname(require.resolve('mammoth/package.json')),'mammoth.browser.min.js'),'utf8')}));
   await page.route('**/assets/auth.js*',r=>r.fulfill({contentType:'application/javascript',body:"document.body.classList.remove('rf-auth-pending');document.getElementById('authGate').style.display='none';"}));
   await page.route('**/assets/data.js*',r=>r.fulfill({contentType:'application/javascript',body:''}));
   await page.route('**/assets/resume-intake.js*',r=>r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(dir,'assets/resume-intake.js'),'utf8')+";{const original=window.AncalagonIntake.create;window.AncalagonIntake.create=api=>{window.testExtractLocalResume=api.extract;return original(api);};}"}));

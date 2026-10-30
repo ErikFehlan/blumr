@@ -17,6 +17,7 @@
     'assets/feedback.js?v=20261028-subscriptions',
     'assets/idempotency.js?v=20260930-idempotency',
     'assets/upload-validation.js?v=20261005-upload-guards',
+    'assets/resume-word-text.js?v=20261030-isolated-word',
     'assets/pdf-text.js?v=20260915-intake',
     'assets/resume-viewer.js?v=20261014-repeat-resume',
     'assets/experience.js?v=20261015-experience',
@@ -49,7 +50,7 @@
     'assets/candidate-list.js?v=20261027-all-candidates',
     'assets/bulk-screening.js?v=20261028-reporting',
     'assets/screening-report.js?v=20261028-reporting',
-    'assets/app.js?v=20261028-reporting'
+    'assets/app.js?v=20261030-isolated-word'
   ];
   const parked = document.createDocumentFragment();
   let isParked = false;

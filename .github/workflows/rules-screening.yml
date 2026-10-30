@@ -79,7 +79,7 @@ jobs:
           supabase secrets set RULES_FIRST_SCREENING=true --project-ref "$SUPABASE_PROJECT_REF"
       - name: Install exact browser import dependencies
         run: |
-          npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.8.0 pdfjs-dist@4.10.38 tesseract.js@5.1.1 @tesseract.js-data/eng@1.0.0 @supabase/supabase-js@2.116.0
+          npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.13.0 pdfjs-dist@4.10.38 tesseract.js@5.1.1 @tesseract.js-data/eng@1.0.0 @supabase/supabase-js@2.116.0
           npx playwright install --with-deps chromium
       - name: Verify actual mixed document extraction and OCR
         run: node scripts/bulk-screening-mixed-browser.cjs
