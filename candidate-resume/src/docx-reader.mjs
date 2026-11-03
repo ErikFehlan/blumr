@@ -168,6 +168,8 @@ export function readDocx(bytes) {
             "Check the reading order, especially tables or columns.",
           );
         if (n.local === "t") inText = true;
+        if (n.local === "noBreakHyphen") value += "‑";
+        if (n.local === "softHyphen") value += "\u00ad";
         if (n.local === "tab") value += " ";
         if (n.local === "br" || n.local === "cr") value += "\n";
         if (n.local === "hyperlink") {

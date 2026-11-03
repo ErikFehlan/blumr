@@ -35,13 +35,17 @@ self.onmessage = async ({ data }) => {
       sourceLines(parsed.text);
       self.postMessage({ channel: "blumr-resume-result", ok: true, ...parsed });
     } else if (data.operation === "export") {
+      const serif = data.template === "classic";
       const bytes =
         data.format === "pdf"
           ? await makePdf(
               data.lines,
-              ...(await Promise.all([font("regular.ttf"), font("bold.ttf")])),
+              ...(await Promise.all([
+                font(serif ? "serif.ttf" : "regular.ttf"),
+                font(serif ? "serif-bold.ttf" : "bold.ttf"),
+              ])),
             )
-          : await makeDocx(data.lines);
+          : await makeDocx(data.lines, data.template);
       validateExport(data.lines, (await parse(new Uint8Array(bytes))).text);
       globalThis.AncalagonUploadGuard.inspect(bytes, data.format);
       self.postMessage({ channel: "blumr-resume-result", ok: true, bytes }, [

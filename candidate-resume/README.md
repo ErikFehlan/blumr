@@ -1,6 +1,6 @@
 # blumr Resume
 
-Private candidate studio for issue #157. The candidate reviews a job, imports or pastes a resume, checks the extracted source, reviews proposed wording and ordering, and approves a single-column Word or PDF download. Start with **Try a sample application** to walk through the Azure/AWS example using synthetic data.
+Private candidate studio for issue #157. The candidate reviews a job, imports or pastes a resume, checks the extracted source, reviews proposed wording and ordering, and selects a Modern or Classic single-column template, and approves a Word or PDF download. Start with **Try a sample application** to walk through the Azure/AWS example using synthetic data.
 
 ## Run the review build
 
@@ -36,7 +36,7 @@ For isolated staging, enable email/password Auth with verified email, disable an
 
 - Evidence cases cover adjacent clouds, ownership, tenure, credentials, dates, quantified outcomes, quoted source and prompt-like content. A candidate can explicitly attest to a personal fact. The product does not independently verify that person's statement.
 - Parsing is conservative. Scans and unsupported Word objects request pasted text. The user checks reading order and missing content after extraction. PDF font coverage and excessively long unbroken strings can limit PDF export; Word remains available. No ATS ranking or interview guarantee is calculated.
-- Browser tests cover mobile and desktop upload, review, changed wording, confirmations, both downloaded files, failed upload and retry. Local PostgreSQL tests cover anonymous and cross-owner denial, immutable records, limits, expiry, and deletion. The separate Auth/PostgREST CI job exercises the private account API with synthetic accounts.
+- Browser tests cover mobile and desktop upload, review, changed wording, confirmations, both downloaded files, failed upload and retry. Local PostgreSQL tests cover anonymous and cross-owner denial, immutable records, limits, expiry, and deletion. The separate Auth/PostgREST CI job exercises the private account API and the signed-in browser journey with synthetic accounts.
 - Optional local model review is hidden unless a compatible English on-device model is already available. Provider contract tests use a fake model. Real-device language quality requires separate evaluation before promoting this feature.
 - Before hosting, put an identity-based access policy in front of **every** preview hostname and verify an unauthenticated visitor is denied. Use a separate Cloudflare Pages project with only this build output. Keep the recruiter project's settings unchanged. Review complex layouts, accessibility and representative consented samples before launch.
 - For rollback, withdraw the candidate deployment or restore a previous candidate build, disable candidate signups, and leave the candidate database private. Restore schema/data only from a verified candidate-specific backup. Production URL, DNS, retention, budget, and any paid launch require owner approval.

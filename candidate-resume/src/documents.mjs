@@ -55,7 +55,7 @@ export async function readPdf(bytes, pdfjs, resources) {
     await task.destroy();
   }
 }
-export async function makeDocx(lines) {
+export async function makeDocx(lines, template = "modern") {
   const paragraphs = lines.map(
     ({ text, kind }) =>
       new Paragraph({
@@ -72,7 +72,7 @@ export async function makeDocx(lines) {
         children: [
           new TextRun({
             text,
-            font: "Calibri",
+            font: template === "classic" ? "Georgia" : "Calibri",
             size: kind === "name" ? 36 : kind === "heading" ? 25 : 22,
             bold: kind === "heading" || kind === "name",
             color: "172D26",

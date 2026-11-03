@@ -22,6 +22,9 @@ const assets = {
   "node_modules/pdfjs-dist/cmaps": "vendor/cmaps",
   "node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf": "vendor/regular.ttf",
   "node_modules/dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf": "vendor/bold.ttf",
+  "node_modules/dejavu-fonts-ttf/ttf/DejaVuSerif.ttf": "vendor/serif.ttf",
+  "node_modules/dejavu-fonts-ttf/ttf/DejaVuSerif-Bold.ttf":
+    "vendor/serif-bold.ttf",
   "node_modules/dejavu-fonts-ttf/LICENSE": "vendor/FONT-LICENSE",
   "node_modules/pdfjs-dist/LICENSE": "vendor/PDFJS-LICENSE",
 };

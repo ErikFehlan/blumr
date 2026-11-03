@@ -43,6 +43,9 @@ test("paste, review, block unsupported facts, approve, download and import both 
   await expect(page.locator("#pdf")).toBeDisabled();
   await expect(page.locator("#preview")).not.toContainText("AWS");
   await page.locator("#final-ok").check();
+  await page.getByLabel("Document style").selectOption("classic");
+  await expect(page.locator("#final-ok")).not.toBeChecked();
+  await page.locator("#final-ok").check();
   const files = {};
   for (const format of ["docx", "pdf"]) {
     const download = page.waitForEvent("download");

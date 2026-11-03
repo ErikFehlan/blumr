@@ -125,6 +125,7 @@ function clearAnalysis() {
   invalidate();
 }
 function reset() {
+  $("template").value = "modern";
   for (const id of ["title", "employer", "job", "source", "file"])
     $(id).value = "";
   $("source-ok").checked = false;
@@ -569,6 +570,10 @@ $("next-review").onclick = () => {
   }
 };
 function renderLive() {
+  $("live-preview").classList.toggle(
+    "classic",
+    $("template").value === "classic",
+  );
   try {
     $("live-preview").replaceChildren(
       ...documentLines(currentRows(true)).map((l) => el("p", l.text, l.kind)),
@@ -582,10 +587,15 @@ $("live-details").ontoggle = () => {
 };
 function renderPreview() {
   const paper = $("preview");
+  paper.classList.toggle("classic", $("template").value === "classic");
   paper.replaceChildren(
     ...documentLines(currentRows()).map((l) => el("p", l.text, l.kind)),
   );
 }
+$("template").onchange = () => {
+  invalidate();
+  renderPreview();
+};
 $("final-ok").onchange = summary;
 for (const format of ["pdf", "docx"])
   $(format).onclick = () =>
@@ -597,6 +607,7 @@ for (const format of ["pdf", "docx"])
         const lines = documentLines(currentRows());
         const { bytes } = await worker("document-worker.js", {
           operation: "export",
+          template: $("template").value,
           format,
           lines,
         });
@@ -641,6 +652,7 @@ function snapshot() {
     job: $("job").value,
     source: $("source").value,
     fileName: file?.name || null,
+    template: $("template").value,
     review: structuredClone(review),
   };
 }
@@ -664,6 +676,7 @@ async function reopen(entry) {
   lastSource = s.source;
   findings = matches;
   review = s.review;
+  $("template").value = s.template === "classic" ? "classic" : "modern";
   $("source-ok").checked = true;
   $("source").readOnly = true;
   $("file").disabled = true;
