@@ -1,32 +1,230 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#17372c"><title>blumr Resume · Candidate studio</title><link rel="icon" href="vendor/icon.png"><link rel="stylesheet" href="style.css"><script type="module" src="app.js"></script></head>
-<body><header class="mast"><div class="frame nav"><div class="identity"><span class="brand"><img src="vendor/logo.png" alt="blumr"></span><span class="product">Resume</span></div><span class="private"><span class="dot"></span> Candidate studio</span></div></header>
-<main class="frame"><div class="intro"><div class="eyebrow">APPLICATION WORKSPACE</div><h1>Tailor your resume<span>.</span></h1><p>Bring the experience that matters to the front.</p></div>
-<nav aria-label="Resume workflow" id="steps" class="steps"></nav>
-<div role="status" aria-live="polite" id="notice" tabindex="-1" hidden></div>
-<div class="layout"><div id="workspace">
-<section id="job-panel" class="panel"><div class="kicker">01 / TARGET ROLE</div><h2>Your next role</h2><p class="hint">Paste the posting so we can find the requirements that match your experience.</p>
-<div class="twocol"><label>Job title <small>optional</small><input id="title" maxlength="180" autocomplete="off" placeholder="e.g. Cloud Engineer"></label><label>Employer <small>optional</small><input id="employer" maxlength="180" autocomplete="off" placeholder="Company name"></label></div>
-<label for="job">Job description</label><textarea id="job" rows="9" maxlength="22000" placeholder="Paste the full job description, including qualifications and responsibilities."></textarea>
-<div class="actions"><button id="next-job" class="primary">Continue to resume <span aria-hidden="true">→</span></button><button id="sample" class="textbtn">Try a sample application</button></div></section>
-<section id="source-panel" class="panel" hidden><div class="kicker">02 / ORIGINAL DOCUMENT</div><h2>Your source resume</h2><p class="hint">Upload the version you would normally submit, or paste it below. Compare the extracted text with your original before continuing.</p>
-<label class="upload" for="file"><strong>Choose a resume file</strong><span>PDF or Word (.docx) · Up to 10 MB</span><input id="file" type="file" accept=".docx,.pdf"></label>
-<div id="file-info"></div><label for="source">Resume text</label><textarea id="source" maxlength="95000" rows="12" placeholder="Or paste your complete resume here."></textarea><p id="extract-warning" class="hint"></p><button id="replace-source" class="textbtn" hidden>Replace this source</button>
-<label class="check"><input type="checkbox" id="source-ok">I checked that this text contains my complete resume in the correct reading order.</label>
-<div class="actions"><button id="tailor" class="primary">Tailor my resume <span aria-hidden="true">→</span></button><button class="textbtn" data-step="0">Back</button></div></section>
-<section id="review-panel" class="panel" hidden><div class="kicker">03 / EVIDENCE &amp; EDITS</div><h2>Review your changes</h2><p class="hint">Compare your resume line by line. You control which changes make it into the final document.</p>
-<details id="match-details" open><summary>Job requirements and evidence</summary><div id="matches"></div></details>
-<div id="move-list"></div><h3>Original and revised</h3><div id="compare"></div>
-<h3>Experience missing from your original?</h3><p class="hint">Add a specific fact in your own words. Confirm it before it appears in the final download.</p><div id="additions"></div><button id="add" class="secondary">Add a detail</button>
-<div id="model-controls" hidden><h3>Optional local model review</h3><p class="hint">Send the posting and resume bullets to the local model on this device to suggest bullets to review.</p><button class="secondary" id="ask-model">Ask local model</button><p id="model-result"></p></div>
-<div class="actions"><button id="next-review" class="primary">Review final document <span aria-hidden="true">→</span></button><button class="textbtn" data-step="1">Back</button></div></section>
-<section id="export-panel" class="panel" hidden><div class="kicker">04 / FINAL DOCUMENT</div><h2>Approve and download</h2><p class="hint">Both formats use a single column and selectable text. Each file is checked against your approved wording before download.</p><article id="preview" class="paper" aria-label="Final resume preview"></article>
-<label class="check"><input type="checkbox" id="final-ok">I approve this version and confirm that it accurately represents my experience.</label>
-<div class="actions"><button id="docx" class="primary" disabled>Download Word</button><button id="pdf" class="secondary" disabled>Download PDF</button><button class="textbtn" data-step="2">Back to edits</button></div></section>
-</div><aside><div class="sidebox"><div class="kicker">YOUR APPLICATION</div><h2 id="role-label">Untitled application</h2><p class="hint" id="company-label">Target role</p><div class="meta"><span>Job description</span><b id="job-status">Pending</b></div><div class="meta"><span>Source resume</span><b id="source-status">Pending</b></div><div class="meta"><span>Final approval</span><b id="approve-status">Pending</b></div></div>
-<div class="sidebox green"><div class="shield" aria-hidden="true">✓</div><h3>Grounded in your experience</h3><p>Every proposed edit starts with your resume. Missing qualifications appear in your review so you can decide whether you have evidence to add.</p></div>
-<div class="sidebox" id="privacy"><div class="kicker">YOUR DATA</div><p id="privacy-copy">Your files stay in this tab. Closing or refreshing clears this session.</p><button id="clear" class="textbtn">Clear workspace</button></div>
-<section class="sidebox" id="accounts" hidden><div class="kicker">PRIVATE ACCOUNT</div><div id="account-ui"></div></section></aside></div>
-</main><footer class="frame">blumr Resume <span>Candidate studio</span></footer>
-<dialog id="confirm-dialog"><h3 id="dialog-title"></h3><p id="dialog-copy"></p><div class="actions"><button class="secondary" id="cancel-dialog">Cancel</button><button class="primary" id="confirm-dialog-action">Continue</button></div></dialog>
-<noscript>Enable JavaScript to use the private resume workspace.</noscript></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#17372c" />
+    <title>blumr Resume · Candidate studio</title>
+    <link rel="icon" href="vendor/icon.png" />
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header class="mast">
+      <div class="frame nav">
+        <div class="identity">
+          <span class="brand"><img src="vendor/logo.png" alt="blumr" /></span
+          ><span class="product">Resume</span>
+        </div>
+        <span class="private"><span class="dot"></span> Candidate studio</span>
+      </div>
+    </header>
+    <main class="frame">
+      <div class="intro">
+        <div class="eyebrow">APPLICATION WORKSPACE</div>
+        <h1>Tailor your resume<span>.</span></h1>
+        <p>Bring the experience that matters to the front.</p>
+      </div>
+      <nav aria-label="Resume workflow" id="steps" class="steps"></nav>
+      <div
+        role="status"
+        aria-live="polite"
+        id="notice"
+        tabindex="-1"
+        hidden
+      ></div>
+      <div class="layout">
+        <div id="workspace">
+          <section id="job-panel" class="panel">
+            <div class="kicker">01 / TARGET ROLE</div>
+            <h2>Your next role</h2>
+            <p class="hint">
+              Paste the posting so we can find the requirements that match your
+              experience.
+            </p>
+            <div class="twocol">
+              <label
+                >Job title <small>optional</small
+                ><input
+                  id="title"
+                  maxlength="180"
+                  autocomplete="off"
+                  placeholder="e.g. Cloud Engineer" /></label
+              ><label
+                >Employer <small>optional</small
+                ><input
+                  id="employer"
+                  maxlength="180"
+                  autocomplete="off"
+                  placeholder="Company name"
+              /></label>
+            </div>
+            <label for="job">Job description</label
+            ><textarea
+              id="job"
+              rows="9"
+              maxlength="22000"
+              placeholder="Paste the full job description, including qualifications and responsibilities."
+            ></textarea>
+            <div class="actions">
+              <button id="next-job" class="primary">
+                Continue to resume <span aria-hidden="true">→</span></button
+              ><button id="sample" class="textbtn">
+                Try a sample application
+              </button>
+            </div>
+          </section>
+          <section id="source-panel" class="panel" hidden>
+            <div class="kicker">02 / ORIGINAL DOCUMENT</div>
+            <h2>Your source resume</h2>
+            <p class="hint">
+              Upload the version you would normally submit, or paste it below.
+              Compare the extracted text with your original before continuing.
+            </p>
+            <label class="upload" for="file"
+              ><strong>Choose a resume file</strong
+              ><span>PDF or Word (.docx) · Up to 10 MB</span
+              ><input id="file" type="file" accept=".docx,.pdf"
+            /></label>
+            <div id="file-info"></div>
+            <label for="source">Resume text</label
+            ><textarea
+              id="source"
+              maxlength="95000"
+              rows="12"
+              placeholder="Or paste your complete resume here."
+            ></textarea>
+            <p id="extract-warning" class="hint"></p>
+            <button id="replace-source" class="textbtn" hidden>
+              Replace this source
+            </button>
+            <label class="check"
+              ><input type="checkbox" id="source-ok" />I checked that this text
+              contains my complete resume in the correct reading order.</label
+            >
+            <div class="actions">
+              <button id="tailor" class="primary">
+                Tailor my resume <span aria-hidden="true">→</span></button
+              ><button class="textbtn" data-step="0">Back</button>
+            </div>
+          </section>
+          <section id="review-panel" class="panel" hidden>
+            <div class="kicker">03 / EVIDENCE &amp; EDITS</div>
+            <h2>Review your changes</h2>
+            <p class="hint">
+              Compare your resume line by line. You control which changes make
+              it into the final document.
+            </p>
+            <details id="match-details" open>
+              <summary>Job requirements and evidence</summary>
+              <div id="matches"></div>
+            </details>
+            <div id="move-list"></div>
+            <h3>Original and revised</h3>
+            <div id="compare"></div>
+            <h3>Experience missing from your original?</h3>
+            <p class="hint">
+              Add a specific fact in your own words. Confirm it before it
+              appears in the final download.
+            </p>
+            <div id="additions"></div>
+            <button id="add" class="secondary">Add a detail</button>
+            <div id="model-controls" hidden>
+              <h3>Optional local model review</h3>
+              <p class="hint">
+                Send the posting and resume bullets to the local model on this
+                device to suggest bullets to review.
+              </p>
+              <button class="secondary" id="ask-model">Ask local model</button>
+              <p id="model-result"></p>
+            </div>
+            <details id="live-details">
+              <summary>Live document preview</summary>
+              <article
+                class="paper"
+                id="live-preview"
+                aria-label="Live resume preview"
+              ></article>
+            </details>
+            <div class="actions">
+              <button id="next-review" class="primary">
+                Review final document <span aria-hidden="true">→</span></button
+              ><button class="textbtn" data-step="1">Back</button>
+            </div>
+          </section>
+          <section id="export-panel" class="panel" hidden>
+            <div class="kicker">04 / FINAL DOCUMENT</div>
+            <h2>Approve and download</h2>
+            <p class="hint">
+              Both formats use a single column and selectable text. Each file is
+              checked against your approved wording before download.
+            </p>
+            <article
+              id="preview"
+              class="paper"
+              aria-label="Final resume preview"
+            ></article>
+            <label class="check"
+              ><input type="checkbox" id="final-ok" />I approve this version and
+              confirm that it accurately represents my experience.</label
+            >
+            <div class="actions">
+              <button id="docx" class="primary" disabled>Download Word</button
+              ><button id="pdf" class="secondary" disabled>Download PDF</button
+              ><button class="textbtn" data-step="2">Back to edits</button>
+            </div>
+          </section>
+        </div>
+        <aside>
+          <div class="sidebox">
+            <div class="kicker">YOUR APPLICATION</div>
+            <h2 id="role-label">Untitled application</h2>
+            <p class="hint" id="company-label">Target role</p>
+            <div class="meta">
+              <span>Job description</span><b id="job-status">Pending</b>
+            </div>
+            <div class="meta">
+              <span>Source resume</span><b id="source-status">Pending</b>
+            </div>
+            <div class="meta">
+              <span>Final approval</span><b id="approve-status">Pending</b>
+            </div>
+          </div>
+          <div class="sidebox green">
+            <div class="shield" aria-hidden="true">✓</div>
+            <h3>Grounded in your experience</h3>
+            <p>
+              Every proposed edit starts with your resume. Missing
+              qualifications appear in your review so you can decide whether you
+              have evidence to add.
+            </p>
+          </div>
+          <div class="sidebox" id="privacy">
+            <div class="kicker">YOUR DATA</div>
+            <p id="privacy-copy">
+              Your files stay in this tab. Closing or refreshing clears this
+              session.
+            </p>
+            <button id="clear" class="textbtn">Clear workspace</button>
+          </div>
+          <section class="sidebox" id="accounts" hidden>
+            <div class="kicker">PRIVATE ACCOUNT</div>
+            <div id="account-ui"></div>
+          </section>
+        </aside>
+      </div>
+    </main>
+    <footer class="frame">blumr Resume <span>Candidate studio</span></footer>
+    <dialog id="confirm-dialog">
+      <h3 id="dialog-title"></h3>
+      <p id="dialog-copy"></p>
+      <div class="actions">
+        <button class="secondary" id="cancel-dialog">Cancel</button
+        ><button class="primary" id="confirm-dialog-action">Continue</button>
+      </div>
+    </dialog>
+    <noscript>Enable JavaScript to use the private resume workspace.</noscript>
+  </body>
+</html>
