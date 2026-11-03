@@ -180,7 +180,18 @@ function worker(path, payload, transfer = []) {
       finish(
         "The private processing worker failed. Refresh or try pasting the text.",
       );
-    w.onmessage = ({ data }) => finish(data.ok ? null : data.error, data);
+    w.onmessage = ({ data }) => {
+      // PDF.js also sends transport control messages on the worker port.
+      if (data?.channel !== "blumr-resume-result") return;
+      if (data.ok !== true)
+        return finish(data.error || "The operation failed.");
+      if (
+        payload.operation === "export" &&
+        (!(data.bytes instanceof Uint8Array) || !data.bytes.byteLength)
+      )
+        return finish("The exporter did not return a document.");
+      finish(null, data);
+    };
     w.postMessage(payload, transfer);
   });
 }

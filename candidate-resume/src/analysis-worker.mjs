@@ -3,9 +3,17 @@ self.onmessage = ({ data }) => {
   try {
     sourceLines(data.source);
     const rules = jobRequirements(data.job, data.title);
-    self.postMessage({ ok: true, findings: mapEvidence(rules, data.source) });
+    self.postMessage({
+      channel: "blumr-resume-result",
+      ok: true,
+      findings: mapEvidence(rules, data.source),
+    });
   } catch (error) {
-    self.postMessage({ ok: false, error: error.message });
+    self.postMessage({
+      channel: "blumr-resume-result",
+      ok: false,
+      error: error.message,
+    });
   } finally {
     self.close();
   }

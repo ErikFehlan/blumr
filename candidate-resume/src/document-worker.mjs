@@ -33,7 +33,7 @@ self.onmessage = async ({ data }) => {
     if (data.operation === "read") {
       const parsed = await parse(new Uint8Array(data.bytes));
       sourceLines(parsed.text);
-      self.postMessage({ ok: true, ...parsed });
+      self.postMessage({ channel: "blumr-resume-result", ok: true, ...parsed });
     } else if (data.operation === "export") {
       const bytes =
         data.format === "pdf"
@@ -44,11 +44,14 @@ self.onmessage = async ({ data }) => {
           : await makeDocx(data.lines);
       validateExport(data.lines, (await parse(new Uint8Array(bytes))).text);
       globalThis.AncalagonUploadGuard.inspect(bytes, data.format);
-      self.postMessage({ ok: true, bytes }, [bytes.buffer]);
+      self.postMessage({ channel: "blumr-resume-result", ok: true, bytes }, [
+        bytes.buffer,
+      ]);
     } else throw Error("Unknown document operation.");
   } catch (e) {
     const message = String(e.message || "");
     self.postMessage({
+      channel: "blumr-resume-result",
       ok: false,
       error:
         /^(Use |This |The |Word |Download blocked|A |Check |Choose |Encrypted|Unsupported|A page)/.test(
