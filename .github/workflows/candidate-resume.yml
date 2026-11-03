@@ -47,7 +47,9 @@ jobs:
           mkdir -p "$CANDIDATE_TEST_STACK"
           supabase init --workdir "$CANDIDATE_TEST_STACK"
           supabase start --workdir "$CANDIDATE_TEST_STACK" --exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
-          psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f backend/schema.sql -f backend/supabase/migrations/*_candidate_workspace.sql -f backend/retention.sql
+          for script in backend/schema.sql backend/supabase/migrations/*.sql backend/retention.sql; do
+            psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f "$script"
+          done
           node tests/local-auth.mjs
       - name: Exercise saved accounts through the candidate UI
         env:

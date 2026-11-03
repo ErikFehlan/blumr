@@ -15,7 +15,17 @@ export function profileHub({
   const { $, el, button, action, ask, info, download } = ui;
   let profile = null,
     baseMeta = null,
-    draftFile = null;
+    draftFile = null,
+    cachedBase = null;
+  async function loadBase() {
+    const meta = await api.baseInfo();
+    if (!meta) {
+      cachedBase = null;
+      return null;
+    }
+    if (cachedBase?.revision !== meta.revision) cachedBase = await api.base();
+    return cachedBase;
+  }
   function clearImport() {
     draftFile = null;
     $("base-file").value = "";
@@ -49,17 +59,31 @@ export function profileHub({
       api.list(),
     ]);
     baseMeta = meta;
+    if (cachedBase?.revision !== meta?.revision) cachedBase = null;
+    $("base-reading").hidden = true;
+    $("base-reading").textContent = "";
     $("base-summary").textContent = meta
       ? "Current source · " + (meta.file_name || "Pasted resume")
       : "Save one reviewed source to reuse for each new position.";
     const controls = $("base-controls");
     controls.replaceChildren();
     if (meta) {
+      controls.append(
+        button("View source text", () =>
+          action("Opening base resume…", async () => {
+            const base = await loadBase();
+            if (!base) throw Error("The saved source was removed.");
+            $("base-reading").textContent = base.source_text;
+            $("base-reading").hidden = false;
+            info("");
+          }),
+        ),
+      );
       if (meta.file_name)
         controls.append(
           button("Download base original", () =>
             action("Opening your original…", async () => {
-              const base = await api.base();
+              const base = await loadBase();
               if (!base?.original_file)
                 throw Error(
                   "This base resume has changed. Reopen your workspace.",
@@ -111,6 +135,23 @@ export function profileHub({
           .filter(Boolean)
           .join(" · "),
       );
+      if (meta && job.fit_base_revision === meta.revision && job.fit_label) {
+        const label = job.fit_total
+          ? job.fit_label +
+            " · " +
+            job.fit_supported +
+            "/" +
+            job.fit_total +
+            " supported"
+          : job.fit_label;
+        actions.before(
+          el(
+            "span",
+            label,
+            "tag" + (job.fit_label === "Stretch" ? " warn" : ""),
+          ),
+        );
+      }
       actions.append(
         button("Open job", () =>
           action("Opening job…", async () =>
@@ -272,11 +313,9 @@ export function profileHub({
   return {
     refresh,
     saveBase,
+    loadBase,
     get profile() {
       return profile;
-    },
-    get baseMeta() {
-      return baseMeta;
     },
   };
 }

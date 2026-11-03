@@ -34,7 +34,7 @@ For isolated staging, enable email/password Auth with verified email, disable an
 
 ## Candidate role fit
 
-Fit is computed from the original reviewed resume and the job description. The displayed score counts directly evidenced, distinct required qualifications. In the absence of explicit requirements it can use qualifications listed under a neutral qualifications heading. Preferred evidence is shown separately. Good fit requires full coverage. Conflicting required evidence or more than half missing yields Stretch. Partial coverage with gaps yields Potential fit. Ambiguous evidence may need clarification, and an unscorable posting gets no verdict. Profile fields and edits made to the tailored document are excluded from this calculation.
+Fit is computed from the original reviewed resume and the job description. The displayed score counts directly evidenced, distinct required qualifications. In the absence of explicit requirements it can use qualifications listed under a neutral qualifications heading. The saved job list shows the last result for the current base resume. Editing the posting invalidates it, and replacing the base hides earlier results. Preferred evidence is shown separately. Good fit requires full coverage. Conflicting required evidence or more than half missing yields Stretch. Partial coverage with gaps yields Potential fit. Ambiguous evidence may need clarification, and an unscorable posting gets no verdict. Profile fields and edits made to the tailored document are excluded from this calculation.
 
 ## Acceptance and launch gates
 

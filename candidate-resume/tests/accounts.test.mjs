@@ -55,6 +55,15 @@ test("Postgres enforces owner isolation, immutable source, expiry, quotas and se
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL(
+        "../backend/supabase/migrations/20261103170640_saved_job_fit.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   const act = async (id, sid = session, anonymous = false) => {
     await db.exec("reset role;set role authenticated");
     await db.query("select set_config('request.jwt.claims',$1,false)", [

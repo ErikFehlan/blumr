@@ -1,3 +1,4 @@
+import { candidateId } from "./id.mjs";
 // Explicit interactive demo. Never accepts credentials or writes browser storage.
 import { encodeFile } from "./account.mjs";
 export function demoAccount() {
@@ -31,7 +32,27 @@ export function demoAccount() {
     saveJob: async (data) => {
       if (!jobs.has(data.id) && jobs.size >= 50)
         throw Error("Saved job limit reached.");
-      jobs.set(data.id, { ...data });
+      const old = jobs.get(data.id);
+      const same =
+        old && old.description === data.description && old.title === data.title;
+      const job = {
+        ...(same ? old : {}),
+        ...data,
+        revision: same ? old.revision : candidateId(),
+      };
+      jobs.set(data.id, job);
+      return { revision: job.revision };
+    },
+    saveFit: async (id, revision, base, fit) => {
+      const job = jobs.get(id);
+      if (job?.revision !== revision) return null;
+      Object.assign(job, {
+        fit_base_revision: base,
+        fit_label: fit.label,
+        fit_supported: fit.supported,
+        fit_total: fit.total,
+      });
+      return { id };
     },
     deleteJob: async (id) => jobs.delete(id),
     list: async () => [...versions.values()].reverse(),

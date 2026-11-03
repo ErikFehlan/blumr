@@ -41,14 +41,12 @@ test("candidate setup, one original for two jobs, fit coverage, independent vers
       ],
     }),
   );
-  await page
-    .locator("#base-file")
-    .setInputFiles({
-      name: "Original.docx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      buffer: bytes,
-    });
+  await page.locator("#base-file").setInputFiles({
+    name: "Original.docx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    buffer: bytes,
+  });
   await expect(page.locator("#base-text")).toHaveValue(
     /Maintained SQL reports/,
   );
@@ -80,6 +78,12 @@ test("candidate setup, one original for two jobs, fit coverage, independent vers
     await home();
   }
   await expect(page.locator("#saved-jobs .hub-row")).toHaveCount(2);
+  await expect(
+    page.locator("#saved-jobs .hub-row").filter({ hasText: "Analyst" }),
+  ).toContainText("Good fit");
+  await expect(
+    page.locator("#saved-jobs .hub-row").filter({ hasText: "Cloud engineer" }),
+  ).toContainText("Stretch");
   await role("Sign out").click();
   await expect(page).toHaveURL(/login\.html$/);
   await credentials();
@@ -98,6 +102,7 @@ test("candidate setup, one original for two jobs, fit coverage, independent vers
   await expect(page.locator("#base-summary")).toContainText(
     "Save one reviewed",
   );
+  await expect(page.locator("#saved-jobs .tag")).toHaveCount(0);
   await role("Open version").click();
   await role("Continue").click();
   await visible(page.locator("#review-panel"));

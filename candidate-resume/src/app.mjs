@@ -145,6 +145,7 @@ function reset() {
   file = null;
   baseRevision = null;
   jobId = null;
+  jobRevision = null;
   lastSource = null;
   findings = [];
   review = blankReview();
@@ -234,6 +235,7 @@ document
   .forEach((b) => (b.onclick = () => jump(Number(b.dataset.step))));
 for (const id of ["title", "employer", "job"])
   $(id).oninput = () => {
+    jobRevision = null;
     clearAnalysis();
     nav();
     info("");
@@ -369,6 +371,23 @@ async function assess() {
   $("replace-source").hidden = false;
   invalidate();
   go(2);
+  if (account && jobRevision && baseRevision) {
+    try {
+      if (
+        !(await account.saveFit(
+          jobId,
+          jobRevision,
+          baseRevision,
+          roleFit(findings),
+        ))
+      )
+        info("The saved posting changed. Reopen it to update its fit.");
+    } catch {
+      info(
+        "Assessment complete. The fit result could not be saved to your job list.",
+      );
+    }
+  }
 }
 $("tailor").onclick = () =>
   action("Finding source evidence and preparing the comparison…", assess);
@@ -683,7 +702,8 @@ $("ask-model").onclick = () =>
 let account = null,
   hub = null,
   baseRevision = null,
-  jobId = null;
+  jobId = null,
+  jobRevision = null;
 const params = new URLSearchParams(location.search);
 const demo = !CANDIDATE_URL && params.get("demo") === "1";
 function hasDraft() {
@@ -746,12 +766,13 @@ async function startJob(job, assessNow) {
     info("");
     return;
   }
-  const base = await account.base();
+  const base = await hub.loadBase();
   if (assessNow && !base)
     throw Error("Save a base resume before assessing a job.");
   reset();
   screen(false);
   jobId = job?.id || null;
+  jobRevision = job?.revision || null;
   $("title").value = job?.title || "";
   $("employer").value = job?.employer || "";
   $("job").value = job?.description || "";
@@ -835,17 +856,18 @@ function accountActions() {
     action("Saving job…", async () => {
       jobRequirements($("job").value, $("title").value);
       jobId ??= candidateId();
-      await account.saveJob({
+      const saved = await account.saveJob({
         id: jobId,
         title: $("title").value.trim(),
         employer: $("employer").value.trim(),
         description: $("job").value,
       });
+      jobRevision = saved.revision;
       info("Job saved to your workspace.");
     });
   $("use-base").onclick = () =>
     action("Loading your base resume…", async () => {
-      const base = await account.base();
+      const base = await hub.loadBase();
       if (!base) throw Error("Save a base resume in My workspace first.");
       if (baseRevision === base.revision) {
         info("You are already using your saved base resume.");

@@ -46,6 +46,19 @@ await a.saveJob({
   employer: "Example",
   description: "SQL required.",
 });
+const j = await a.job(jobId);
+const fit = { label: "Good fit", supported: 1, total: 1 };
+await a.saveFit(jobId, j.revision, rev, fit);
+assert.equal((await a.jobs())[0].fit_label, "Good fit");
+assert.equal(await b.saveFit(jobId, j.revision, rev, fit), null);
+await a.saveJob({
+  id: jobId,
+  title: "Other job",
+  employer: "Example",
+  description: "AWS required.",
+});
+assert.equal(await a.saveFit(jobId, j.revision, rev, fit), null);
+assert.equal((await a.jobs())[0].fit_label, null);
 assert.equal((await a.jobs()).length, 1);
 assert.equal((await b.jobs()).length, 0);
 await assert.rejects(b.job(jobId));

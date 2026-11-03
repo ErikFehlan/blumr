@@ -145,14 +145,16 @@ export function accountClient(url, key, sessionStore) {
       checked(
         client
           .from("candidate_saved_jobs")
-          .select("id,title,employer,created_at")
+          .select(
+            "id,title,employer,created_at,fit_base_revision,fit_label,fit_supported,fit_total",
+          )
           .order("created_at", { ascending: false }),
       ),
     job: (id) =>
       checked(
         client
           .from("candidate_saved_jobs")
-          .select("id,title,employer,description")
+          .select("id,title,employer,description,revision")
           .eq("id", id)
           .single(),
       ),
@@ -160,7 +162,24 @@ export function accountClient(url, key, sessionStore) {
       checked(
         client
           .from("candidate_saved_jobs")
-          .upsert(data, { onConflict: "owner_id,id" }),
+          .upsert(data, { onConflict: "owner_id,id" })
+          .select("revision")
+          .single(),
+      ),
+    saveFit: (id, revision, base, fit) =>
+      checked(
+        client
+          .from("candidate_saved_jobs")
+          .update({
+            fit_base_revision: base,
+            fit_label: fit.label,
+            fit_supported: fit.supported,
+            fit_total: fit.total,
+          })
+          .eq("id", id)
+          .eq("revision", revision)
+          .select("id")
+          .maybeSingle(),
       ),
     deleteJob: (id) =>
       checked(client.from("candidate_saved_jobs").delete().eq("id", id)),
