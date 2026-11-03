@@ -13,7 +13,8 @@ await mkdir("dist/vendor", { recursive: true });
 const assets = {
   "index.html": "index.html",
   "style.css": "style.css",
-  "../assets/blumr-logo.png": "vendor/logo.png",
+  "../assets/brand.css": "vendor/brand.css",
+  "../assets/blumr-logo.png": "vendor/blumr-logo.png",
   "../assets/blumr-icon.png": "vendor/icon.png",
   "node_modules/pdfjs-dist/build/pdf.min.mjs": "vendor/pdf.min.mjs",
   "node_modules/pdfjs-dist/build/pdf.worker.min.mjs":

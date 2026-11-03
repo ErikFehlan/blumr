@@ -76,6 +76,10 @@ function summary() {
   $("approve-status").textContent = $("final-ok").checked
     ? "Approved"
     : "Pending";
+  for (const id of ["job-status", "source-status", "approve-status"]) {
+    const badge = $(id);
+    badge.toggleAttribute("data-ready", badge.textContent !== "Pending");
+  }
   $("docx").disabled = $("pdf").disabled = !$("final-ok").checked;
 }
 function nav() {
@@ -371,7 +375,7 @@ function renderReview() {
           preferred: "Preferred",
           required: "Required",
         }[f.priority] || "Job detail",
-        "tag",
+        "tag priority",
       ),
       el(
         "span",
