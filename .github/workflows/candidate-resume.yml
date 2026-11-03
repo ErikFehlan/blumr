@@ -49,3 +49,13 @@ jobs:
           supabase start --workdir "$CANDIDATE_TEST_STACK" --exclude realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
           psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f backend/schema.sql -f backend/retention.sql
           node tests/local-auth.mjs
+      - name: Exercise saved accounts through the candidate UI
+        env:
+          CANDIDATE_TEST_STACK: ${{ runner.temp }}/candidate-supabase
+        run: |
+          export CANDIDATE_SUPABASE_URL=http://127.0.0.1:54321
+          CANDIDATE_PUBLISHABLE_KEY="$(supabase status --workdir "$CANDIDATE_TEST_STACK" -o json | jq -er .PUBLISHABLE_KEY)"
+          export CANDIDATE_PUBLISHABLE_KEY
+          npm run build
+          npx playwright install --with-deps chromium
+          npx playwright test --config playwright.accounts.config.mjs
