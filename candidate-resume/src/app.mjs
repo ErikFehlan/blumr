@@ -1,3 +1,4 @@
+import { candidateId } from "./id.mjs";
 import {
   limits,
   sourceLines,
@@ -9,6 +10,9 @@ import {
   documentLines,
 } from "./engine.mjs";
 import { localReviewer, modelReady } from "./model.mjs";
+import { roleFit } from "./fit.mjs";
+import { demoAccount } from "./demo-account.mjs";
+import { profileHub } from "./profile-hub.mjs";
 import { accountClient, decodeFile } from "./account.mjs";
 const $ = (id) => document.getElementById(id);
 function el(tag, text = "", cls = "") {
@@ -139,6 +143,8 @@ function reset() {
   $("file-info").replaceChildren();
   $("extract-warning").textContent = "";
   file = null;
+  baseRevision = null;
+  jobId = null;
   lastSource = null;
   findings = [];
   review = blankReview();
@@ -152,6 +158,8 @@ async function action(label, fn) {
   if (busy) return;
   busy = true;
   info(label);
+  $("profile-home").inert = true;
+  $("home-link").inert = true;
   $("workspace").inert = true;
   document.querySelector("aside").inert = true;
   $("steps").inert = true;
@@ -161,6 +169,8 @@ async function action(label, fn) {
     info(e.message || "The operation could not be completed. Try again.");
   } finally {
     busy = false;
+    $("profile-home").inert = false;
+    $("home-link").inert = false;
     $("workspace").inert = false;
     document.querySelector("aside").inert = false;
     $("steps").inert = false;
@@ -229,6 +239,7 @@ for (const id of ["title", "employer", "job"])
     info("");
   };
 $("source").oninput = () => {
+  baseRevision = null;
   $("source-ok").checked = false;
   clearAnalysis();
   summary();
@@ -279,6 +290,7 @@ $("replace-source").onclick = async () => {
   )
     return;
   file = null;
+  baseRevision = null;
   review = blankReview();
   lastSource = null;
   clearAnalysis();
@@ -292,6 +304,23 @@ $("replace-source").onclick = async () => {
   fileInfo();
   go(1);
 };
+async function readResume(selected) {
+  const format = selected.name.split(".").pop().toLowerCase();
+  if (
+    !["pdf", "docx"].includes(format) ||
+    !selected.size ||
+    selected.size > 10485760
+  )
+    throw Error("Choose a PDF or DOCX file up to 10 MB.");
+  const bytes = await selected.arrayBuffer();
+  const parsed = await worker(
+    "document-worker.js",
+    { operation: "read", format, bytes },
+    [bytes],
+  );
+  sourceLines(parsed.text);
+  return parsed;
+}
 $("file").onchange = async () => {
   const selected = $("file").files[0];
   if (!selected) return;
@@ -306,19 +335,8 @@ $("file").onchange = async () => {
     return;
   }
   await action("Reading your file on this device…", async () => {
-    const format = selected.name.split(".").pop().toLowerCase();
-    if (
-      !["pdf", "docx"].includes(format) ||
-      !selected.size ||
-      selected.size > 10485760
-    )
-      throw Error("Choose a PDF or DOCX file up to 10 MB.");
-    const bytes = await selected.arrayBuffer();
-    const parsed = await worker(
-      "document-worker.js",
-      { operation: "read", format, bytes },
-      [bytes],
-    );
+    const parsed = await readResume(selected);
+    baseRevision = null;
     file = selected;
     $("source").value = parsed.text;
     $("source").readOnly = true;
@@ -332,27 +350,28 @@ $("file").onchange = async () => {
   });
   $("file").value = "";
 };
-$("tailor").onclick = () =>
-  action("Finding source evidence and preparing the comparison…", async () => {
-    if (!$("source-ok").checked)
-      throw Error("Review the source text and confirm it is complete first.");
-    const source = $("source").value;
-    const result = await worker("analysis-worker.js", {
-      source,
-      job: $("job").value,
-      title: $("title").value,
-    });
-    if (lastSource !== source) {
-      review = blankReview();
-      lastSource = source;
-    }
-    findings = result.findings;
-    $("source").readOnly = true;
-    $("file").disabled = true;
-    $("replace-source").hidden = false;
-    invalidate();
-    go(2);
+async function assess() {
+  if (!$("source-ok").checked)
+    throw Error("Review the source text and confirm it is complete first.");
+  const source = $("source").value;
+  const result = await worker("analysis-worker.js", {
+    source,
+    job: $("job").value,
+    title: $("title").value,
   });
+  if (lastSource !== source) {
+    review = blankReview();
+    lastSource = source;
+  }
+  findings = result.findings;
+  $("source").readOnly = true;
+  $("file").disabled = true;
+  $("replace-source").hidden = false;
+  invalidate();
+  go(2);
+}
+$("tailor").onclick = () =>
+  action("Finding source evidence and preparing the comparison…", assess);
 function toggle(list, id) {
   const i = list.indexOf(id);
   i < 0 ? list.push(id) : list.splice(i, 1);
@@ -362,6 +381,20 @@ function toggle(list, id) {
 function renderReview() {
   const original = $("source").value;
   const { groups, lines } = propose(original, findings);
+  const fit = roleFit(findings);
+  $("fit-label").textContent = fit.label;
+  $("role-fit").classList.toggle("stretch", fit.label === "Stretch");
+  $("fit-score").textContent = fit.total
+    ? fit.supported + " of " + fit.total + " " + fit.basis + " supported"
+    : "Required coverage unavailable";
+  $("fit-reason").textContent = fit.reason;
+  $("fit-preferred").textContent =
+    (fit.preferredTotal
+      ? fit.preferredSupported +
+        " of " +
+        fit.preferredTotal +
+        " preferred qualifications supported. "
+      : "") + "This is resume evidence, not an interview probability.";
   const matches = $("matches");
   matches.replaceChildren();
   for (const f of findings) {
@@ -372,6 +405,7 @@ function renderReview() {
         {
           inferred: "Job detail",
           responsibility: "Responsibility",
+          qualification: "Qualification",
           preferred: "Preferred",
           required: "Required",
         }[f.priority] || "Job detail",
@@ -647,7 +681,85 @@ $("ask-model").onclick = () =>
     info("");
   });
 let account = null,
-  signedIn = false;
+  hub = null,
+  baseRevision = null,
+  jobId = null;
+const params = new URLSearchParams(location.search);
+const demo = !CANDIDATE_URL && params.get("demo") === "1";
+function hasDraft() {
+  return !!(
+    $("job").value ||
+    $("source").value ||
+    $("title").value ||
+    $("employer").value
+  );
+}
+function toFile(record) {
+  return record.original_file
+    ? new File(
+        [decodeFile(record.original_file)],
+        record.file_name || "Original resume",
+      )
+    : null;
+}
+function screen(home) {
+  $("profile-home").hidden = !home;
+  $("studio-content").hidden = home;
+  $("studio-intro").hidden = home;
+  $("studio-nav").hidden = home;
+  if (account) history.replaceState(null, "", home ? "#profile" : "#studio");
+  document.querySelector(".skip").href = home ? "#profile-home" : "#workspace";
+  window.scrollTo(0, 0);
+}
+async function home() {
+  await hub.refresh();
+  screen(true);
+  info("");
+}
+function showStudio() {
+  if (!hub?.profile) return;
+  screen(false);
+  go(step);
+}
+function useBase(base) {
+  if (!base) throw Error("Add a base resume to your profile first.");
+  baseRevision = base.revision;
+  file = toFile(base);
+  fileInfo();
+  $("source").value = base.source_text;
+  $("source").readOnly = true;
+  $("source-ok").checked = true;
+  $("file").disabled = true;
+  $("replace-source").hidden = false;
+  $("extract-warning").textContent =
+    "Using the reviewed base resume in your profile.";
+  summary();
+}
+async function startJob(job, assessNow) {
+  if (
+    hasDraft() &&
+    !(await ask(
+      "Start another application?",
+      "This replaces the current draft. Your saved jobs and resume versions stay in your profile.",
+    ))
+  ) {
+    info("");
+    return;
+  }
+  const base = await account.base();
+  if (assessNow && !base)
+    throw Error("Save a base resume before assessing a job.");
+  reset();
+  screen(false);
+  jobId = job?.id || null;
+  $("title").value = job?.title || "";
+  $("employer").value = job?.employer || "";
+  $("job").value = job?.description || "";
+  if (base) useBase(base);
+  summary();
+  if (assessNow) await assess();
+}
+
 function snapshot() {
   return {
     version: 1,
@@ -655,6 +767,7 @@ function snapshot() {
     employer: $("employer").value,
     job: $("job").value,
     source: $("source").value,
+    savedJobId: jobId,
     fileName: file?.name || null,
     template: $("template").value,
     review: structuredClone(review),
@@ -673,6 +786,7 @@ async function reopen(entry) {
   verifiedRows(s.source, matches, s.review, { preview: true });
   const bytes = entry.original_file ? decodeFile(entry.original_file) : null;
   reset();
+  screen(false);
   for (const id of ["title", "employer", "job", "source"])
     $(id).value = s[id] || "";
   file = bytes ? new File([bytes], s.fileName || "Original resume") : null;
@@ -687,137 +801,135 @@ async function reopen(entry) {
   $("replace-source").hidden = false;
   go(2);
 }
-async function accounts() {
-  const box = $("account-ui");
-  box.replaceChildren();
+function accountActions() {
   $("accounts").hidden = false;
-  if (!signedIn) {
-    const email = el("input");
-    email.type = "email";
-    email.autocomplete = "email";
-    email.setAttribute("aria-label", "Email address");
-    email.placeholder = "Email address";
-    const password = el("input");
-    password.type = "password";
-    password.autocomplete = "current-password";
-    password.setAttribute("aria-label", "Password");
-    password.placeholder = "Password";
-    for (const mode of ["login", "register"]) {
-      const b = button(mode === "login" ? "Sign in" : "Create account", () =>
-        action("Contacting your candidate account…", async () => {
-          if (!email.value.trim() || !password.value)
-            throw Error("Enter your email address and password.");
-          const data = await account[mode](email.value.trim(), password.value);
-          password.value = "";
-          if (!data.session) {
-            info("Check your email to verify your account, then sign in here.");
-            return;
-          }
-          signedIn = true;
-          await accounts();
-          info(
-            "Signed in. Choose Save version to store this resume in your private account.",
+  $("home-link").textContent = "My workspace";
+  $("home-link").href = "#profile";
+  $("home-link").onclick = (e) => {
+    e.preventDefault();
+    action("Opening workspace…", home);
+  };
+  $("save-job").hidden = $("keep-base").hidden = $("use-base").hidden = false;
+  $("account-ui").append(
+    button(
+      "Save version",
+      () =>
+        action("Saving this version…", async () => {
+          if (lastSource !== $("source").value || !lastSource || furthest < 2)
+            throw Error("Complete source review and tailoring before saving.");
+          currentRows(true);
+          saveId ??= candidateId();
+          await account.save(
+            saveId,
+            $("title").value || "Tailored resume",
+            snapshot(),
+            file,
+            baseRevision,
           );
+          info("Version saved.");
         }),
-      );
-      if (mode === "login") box.append(email, password);
-      box.append(b);
-    }
+      "secondary",
+    ),
+  );
+  $("save-job").onclick = () =>
+    action("Saving job…", async () => {
+      jobRequirements($("job").value, $("title").value);
+      jobId ??= candidateId();
+      await account.saveJob({
+        id: jobId,
+        title: $("title").value.trim(),
+        employer: $("employer").value.trim(),
+        description: $("job").value,
+      });
+      info("Job saved to your workspace.");
+    });
+  $("use-base").onclick = () =>
+    action("Loading your base resume…", async () => {
+      const base = await account.base();
+      if (!base) throw Error("Save a base resume in My workspace first.");
+      if (baseRevision === base.revision) {
+        info("You are already using your saved base resume.");
+        return;
+      }
+      if (
+        $("source").value &&
+        !(await ask(
+          "Use your base resume?",
+          "This replaces the current source and its edits.",
+        ))
+      ) {
+        info("");
+        return;
+      }
+      review = blankReview();
+      lastSource = null;
+      clearAnalysis();
+      useBase(base);
+      go(1);
+    });
+  $("keep-base").onclick = () =>
+    action("Saving your base resume…", async () => {
+      if (!$("source-ok").checked)
+        throw Error("Review and confirm the source text first.");
+      const revision = await hub.saveBase($("source").value, file);
+      if (revision) {
+        baseRevision = revision;
+        $("source").readOnly = true;
+        $("file").disabled = true;
+        $("replace-source").hidden = false;
+        invalidate();
+        info("Base resume saved for future positions.");
+      } else info("");
+    });
+  $("privacy-copy").textContent = demo
+    ? "Demo data stays in memory and clears when you refresh or leave."
+    : "Only items you choose to save are stored in your candidate account. You can manage them in My workspace.";
+  $("session-badge").textContent = demo
+    ? "Demo workspace"
+    : "Candidate account";
+}
+async function initialize() {
+  if (!demo && !CANDIDATE_URL && params.get("guest") !== "1") {
+    location.replace("login.html");
     return;
   }
-  box.append(
-    el("p", "Save up to ten versions. Each expires after 30 days."),
-    button("Save version", () =>
-      action("Saving this version…", async () => {
-        if (lastSource !== $("source").value || !lastSource || furthest < 2)
-          throw Error(
-            "Complete the source review and tailoring before saving.",
-          );
-        currentRows(true);
-        saveId ??= crypto.randomUUID();
-        await account.save(
-          saveId,
-          $("title").value || "Tailored resume",
-          snapshot(),
-          file,
-        );
-        await accounts();
-        info("Version saved.");
-      }),
-    ),
-  );
-  const entries = await account.list();
-  for (const entry of entries) {
-    const row = el("div", "", "change");
-    row.append(
-      el("strong", entry.title),
-      el("div", new Date(entry.created_at).toLocaleString(), "hint"),
-      button("Open version", () =>
-        action("Opening saved version…", async () => {
-          if (
-            await ask(
-              "Open this version?",
-              "This replaces the application currently in the tab.",
-            )
-          )
-            await reopen(await account.open(entry.id));
-          else info("");
-        }),
-      ),
-      button("Delete version", () =>
-        action("Deleting saved version…", async () => {
-          if (
-            await ask(
-              "Delete this version?",
-              "The stored resume and original file for this version will be removed.",
-            )
-          ) {
-            await account.remove(entry.id);
-            saveId = null;
-            await accounts();
-          }
-          info("");
-        }),
-      ),
-    );
-    box.append(row);
+  if (demo) account = demoAccount();
+  else if (CANDIDATE_URL && params.get("guest") !== "1") {
+    account = accountClient(CANDIDATE_URL, CANDIDATE_KEY, sessionStorage);
+    if (!(await account.session())) {
+      location.replace("login.html");
+      return;
+    }
   }
-  box.append(
-    button("Sign out", () =>
-      action("Signing out…", async () => {
-        await account.logout();
-        signedIn = false;
-        reset();
-        await accounts();
-      }),
-    ),
-    button("Delete account and data", () =>
-      action("Deleting account…", async () => {
-        if (
-          !(await ask(
-            "Delete your candidate account?",
-            "This removes all saved versions, original files, and the candidate account.",
-          ))
-        ) {
-          info("");
-          return;
-        }
-        await account.erase();
-        try {
-          await account.logout();
-        } catch {}
-        signedIn = false;
-        reset();
-        await accounts();
-        info("Account and saved application data deleted.");
-      }),
-    ),
+  go(0);
+  if (account) {
+    hub = profileHub({
+      api: account,
+      demo,
+      ui: { $, el, button, action, ask, info, download, toFile },
+      readResume,
+      validateSource: sourceLines,
+      startJob,
+      openVersion: reopen,
+      resumeDraft: showStudio,
+      hasDraft,
+    });
+    accountActions();
+    await home();
+  }
+  document.body.classList.remove("booting");
+}
+initialize().catch(() => {
+  document.body.classList.remove("booting");
+  $("studio-content").hidden = true;
+  $("studio-nav").hidden = true;
+  $("profile-home").hidden = true;
+  info(
+    "Your candidate workspace could not load. Check your connection and reopen the sign-in page.",
   );
-}
-if (CANDIDATE_URL) {
-  account = accountClient(CANDIDATE_URL, CANDIDATE_KEY);
-  $("privacy-copy").textContent =
-    "Processing happens in this tab. Signing in and choosing Save version stores an original and a private copy for 30 days.";
-  accounts().catch(() => info("The private account service is unavailable."));
-}
-go(0);
+  $("home-link").href = "login.html";
+  $("home-link").onclick = null;
+});
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted && account) location.reload();
+});

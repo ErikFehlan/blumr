@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="style.css" />
     <script type="module" src="app.js"></script>
   </head>
-  <body>
+  <body class="booting">
     <a class="skip" href="#workspace">Skip to current step</a>
     <header class="rail">
       <div class="identity">
@@ -21,7 +21,10 @@
         /></span>
         <span class="product">Resume</span>
       </div>
-      <div class="rail-section">
+      <a id="home-link" class="portal-link" href="login.html"
+        >Candidate sign in</a
+      >
+      <div id="studio-nav" class="rail-section">
         <div class="kicker">Application workflow</div>
         <nav aria-label="Resume workflow" id="steps" class="steps"></nav>
       </div>
@@ -45,10 +48,10 @@
           <span>Workspace</span><span aria-hidden="true">/</span
           ><strong>Resume studio</strong>
         </div>
-        <span class="audience">For candidates</span>
+        <span id="session-badge" class="audience">For candidates</span>
       </div>
       <div class="frame">
-        <div class="intro">
+        <div id="studio-intro" class="intro">
           <div class="intro-copy">
             <div class="eyebrow">
               <span class="dot" aria-hidden="true"></span> Candidate studio
@@ -136,7 +139,112 @@
           tabindex="-1"
           hidden
         ></div>
-        <div class="layout">
+        <section id="profile-home" hidden aria-label="Candidate workspace">
+          <div class="intro">
+            <div class="intro-copy">
+              <div class="eyebrow">Candidate home</div>
+              <h1 id="home-title">Set up your profile.</h1>
+              <p id="home-subtitle">Choose how you appear in your workspace.</p>
+            </div>
+          </div>
+          <p id="demo-note" class="warning" hidden>
+            Demo profile · Your profile, jobs, and resume clear when you refresh
+            or leave this page.
+          </p>
+          <p id="saved-retention" class="hint">
+            Your base resume and saved jobs stay in your account until you
+            remove them.
+          </p>
+          <div class="hub-grid">
+            <section class="panel">
+              <div class="kicker">Your details</div>
+              <h2>Candidate profile</h2>
+              <form id="profile-form">
+                <label
+                  >Display name<input
+                    id="display-name"
+                    required
+                    maxlength="100"
+                    autocomplete="given-name"
+                /></label>
+                <label
+                  >Target role <small>optional</small
+                  ><input
+                    id="target-role"
+                    maxlength="180"
+                    placeholder="e.g. Mobile Developer"
+                /></label>
+                <button class="primary" type="submit">Save profile</button>
+              </form>
+            </section>
+            <section id="base-panel" class="panel" hidden>
+              <div class="kicker">Reusable source</div>
+              <h2>Base resume</h2>
+              <p id="base-summary" class="hint"></p>
+              <div class="compact" id="base-controls"></div>
+              <details id="base-editor">
+                <summary>Upload or paste a base resume</summary>
+                <label
+                  >Choose a base resume file<input
+                    id="base-file"
+                    type="file"
+                    accept=".pdf,.docx"
+                /></label>
+                <label
+                  >Base resume text<textarea
+                    id="base-text"
+                    maxlength="95000"
+                    rows="7"
+                  ></textarea>
+                </label>
+                <p id="base-warning" class="hint"></p>
+                <button
+                  id="base-clear-draft"
+                  class="textbtn"
+                  type="button"
+                  hidden
+                >
+                  Discard imported file
+                </button>
+                <label class="check"
+                  ><input id="base-confirm" type="checkbox" />I checked the full
+                  text and reading order.</label
+                >
+                <button id="base-save" class="primary">Save base resume</button>
+              </details>
+            </section>
+            <section id="jobs-panel" class="panel hub-wide" hidden>
+              <div class="kicker">Job tracker</div>
+              <h2>Saved jobs</h2>
+              <p class="hint">
+                Save a posting and assess it with your base resume.
+              </p>
+              <div class="actions">
+                <button id="new-job" class="primary">Add a position</button
+                ><button id="resume-draft" class="secondary" hidden>
+                  Continue current application
+                </button>
+              </div>
+              <div id="saved-jobs"></div>
+            </section>
+            <section id="versions-panel" class="panel hub-wide" hidden>
+              <div class="kicker">Tailored documents</div>
+              <h2>Saved resume versions</h2>
+              <p class="hint">
+                Reopen a saved version to review or download it. Saved versions
+                expire after 30 days.
+              </p>
+              <div id="saved-versions"></div>
+            </section>
+          </div>
+          <div class="actions">
+            <button class="secondary" id="signout">Sign out</button
+            ><button class="textbtn" id="erase-account">
+              Delete account and data
+            </button>
+          </div>
+        </section>
+        <div id="studio-content" class="layout">
           <div id="workspace" tabindex="-1">
             <section id="job-panel" class="panel">
               <div class="kicker">01 / TARGET ROLE</div>
@@ -170,6 +278,7 @@
                 placeholder="Paste the full job description, including qualifications and responsibilities."
               ></textarea>
               <div class="actions">
+                <button id="save-job" class="secondary" hidden>Save job</button>
                 <button id="next-job" class="primary">
                   Continue to resume <span aria-hidden="true">→</span></button
                 ><button id="sample" class="textbtn">
@@ -207,6 +316,11 @@
                 order.</label
               >
               <div class="actions">
+                <button id="use-base" class="secondary" hidden>
+                  Use my base resume</button
+                ><button id="keep-base" class="secondary" hidden>
+                  Save as my base resume
+                </button>
                 <button id="tailor" class="primary">
                   Tailor my resume <span aria-hidden="true">→</span></button
                 ><button class="textbtn" data-step="0">Back</button>
@@ -219,6 +333,13 @@
                 Compare your resume line by line. You control which changes make
                 it into the final document.
               </p>
+              <section id="role-fit" class="fit-card" aria-label="Role fit">
+                <div class="kicker">Role fit · Source resume</div>
+                <h3 id="fit-label"></h3>
+                <strong id="fit-score"></strong>
+                <p id="fit-reason"></p>
+                <p id="fit-preferred" class="hint"></p>
+              </section>
               <details id="match-details" open>
                 <summary>Job requirements and evidence</summary>
                 <div id="matches"></div>

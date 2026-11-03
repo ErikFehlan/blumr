@@ -48,14 +48,15 @@ export function validBackend(url, key) {
     /^sb_publishable_[\w-]+$/.test(key)
   );
 }
-export function accountClient(url, key) {
+export function accountClient(url, key, sessionStore) {
   if (!validBackend(url, key))
     throw Error(
       "A separate candidate backend and publishable key are required.",
     );
   const client = createClient(url, key, {
     auth: {
-      persistSession: false,
+      persistSession: !!sessionStore,
+      ...(sessionStore ? { storage: sessionStore } : {}),
       detectSessionInUrl: false,
       autoRefreshToken: true,
       storageKey: "blumr-resume-auth",
@@ -67,12 +68,102 @@ export function accountClient(url, key) {
     if (error)
       throw Error(
         error.code === "P0001"
-          ? "Delete a saved version to free a slot."
+          ? error.message
           : "The account request could not finish. Check your sign-in, connection, and saved versions.",
       );
     return data;
   }
   return {
+    session: async () => (await checked(client.auth.getSession())).session,
+    profile: () =>
+      checked(
+        client
+          .from("candidate_profiles")
+          .select("display_name,target_role")
+          .maybeSingle(),
+      ),
+    saveProfile: (data) =>
+      checked(
+        client
+          .from("candidate_profiles")
+          .upsert(data, { onConflict: "owner_id" }),
+      ),
+    baseInfo: () =>
+      checked(
+        client
+          .from("candidate_base_resumes")
+          .select("revision,file_name")
+          .maybeSingle(),
+      ),
+    base: () =>
+      checked(
+        client
+          .from("candidate_base_resumes")
+          .select("revision,source_text,file_name,original_file")
+          .maybeSingle(),
+      ),
+    async saveBase(revision, source_text, file, previousRevision = null) {
+      const original_file = file
+        ? encodeFile(new Uint8Array(await file.arrayBuffer()))
+        : null;
+      const table = client.from("candidate_base_resumes");
+      const data = {
+        revision,
+        source_text,
+        file_name: file?.name || null,
+        original_file,
+      };
+      const result = previousRevision
+        ? await table
+            .update(data)
+            .eq("revision", previousRevision)
+            .select("revision")
+            .maybeSingle()
+        : await table.insert(data).select("revision").maybeSingle();
+      if (result.data?.revision === revision) return;
+      if (
+        (await checked(table.select("revision").maybeSingle()))?.revision ===
+        revision
+      )
+        return;
+      if (!result.error || result.error.code === "23505")
+        throw Error(
+          "Your base resume changed. Reopen My workspace before replacing it.",
+        );
+      await checked(result);
+    },
+    deleteBase: (revision) =>
+      checked(
+        client
+          .from("candidate_base_resumes")
+          .delete()
+          .eq("revision", revision)
+          .select("revision")
+          .single(),
+      ),
+    jobs: () =>
+      checked(
+        client
+          .from("candidate_saved_jobs")
+          .select("id,title,employer,created_at")
+          .order("created_at", { ascending: false }),
+      ),
+    job: (id) =>
+      checked(
+        client
+          .from("candidate_saved_jobs")
+          .select("id,title,employer,description")
+          .eq("id", id)
+          .single(),
+      ),
+    saveJob: (data) =>
+      checked(
+        client
+          .from("candidate_saved_jobs")
+          .upsert(data, { onConflict: "owner_id,id" }),
+      ),
+    deleteJob: (id) =>
+      checked(client.from("candidate_saved_jobs").delete().eq("id", id)),
     login: async (email, password) =>
       checked(client.auth.signInWithPassword({ email, password })),
     register: async (email, password) =>
@@ -81,21 +172,23 @@ export function accountClient(url, key) {
     list: async () =>
       checked(
         table()
-          .select("id,title,created_at")
+          .select("id,title,created_at,saved_job_id:snapshot->>savedJobId")
           .order("created_at", { ascending: false }),
       ),
-    async save(id, title, snapshot, file) {
+    async save(id, title, snapshot, file, baseRevision = null) {
       // A retry reuses the UUID and checks whether the first request committed.
       if ((await checked(table().select("id").eq("id", id).maybeSingle()))?.id)
         return;
-      const original_file = file
-        ? encodeFile(new Uint8Array(await file.arrayBuffer()))
-        : null;
+      const original_file =
+        file && !baseRevision
+          ? encodeFile(new Uint8Array(await file.arrayBuffer()))
+          : null;
       const result = await table().insert({
         id,
         title,
         snapshot,
         original_file,
+        base_revision: baseRevision,
       });
       if (
         result.error?.code === "23505" &&

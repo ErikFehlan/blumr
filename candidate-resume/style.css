@@ -774,3 +774,135 @@ dialog::backdrop {
     gap: 8px;
   }
 }
+.booting > .rail,
+.booting > .studio {
+  visibility: hidden;
+}
+.portal-link {
+  display: block;
+  margin: 16px 8px 0;
+  border: 1px solid var(--control);
+  color: var(--mint);
+  padding: 8px 12px;
+  border-radius: 7px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+.portal-link:hover {
+  background: var(--soft);
+}
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.hub-wide {
+  grid-column: 1/-1;
+}
+.hub-grid .panel > h2 {
+  font-size: 24px;
+}
+.hub-grid form button {
+  margin-top: 14px;
+}
+.hub-row {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.hub-row:first-child {
+  margin-top: 16px;
+}
+.hub-row strong {
+  display: block;
+}
+.access-page {
+  display: block;
+  background:
+    radial-gradient(ellipse at 55% 0%, #284c45, transparent 68%), var(--bg);
+}
+.access-shell {
+  width: min(500px, calc(100% - 36px));
+  margin: clamp(22px, 7vh, 88px) auto;
+}
+.access-shell .identity {
+  padding: 0;
+  border: 0;
+  min-height: 64px;
+}
+.access-card {
+  padding: clamp(22px, 4vw, 38px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.access-card h1 {
+  font-size: clamp(36px, 5vw, 48px);
+  line-height: 1.08;
+  letter-spacing: -0.06em;
+  font-weight: 600;
+  margin: 18px 0 12px;
+}
+.access-card h2 {
+  font-size: 21px;
+}
+.access-card p {
+  color: var(--muted);
+}
+.access-card a {
+  display: inline-block;
+}
+.access-card .primary {
+  text-decoration: none;
+}
+.access-card label {
+  display: block;
+  margin: 12px 0;
+}
+#preview-access,
+#credentials {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-top: 22px;
+}
+.fit-card {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--control);
+  border-left: 3px solid var(--mint);
+  border-radius: 10px;
+  background: var(--rail);
+}
+.fit-card h3 {
+  margin: 4px 0;
+  font-size: 23px;
+  color: var(--mint);
+}
+.fit-card p {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+.fit-card.stretch {
+  border-left-color: var(--warn);
+}
+.fit-card.stretch h3 {
+  color: var(--warn);
+}
+@media (max-width: 900px) {
+  .rail .portal-link {
+    position: absolute;
+    right: 16px;
+    top: 12px;
+    margin: 0;
+    font-size: 12px;
+  }
+  .rail {
+    min-height: 61px;
+  }
+}
+@media (max-width: 680px) {
+  .hub-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

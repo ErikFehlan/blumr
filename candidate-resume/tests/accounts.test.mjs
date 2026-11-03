@@ -46,6 +46,15 @@ test("Postgres enforces owner isolation, immutable source, expiry, quotas and se
   await assert.rejects(db.exec(schema), /dedicated/);
   await db.exec("rollback;drop table public.workspaces");
   await db.exec(schema);
+  await db.exec(
+    await readFile(
+      new URL(
+        "../backend/supabase/migrations/20261103165554_candidate_workspace.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   const act = async (id, sid = session, anonymous = false) => {
     await db.exec("reset role;set role authenticated");
     await db.query("select set_config('request.jwt.claims',$1,false)", [
@@ -63,6 +72,69 @@ test("Postgres enforces owner isolation, immutable source, expiry, quotas and se
         .count,
     );
   await act(alice);
+  const rev = crypto.randomUUID(),
+    savedJob = crypto.randomUUID(),
+    versionId = crypto.randomUUID();
+  await db.query(
+    "insert into candidate_profiles(display_name,target_role) values('Alex','Cloud')",
+  );
+  await db.query(
+    "insert into candidate_base_resumes(revision,source_text,file_name,original_file) values($1,'Used SQL','original.docx',decode('cafe','hex'))",
+    [rev],
+  );
+  await db.query(
+    "insert into candidate_saved_jobs(id,title,employer,description) values($1,'Engineer','Example','SQL required')",
+    [savedJob],
+  );
+  await db.query(
+    `insert into resume_versions(id,title,snapshot,base_revision) values($1,'Engineer','{"source":"Used SQL"}',$2)`,
+    [versionId, rev],
+  );
+  const saved = async (id) =>
+    (
+      await db.query(
+        "select encode(original_file,'hex') as bytes,snapshot from resume_versions where id=$1",
+        [id],
+      )
+    ).rows[0];
+  assert.equal((await saved(versionId)).bytes, "cafe");
+  assert.equal((await saved(versionId)).snapshot.fileName, "original.docx");
+  await act(bob);
+  for (const table of [
+    "candidate_profiles",
+    "candidate_base_resumes",
+    "candidate_saved_jobs",
+  ]) {
+    assert.equal((await db.query("select * from " + table)).rows.length, 0);
+    assert.equal(
+      (await db.query("delete from " + table + " returning owner_id")).rows
+        .length,
+      0,
+    );
+  }
+  await assert.rejects(
+    db.query(
+      `insert into resume_versions(id,title,snapshot,base_revision) values($1,'Stolen','{"source":"Used SQL"}',$2)`,
+      [crypto.randomUUID(), rev],
+    ),
+    /Base resume changed/,
+  );
+  await act(alice);
+  await db.query("delete from candidate_base_resumes where revision=$1", [rev]);
+  assert.equal((await saved(versionId)).bytes, "cafe");
+  await db.query("delete from resume_versions where id=$1", [versionId]);
+  for (let i = 0; i < 49; i++)
+    await db.query(
+      "insert into candidate_saved_jobs(id,title,employer,description) values($1,'Job','','Posting')",
+      [crypto.randomUUID()],
+    );
+  await assert.rejects(
+    db.query(
+      "insert into candidate_saved_jobs(id,title,employer,description) values($1,'Job','','Posting')",
+      [crypto.randomUUID()],
+    ),
+    /limit/,
+  );
   const id = crypto.randomUUID();
   await insert(id);
   assert.equal(await count(), 1);
@@ -106,6 +178,8 @@ test("Postgres enforces owner isolation, immutable source, expiry, quotas and se
   await db.query("select delete_resume_account()");
   assert.equal(await count(), 0);
   await assert.rejects(insert(), /foreign key/);
+  for (const table of ["candidate_profiles", "candidate_saved_jobs"])
+    assert.equal((await db.query("select * from " + table)).rows.length, 0);
   await act(bob);
   assert.equal(await count(), 1);
   await db.exec("reset role");

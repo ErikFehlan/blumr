@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Sign in · blumr Resume</title>
+    <link rel="icon" href="vendor/icon.png" />
+    <link rel="stylesheet" href="vendor/brand.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="login.js"></script>
+  </head>
+  <body class="access-page">
+    <main class="access-shell">
+      <header class="identity">
+        <span class="blumr-logo"
+          ><img src="vendor/blumr-logo.png" alt="blumr" /></span
+        ><span class="product">Resume</span>
+      </header>
+      <section class="access-card">
+        <div class="eyebrow"><span class="dot"></span> Candidate workspace</div>
+        <h1>Welcome to blumr Resume.</h1>
+        <p>Save your resume once and see how your experience fits each role.</p>
+        <form id="credentials" hidden>
+          <h2 id="auth-heading">Sign in</h2>
+          <label
+            >Email address<input
+              required
+              type="email"
+              id="email"
+              autocomplete="username" /></label
+          ><label
+            >Password<input
+              required
+              minlength="6"
+              type="password"
+              id="password"
+              autocomplete="current-password"
+          /></label>
+          <div class="actions">
+            <button id="submit-auth" type="submit" class="primary">
+              Sign in</button
+            ><button id="mode" type="button" class="textbtn">
+              Create account
+            </button>
+          </div>
+        </form>
+        <div id="preview-access" hidden>
+          <h2>Try a demo profile</h2>
+          <p>
+            Set up a profile, save a resume, and compare jobs in this tab. Demo
+            data clears when you refresh or leave the page.
+          </p>
+          <a class="primary" href="./?demo=1#profile">Open demo workspace →</a>
+        </div>
+        <p id="login-status" role="status" aria-live="polite"></p>
+        <a class="textbtn" href="./?guest=1">Continue as a guest</a>
+      </section>
+    </main>
+  </body>
+</html>

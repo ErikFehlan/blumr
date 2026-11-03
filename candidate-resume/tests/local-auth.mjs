@@ -20,6 +20,70 @@ const a = client(),
   first = email();
 assert.ok((await a.register(first, password)).session);
 assert.ok((await b.register(email(), password)).session);
+await a.saveProfile({ display_name: "Alex Example", target_role: "Analyst" });
+assert.equal((await a.profile()).display_name, "Alex Example");
+assert.equal(await b.profile(), null);
+const rev = crypto.randomUUID(),
+  otherRev = crypto.randomUUID(),
+  jobId = crypto.randomUUID();
+await a.saveBase(
+  rev,
+  "Maintained SQL reports.",
+  new File(["one original"], "original.docx"),
+);
+await assert.rejects(a.saveBase(otherRev, "stale", null));
+assert.equal(await b.base(), null);
+assert.equal((await a.baseInfo()).revision, rev);
+await a.saveJob({
+  id: jobId,
+  title: "Analyst",
+  employer: "Example",
+  description: "SQL required.",
+});
+await a.saveJob({
+  id: jobId,
+  title: "Data analyst",
+  employer: "Example",
+  description: "SQL required.",
+});
+assert.equal((await a.jobs()).length, 1);
+assert.equal((await b.jobs()).length, 0);
+await assert.rejects(b.job(jobId));
+const storedId = crypto.randomUUID();
+await a.save(
+  storedId,
+  "Analyst",
+  { source: "Maintained SQL reports.", savedJobId: jobId },
+  null,
+  rev,
+);
+await assert.rejects(
+  b.save(
+    crypto.randomUUID(),
+    "Other",
+    { source: "Maintained SQL reports." },
+    null,
+    rev,
+  ),
+);
+await a.saveBase(otherRev, "New base", null, rev);
+await assert.rejects(
+  a.save(
+    crypto.randomUUID(),
+    "Stale",
+    { source: "Maintained SQL reports." },
+    null,
+    rev,
+  ),
+);
+assert.equal((await a.list())[0].saved_job_id, jobId);
+const prior = await a.open(storedId);
+assert.equal(
+  Buffer.from(prior.original_file.slice(2), "hex").toString(),
+  "one original",
+);
+await a.remove(storedId);
+await a.deleteBase(otherRev);
 const id = crypto.randomUUID(),
   snapshot = {
     version: 1,

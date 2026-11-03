@@ -1,3 +1,4 @@
 .openai/
 test-results/
 playwright-report/
+backend/supabase/.temp/

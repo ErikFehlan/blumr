@@ -24,6 +24,10 @@ export const heading =
   /^(?:(?:professional |relevant |work |employment |career |technical )?(?:experience|history|skills|summary|profile|projects)|education(?: and training)?|certifications?(?: and licenses)?|licenses|accomplishments|awards|publications|volunteering|professional development|languages)\s*:?$/i;
 const sectionKinds = [
   [
+    /^(?:qualifications|skills and qualifications|what you bring|what you.ll bring)$/i,
+    "qualification",
+  ],
+  [
     /^(?:(?:minimum|required|essential|basic) (?:skills|experience|qualifications|requirements)|must[- ]haves?|requirements|required)$/i,
     "required",
   ],
@@ -118,10 +122,31 @@ export function mapEvidence(rules, original) {
     const direct = finding.evidence.some(
       (e) => e.type !== "inferred" && e.type !== "contradicted",
     );
+    // The shared vocabulary may recognize only one half of a compound requirement.
+    // Recheck its clauses before crediting the full statement (e.g. Azure and COBOL).
+    let fullySupported =
+      finding.status === "supported" && !finding.verificationRequired;
+    if (fullySupported) {
+      const parts = rule.text
+        .split(/\s+(?:and|with|using|including|as well as)\s+|,\s+/i)
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (parts.length > 1)
+        fullySupported =
+          parts.length <= 8 &&
+          parts.every((text) => {
+            const part = compileRequirement({
+              id: rule.id,
+              title: text,
+              requirementType: rule.priority,
+            });
+            if (part.excluded || !part.condition) return false;
+            const match = evaluateRequirementEvidence(part.condition, profile);
+            return match.status === "supported" && !match.verificationRequired;
+          });
+    }
     const status =
-      finding.status === "supported" &&
-      !finding.verificationRequired &&
-      quotes.length
+      fullySupported && quotes.length
         ? "Evidence found"
         : finding.status === "contradicted"
           ? "Conflicting evidence"

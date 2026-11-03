@@ -12,6 +12,7 @@ await rm("dist", { recursive: true, force: true });
 await mkdir("dist/vendor", { recursive: true });
 const assets = {
   "index.html": "index.html",
+  "login.html": "login.html",
   "style.css": "style.css",
   "../assets/brand.css": "vendor/brand.css",
   "../assets/blumr-logo.png": "vendor/blumr-logo.png",
@@ -34,6 +35,7 @@ for (const [source, to] of Object.entries(assets))
 await build({
   entryPoints: [
     "src/app.mjs",
+    "src/login.mjs",
     "src/document-worker.mjs",
     "src/analysis-worker.mjs",
   ],
@@ -60,12 +62,13 @@ await writeFile(
     policy +
     "; frame-ancestors 'none'\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Cache-Control: no-store\n  X-Robots-Tag: noindex, nofollow\n",
 );
-await writeFile(
-  "dist/index.html",
-  (await readFile("index.html", "utf8")).replace(
-    '<meta name="robots"',
-    '<meta http-equiv="Content-Security-Policy" content="' +
-      policy +
-      '"><meta name="robots"',
-  ),
-);
+for (const page of ["index.html", "login.html"])
+  await writeFile(
+    "dist/" + page,
+    (await readFile(page, "utf8")).replace(
+      '<meta name="robots"',
+      '<meta http-equiv="Content-Security-Policy" content="' +
+        policy +
+        '"><meta name="robots"',
+    ),
+  );
