@@ -1,0 +1,51 @@
+name: Candidate Resume verification
+on:
+  pull_request:
+    paths: ['candidate-resume/**', 'supabase/functions/_shared/**', 'assets/upload-validation.js', 'assets/pdf-text.js', '.github/workflows/candidate-resume.yml']
+permissions:
+  contents: read
+jobs:
+  studio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: candidate-resume
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test && npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-resume-private-review
+          path: candidate-resume/dist/
+          retention-days: 7
+  private-accounts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: candidate-resume
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.119.0
+      - run: npm ci
+      - name: Test candidate accounts in a disposable local project
+        env:
+          CANDIDATE_TEST_STACK: ${{ runner.temp }}/candidate-supabase
+        run: |
+          mkdir -p "$CANDIDATE_TEST_STACK"
+          supabase init --workdir "$CANDIDATE_TEST_STACK"
+          supabase start --workdir "$CANDIDATE_TEST_STACK" --exclude realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f backend/schema.sql -f backend/retention.sql
+          node tests/local-auth.mjs

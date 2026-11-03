@@ -103,6 +103,10 @@ function evaluate(c,profile){
  // Keep evidence responsible for the score even after many earlier mentions.
  return {value,status:contradicted?'contradicted':value===1?'supported':value>0?'partial':'unknown',evidence:evidence.sort((a,b)=>(b.type==='contradicted')-(a.type==='contradicted')||b.value-a.value).slice(0,12)};
 }
+// Evaluate one source requirement without a workspace, candidate record, ranking or score.
+export function evaluateRequirementEvidence(condition, profile){
+ return evaluate(compile(condition),profile);
+}
 export function compileScreeningRubric(rubric){
  return {...rubric,compiled:rubric.rules.map(r=>({...r,compiledCondition:compile(r.condition)})),compiledTitles:rubric.titleTerms.map(termRE)};
 }
