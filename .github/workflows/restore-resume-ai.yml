@@ -1,0 +1,54 @@
+name: Restore production resume AI
+on:
+  push:
+    branches: [ops/restore-resume-ai-20261104]
+    paths: [.github/workflows/restore-resume-ai.yml]
+permissions:
+  contents: read
+concurrency:
+  group: criteria-backend-deploy
+  cancel-in-progress: false
+jobs:
+  restore-provider:
+    if: github.repository == 'ErikFehlan/blumr' && github.ref == 'refs/heads/ops/restore-resume-ai-20261104'
+    runs-on: ubuntu-latest
+    environment: criteria-backend
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Restore only the production provider switch and verify every other secret is unchanged
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {createHash} from 'node:crypto';
+          const token=process.env.SUPABASE_ACCESS_TOKEN?.trim();
+          if(!token)throw Error('Production management credential is unavailable.');
+          const root='https://api.supabase.com/v1/projects/zqiqjzxcpznhzjengfff';
+          const digest=value=>createHash('sha256').update(value).digest('hex');
+          async function api(path,body){
+            const response=await fetch(root+path,{
+              method:body===undefined?'GET':'POST',
+              headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+              ...(body===undefined?{}:{body:JSON.stringify(body)}),
+              redirect:'error',signal:AbortSignal.timeout(30000),
+            });
+            if(!response.ok)throw Error('Production management request failed: HTTP '+response.status);
+            if(path==='/secrets'&&body!==undefined)return;
+            return response.json();
+          }
+          const before=await api('/secrets');
+          const flag=before.filter(s=>s.name==='AI_PROVIDER_CALLS_DISABLED');
+          if(flag.length!==1||![digest('true'),digest('false')].includes(flag[0].value))throw Error('Unexpected production provider-switch state.');
+          const [state]=await api('/database/query',{query:"select ai_paused from public.security_limits where id=true"});
+          if(state?.ai_paused!==true)throw Error('Keep the database AI pause in place during provider-switch restoration.');
+          const otherSecrets=secrets=>JSON.stringify(secrets.filter(s=>s.name!=='AI_PROVIDER_CALLS_DISABLED').map(s=>[s.name,s.value]).sort((a,b)=>a[0].localeCompare(b[0])));
+          await api('/secrets',[{name:'AI_PROVIDER_CALLS_DISABLED',value:'false'}]);
+          const after=await api('/secrets');
+          if(after.filter(s=>s.name==='AI_PROVIDER_CALLS_DISABLED'&&s.value===digest('false')).length!==1)throw Error('Provider-switch verification failed.');
+          if(otherSecrets(after)!==otherSecrets(before))throw Error('Another runtime setting changed during restoration; review before resuming workers.');
+          console.log(JSON.stringify({project:'zqiqjzxcpznhzjengfff',provider_calls_enabled:true,other_runtime_settings_unchanged:true,database_pause_retained:true}));
+          NODE
