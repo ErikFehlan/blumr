@@ -14,7 +14,7 @@ for(let attempt=0;attempt<12;attempt++){
   await output(false);console.log('SKIPPED: a newer main commit superseded this release.');
   await appendFile(process.env.GITHUB_STEP_SUMMARY,'Live tests skipped: a newer release superseded this commit.\n');process.exit(0);
  }
- const checks=(await github(`commits/${sha}/check-runs`)).check_runs.filter(c=>c.name==='Cloudflare Pages');
+ const checks=(await github(`commits/${sha}/check-runs`)).check_runs.filter(c=>['Cloudflare Pages','Cloudflare Pages: blumr'].includes(c.name));
  if(checks.some(c=>c.status==='completed'&&c.conclusion==='failure'))throw Error('Cloudflare deployment failed');
  if(checks.some(c=>c.status==='completed'&&c.conclusion==='success')){
   try{

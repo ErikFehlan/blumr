@@ -181,20 +181,20 @@ jobs:
       staging_verified: ${{ needs.staging.result == 'success' }}
     secrets: inherit
 
-  closed-billing:
+  runtime-proof:
     needs: [validate, core-backend]
     if: >-
       always() && !cancelled() && github.ref == 'refs/heads/main' &&
       vars.PAID_AI_RELEASE_ENABLED != 'true' &&
       needs.validate.result == 'success' && needs.core-backend.result == 'success'
-    uses: ./.github/workflows/billing-production-verify.yml
+    uses: ./.github/workflows/production-runtime-verify.yml
     secrets: inherit
 
   closed-site:
-    needs: closed-billing
+    needs: runtime-proof
     if: >-
       always() && !cancelled() && github.ref == 'refs/heads/main' &&
-      vars.PAID_AI_RELEASE_ENABLED != 'true' && needs.closed-billing.result == 'success'
+      vars.PAID_AI_RELEASE_ENABLED != 'true' && needs.runtime-proof.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
