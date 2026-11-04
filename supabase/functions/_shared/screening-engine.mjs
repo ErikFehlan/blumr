@@ -85,7 +85,7 @@ function evaluate(c,profile){
   return {value,evidence:rows.flatMap(r=>r.evidence),status:contradicted?'contradicted':value===1?'supported':rows.some(r=>r.value>0||r.status==='partial')?'partial':'unknown',components:rows,verificationRequired:rows.some(r=>r.verificationRequired)};
  }
  if(!c.direct)return evaluateQualification(c,profile);
- const evidence=[],denials=[];let value=0;
+ const evidence=[],denials=[],scopes=new Map();let value=0;
  for(const p of passages){
   const directMatches=c.direct.map(rx=>matchEvidence(rx,p)).filter(Boolean),relatedMatches=c.related.map(rx=>matchEvidence(rx,p)).filter(Boolean);
   const direct=directMatches.length>0,related=relatedMatches.length>0;
@@ -97,9 +97,9 @@ function evaluate(c,profile){
   const basis=matches.find(m=>m.substantive)||matches[0];
   evidence.push({sourceId:p.sourceId,quote:p.quote,type:negative?'contradicted':direct?'direct':'inferred',depth:substantive?'practice':'mention',value:v,
    interpretation:{actor:basis.actor,action:basis.action,depth:basis.depth,modality:basis.modality,negated:basis.negative}});
-  if(negative&&direct)denials.push(evidence.at(-1));
+  if(negative&&direct){denials.push(evidence.at(-1));scopes.set(evidence.at(-1),matches.map(m=>m.sourceClause||m.clause));}
  }
- const contradicted=resolveHistoricalDenials(evidence,profile,denials);
+ const contradicted=resolveHistoricalDenials(evidence,profile,denials,scopes);
  if(contradicted)value=Math.min(value,0.35);
  // Keep evidence responsible for the score even after many earlier mentions.
  return {value,status:contradicted?'contradicted':value===1?'supported':value>0?'partial':'unknown',evidence:evidence.sort((a,b)=>(b.type==='contradicted')-(a.type==='contradicted')||b.value-a.value).slice(0,12)};

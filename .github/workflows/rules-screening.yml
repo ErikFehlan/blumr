@@ -47,6 +47,8 @@ jobs:
         env:
           PGPASSWORD: postgres
       - run: node scripts/benchmark-screening.mjs
+      - name: Verify runtime-cache parity and report CPU timings
+        run: node scripts/benchmark-screening-runtime.mjs
   staging:
     needs: validate
     if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/rules-first-screening'

@@ -25,6 +25,8 @@ const conflicts=[
  ['blanket denial',old.replace('Did not use Terraform in this role.','I have never used Terraform in any role.')+'\n'+recent],
  ['current denial',old.replace('Did not use','Currently do not use')+'\n'+recent],
  ['unscoped denial',old.replace(' in this role','')+'\n'+recent],
+ ['scope from an unrelated clause',old.replace('Did not use Terraform in this role.','Did not use Terraform; used Excel in this role.')+'\n'+recent],
+ ['current denial after an older scoped clause',old.replace('Did not use Terraform in this role.','Did not use Terraform in this role; I still do not use Terraform today.')+'\n'+recent],
  ['same role',old+'\nImplemented Terraform modules.'],
  ['later denial',recent+'\n'+old.replace('January 2018 - December 2020','January 2025 - September 2026')],
  ['team-only positive',old+'\n'+recent.replace('Implemented Terraform','Our team implemented Terraform')],
