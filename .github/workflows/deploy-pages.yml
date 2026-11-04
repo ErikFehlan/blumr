@@ -38,6 +38,7 @@ jobs:
           node --check assets/job-intake-code.js
           node --check assets/app.js
           node --check assets/bulk-files.js
+          node --check assets/bulk-upload-pool.js
           node --check assets/bulk-screening.js
           node --check assets/search-flow.js
           node --check assets/guidance.js

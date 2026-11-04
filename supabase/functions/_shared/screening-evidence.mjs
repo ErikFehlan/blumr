@@ -46,8 +46,11 @@ export function interpretEvidence(pattern,p){
  let memo=interpretationCache.get(p);
  if(!memo){memo=new Map();interpretationCache.set(p,memo);}
  if(memo.has(key))return memo.get(key);
+ // Parsed evidence can serve several job rubrics in one warm worker. Bound
+ // per-passage interpretation retention as well as the outer resume cache.
+ const remember=value=>{if(memo.size>=128)memo.delete(memo.keys().next().value);memo.set(key,value);return value;};
  pattern.lastIndex=0;
- if(!pattern.test(p.normalized)){memo.set(key,null);return null;}
+ if(!pattern.test(p.normalized))return remember(null);
  let repeated=patterns.get(key);
  if(!repeated){
   repeated=new RegExp(pattern.source,pattern.flags.replaceAll('g','')+'g');
@@ -59,7 +62,7 @@ export function interpretEvidence(pattern,p){
  // mention. Personal denials remain conflicts, never silently overwritten.
  const result=rows.find(r=>r.actor==='applicant'&&r.negative&&r.modality==='asserted')||
   rows.find(r=>r.substantive)||rows.find(r=>r.actor==='applicant'&&r.modality==='asserted')||rows[0]||null;
- memo.set(key,result);return result;
+ return remember(result);
 }
 function interpretMatch(match,p){
  const at=match.index+(match[0].match(/^[^\p{L}\p{N}_]/u)?.[0].length||0);

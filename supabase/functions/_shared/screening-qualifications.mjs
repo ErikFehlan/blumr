@@ -29,6 +29,28 @@ export const matchQualificationEvidence=interpretEvidence;
 export const termPattern=term=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escapeRE(normalize(term))}(?=$|[^\\p{L}\\p{N}_])`,'u');
 const originalEvidence=(p,fields={})=>({sourceId:p.sourceId,quote:p.originalQuote||p.quote,type:'direct',...fields});
 
+// A local non-use statement in a completed role is not a lifetime denial.
+// Resolve it only with sufficient, personally asserted evidence in a separate,
+// strictly later role. Undated, overlapping and blanket denials stay conflicts.
+export function resolveHistoricalDenials(evidence,profile,denials=evidence.filter(e=>e.type==='contradicted')){
+ const passages=new Map(profile.passages.map(p=>[p.sourceId,p]));
+ const episodes=new Map(profile.episodes.map(e=>[e.id,e]));
+ const period=item=>episodes.get(passages.get(item.sourceId)?.episodeId);
+ const sufficient=evidence.filter(e=>e.type==='direct'&&e.value===1);
+ for(const item of denials){
+  const quote=item.quote,old=period(item);
+  if(!old||old.current||old.precision!=='month'||
+   !/\b(?:in|during|at) (?:this|that|the|my) (?:role|position|job|project|assignment)\b/i.test(quote)||
+   /\b(?:never|ever|still|currently|today|overall|total|entire|at all|any (?:role|job))\b/i.test(quote))continue;
+  const later=sufficient.find(e=>{
+   const next=period(e);
+   return next&&next.id!==old.id&&next.precision==='month'&&next.start_month>=old.end_month;
+  });
+  if(later){item.type='historical';item.supersededBy=later.sourceId;item.basis='earlier_role_specific_gap';}
+ }
+ return denials.some(e=>e.type==='contradicted');
+}
+
 // Use the existing date parser and interval union. Work dates are not silently
 // converted into years using every tool mentioned in the role.
 export function qualificationProfile(passages,asOf){
@@ -181,10 +203,10 @@ function credentialFinding(q,profile){
  return finding(value,contradicted?'contradicted':value===1?'supported':evidence.length?'partial':'unknown',evidence,{verificationRequired:true,independentlyVerified:false,...(pending?{pending:true}:{})});
 }
 function depthFinding(q,profile){
- const evidence=[];let value=0,negative=false;
+ const evidence=[];let value=0;
  for(const {p,m} of candidateFacts(profile,q.terms||[])){
   const matches=m.filter(x=>!x.negative&&x.actor==='applicant'),depth=matches.find(x=>x.substantive)?.depth||matches.find(x=>x.depth)?.depth;
-  if(!matches.length){negative=true;evidence.push(originalEvidence(p,{type:'contradicted',value:0}));continue;}
+  if(!matches.length){evidence.push(originalEvidence(p,{type:'contradicted',value:0}));continue;}
   const practice=matches.some(x=>x.substantive),team=/\b(collaborat\w*|partnered|alongside|with (?:the |a )?team|coordinated with)\b/i.test(p.quote);
   const people=/\b(?:manage[ds]?|managing|supervise[ds]?|supervising|led|leads?)\s+(?:(?:a|the)\s+)?(?:team|staff|people|employees|direct reports)\b|\b(?:hired|coached|mentored)\b.{0,50}\b(?:engineers|staff|employees|team|teachers|nurses)\b|\bperformance reviews\b/i.test(p.quote)||
    matches.some(m=>/^(manage[ds]?|managing|supervise[ds]?|supervising|led|leads?)$/.test(m.action||'')&&quantities(m.clause).some(n=>n.unit==='people'));
@@ -194,6 +216,7 @@ function depthFinding(q,profile){
   const v=sufficient?1:practice||team?0.5:0.2;value=Math.max(value,v);
   evidence.push(originalEvidence(p,{depth:depth||'mention',value:v}));
  }
+ const negative=resolveHistoricalDenials(evidence,profile);
  if(negative)value=Math.min(value,0.35);
  return finding(value,negative?'contradicted':value===1?'supported':evidence.length?'partial':'unknown',evidence.sort((a,b)=>b.value-a.value).slice(0,8));
 }

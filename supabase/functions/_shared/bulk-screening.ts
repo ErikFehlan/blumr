@@ -1,15 +1,15 @@
-import {buildJobIntelligence} from './job-intelligence.mjs';
-import {compileScreeningRubric,parseScreeningEvidence,scoreScreeningCandidate,rankScreeningCandidates,fingerprint} from './screening-engine.mjs';
+import {rankScreeningCandidates,fingerprint} from './screening-engine.mjs';
+import {screeningRuntime} from './screening-runtime.mjs';
 type RPC=(name:string,body:Record<string,unknown>)=>Promise<any>;
 // Deterministic pages can safely repeat. Every write checks its source version.
 export async function processBulkScreeningBatch(batchId:string,rpc:RPC){
  const source=await rpc('bulk_screening_source',{p_batch:batchId});
  if(source.batch?.defer_analysis&&!source.batch.analysis_requested_at)return {processed:0,status:'awaiting_start',ai_calls:0};
  const feedbackVersion=await fingerprint({feedback:source.feedback,assessments:source.assessments,lessons:source.lessons});
- const intelligence=await buildJobIntelligence({...source,feedbackVersion});
+ const screening=await screeningRuntime.prepare({...source,feedbackVersion}),intelligence=screening.intelligence;
  const inputs=intelligence.status==='ready'?await rpc('bulk_screening_page',{p_batch:batchId,p_key:intelligence.rubric!.key,p_limit:100}):[];
- const compiled=intelligence.status==='ready'?compileScreeningRubric(intelligence.rubric):null;
- const rows=inputs.map((input:any)=>({...input,resume_text:undefined,result:scoreScreeningCandidate(compiled,parseScreeningEvidence(input.resume_text,{asOf:intelligence.asOf}),input.candidate_id)}));
+ const rows=[];
+ for(const input of inputs)rows.push({...input,resume_text:undefined,result:await screening.score(input.candidate_id,input.resume_text)});
  if(await rpc('save_bulk_screening_page',{p_batch:batchId,p_source:source.sourceVersion,p_intelligence:intelligence,p_rows:rows})!==true)throw Error('screening_source_changed');
  if(source.batch?.analysis_requested_at&&!source.batch.auto_selected)await rpc('auto_start_resume_analysis',{p_batch:batchId});
  return {processed:rows.length,status:intelligence.status,ai_calls:0};

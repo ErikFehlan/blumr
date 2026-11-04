@@ -1,5 +1,5 @@
-import {buildJobIntelligence} from '../_shared/job-intelligence.mjs';
-import {compileScreeningRubric,parseScreeningEvidence,scoreScreeningCandidate,rankScreeningCandidates,fingerprint} from '../_shared/screening-engine.mjs';
+import {rankScreeningCandidates,fingerprint} from '../_shared/screening-engine.mjs';
+import {screeningRuntime} from '../_shared/screening-runtime.mjs';
 const uuid=(v:unknown):v is string=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 type Scope={workspace:string;base:string;serviceKey:string;headers:Record<string,string>;actor?:string};
 // Reuses the existing authenticated endpoint. Caller-supplied resumes, priorities,
@@ -40,22 +40,22 @@ export async function handleRulesScreening(payload:Record<string,unknown>,scope:
   ]);
   if(!Array.isArray(feedback)||feedback.length>=1000||!Array.isArray(assessments)||assessments.length>=1000||!Array.isArray(lessons))throw Error('screening_unavailable');
   const feedbackVersion=await fingerprint({feedback,assessments,lessons});
-  const prepared=await buildJobIntelligence({workspaceId:scope.workspace,job,priorities,feedbackVersion,feedback,assessments,lessons});
+  const screening=await screeningRuntime.prepare({workspaceId:scope.workspace,job,priorities,feedbackVersion,feedback,assessments,lessons}),prepared=screening.intelligence;
   const cached=caches?.find((r:any)=>r.rubric_key===prepared.key);
-  const intelligence=cached?.intelligence?{...cached.intelligence,billingKey:prepared.billingKey}:prepared;
+  const intelligence=prepared;
   if(!cached)await write('job_screening_rubrics?on_conflict=job_id',{job_id:jobId,workspace_id:scope.workspace,rubric_key:prepared.key,intelligence:prepared,updated_at:new Date().toISOString()});
   if(intelligence.status!=='ready')return reply({status:'needs_review',intelligence,ai_calls:0,provider_cost_usd:0});
   // Only current, approved job-scoped signals alter the shared rubric. Raw
   // candidate feedback never becomes another candidate's qualification evidence.
   const inputs=await read('rpc/get_screening_candidate_inputs',{p_job:jobId,p_candidates:ids,p_rubric_key:intelligence.rubric.key});
   if(!Array.isArray(inputs)||inputs.length!==ids.length||inputs.some((row:any)=>!ids.includes(row.candidate_id)))throw Error('screening_unavailable');
-  const compiled=compileScreeningRubric(intelligence.rubric),results=[],pending=[],attention=[];let cacheHits=0;
+  const results=[],pending=[],attention=[];let cacheHits=0;
   for(const row of inputs){
    if(row.cached_result){results.push({...row.cached_result,cacheHit:true});cacheHits++;continue;}
    if(!row.document_id||typeof row.resume_text!=='string'||row.resume_text.trim().length<40||row.resume_text.length>120000){attention.push({candidateId:row.candidate_id,code:'resume_needs_review'});continue;}
-   const result=scoreScreeningCandidate(compiled,parseScreeningEvidence(row.resume_text,{asOf:intelligence.asOf}),row.candidate_id);
+   const result=await screening.score(row.candidate_id,row.resume_text);
    results.push({...result,cacheHit:false});
-   pending.push({candidate_id:row.candidate_id,job_id:jobId,workspace_id:scope.workspace,document_id:row.document_id,rubric_key:compiled.key,resume_hash:row.resume_hash,result,updated_at:new Date().toISOString()});
+   pending.push({candidate_id:row.candidate_id,job_id:jobId,workspace_id:scope.workspace,document_id:row.document_id,rubric_key:intelligence.rubric.key,resume_hash:row.resume_hash,result,updated_at:new Date().toISOString()});
   }
   if(pending.length){
    if(metered)await serviceRPC('save_subscription_rules_results',{p_job:jobId,p_actor:scope.actor,p_source:sourceVersion,p_intelligence:intelligence,p_rows:pending});

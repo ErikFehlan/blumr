@@ -1,9 +1,9 @@
 // Shared, provider-free screening kernel. Callers must authorize workspace/job access.
 import {evidenceTextRanges,isSourceInstruction} from './source-instructions.mjs';
 import {unsafeScreeningText} from './screening-rule-spec.mjs';
-import {validateQualification,qualificationProfile,evaluateQualification,matchQualificationEvidence} from './screening-qualifications.mjs';
+import {validateQualification,qualificationProfile,evaluateQualification,matchQualificationEvidence,resolveHistoricalDenials} from './screening-qualifications.mjs';
 import {evidencePassages,workEvidenceText} from './screening-evidence.mjs';
-export const screeningVersion='screening-v5';
+export const screeningVersion='screening-v6';
 const norm=s=>String(s).normalize('NFKC').toLowerCase().replace(/[‐‑–—]/g,'-').replace(/\s+/g,' ').trim();
 const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const termRE=t=>new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escape(norm(t))}(?=$|[^\\p{L}\\p{N}_])`,'u');
@@ -85,7 +85,7 @@ function evaluate(c,profile){
   return {value,evidence:rows.flatMap(r=>r.evidence),status:contradicted?'contradicted':value===1?'supported':rows.some(r=>r.value>0||r.status==='partial')?'partial':'unknown',components:rows,verificationRequired:rows.some(r=>r.verificationRequired)};
  }
  if(!c.direct)return evaluateQualification(c,profile);
- const evidence=[];let value=0,contradicted=false;
+ const evidence=[],denials=[];let value=0;
  for(const p of passages){
   const directMatches=c.direct.map(rx=>matchEvidence(rx,p)).filter(Boolean),relatedMatches=c.related.map(rx=>matchEvidence(rx,p)).filter(Boolean);
   const direct=directMatches.length>0,related=relatedMatches.length>0;
@@ -93,12 +93,13 @@ function evaluate(c,profile){
   const matches=direct?directMatches:relatedMatches;
   const negative=matches.every(m=>m.negative),substantive=matches.some(m=>!m.negative&&m.actor==='applicant'&&m.modality==='asserted'&&(m.substantive||c.minimumDepth==='contribution'&&m.depth==='contribution'));
   const v=negative?0:direct?(substantive?1:0.35):(substantive?0.5:0.15);
-  contradicted ||= negative&&direct;
   value=Math.max(value,v);
   const basis=matches.find(m=>m.substantive)||matches[0];
   evidence.push({sourceId:p.sourceId,quote:p.quote,type:negative?'contradicted':direct?'direct':'inferred',depth:substantive?'practice':'mention',value:v,
    interpretation:{actor:basis.actor,action:basis.action,depth:basis.depth,modality:basis.modality,negated:basis.negative}});
+  if(negative&&direct)denials.push(evidence.at(-1));
  }
+ const contradicted=resolveHistoricalDenials(evidence,profile,denials);
  if(contradicted)value=Math.min(value,0.35);
  // Keep evidence responsible for the score even after many earlier mentions.
  return {value,status:contradicted?'contradicted':value===1?'supported':value>0?'partial':'unknown',evidence:evidence.sort((a,b)=>(b.type==='contradicted')-(a.type==='contradicted')||b.value-a.value).slice(0,12)};

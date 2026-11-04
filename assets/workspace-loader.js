@@ -47,8 +47,9 @@
     'assets/retention-analytics.js?v=20261014-retention',
     'assets/vendor/jszip-3.10.1.min.js',
     'assets/bulk-files.js?v=20261020-bulk',
+    'assets/bulk-upload-pool.js?v=20261104-pipeline',
     'assets/candidate-list.js?v=20261027-all-candidates',
-    'assets/bulk-screening.js?v=20261028-reporting',
+    'assets/bulk-screening.js?v=20261104-pipeline',
     'assets/screening-report.js?v=20261028-reporting',
     'assets/app.js?v=20261030-isolated-word'
   ];
