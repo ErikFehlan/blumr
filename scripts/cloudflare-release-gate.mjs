@@ -1,15 +1,17 @@
 import {pathToFileURL} from 'node:url';
 export function releaseDecision(checks){
- // Closed billing has its own read-only production proof. Paid staging and
- // model deployment stay gated; skipped paid jobs are never counted as proof.
+ // An active beta requires its own read-only proof of deployed source, enabled
+ // AI and closed billing. Historical closed and paid release paths stay strict.
+ const beta=checks.some(c=>c.name==='runtime-proof / verify'&&c.conclusion!=='skipped');
  const closed=checks.some(c=>c.name==='closed-billing / verify'&&c.conclusion!=='skipped');
- const names=closed?['core-backend / validate','closed-billing / verify']:['core-backend / validate','core-backend / deploy','staging / verify'];
+ if(beta&&closed)return 'failed';
+ const names=beta?['core-backend / validate','runtime-proof / verify']:closed?['core-backend / validate','closed-billing / verify']:['core-backend / validate','core-backend / deploy','staging / verify'];
  const validate=checks.filter(c=>c.name==='validate');
  const required=[...validate,...names.flatMap(name=>checks.filter(c=>c.name===name))];
  // Dependent jobs may not exist yet. Skipped paid jobs must wait for the
  // closed-release check to appear, and can never satisfy either release path.
  if(required.some(c=>c.status==='completed'&&!['success','skipped'].includes(c.conclusion)))return 'failed';
- if(validate.length<(closed?4:2)||names.some(name=>!checks.some(c=>c.name===name)))return 'pending';
+ if(validate.length<(closed||beta?4:2)||names.some(name=>!checks.some(c=>c.name===name)))return 'pending';
  return required.every(c=>c.status==='completed'&&c.conclusion==='success')?'passed':'pending';
 }
 export async function enforceRelease({sha,fetcher=fetch,wait=ms=>new Promise(r=>setTimeout(r,ms)),attempts=30,token}={}){

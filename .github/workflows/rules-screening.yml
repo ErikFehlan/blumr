@@ -18,6 +18,13 @@ on:
       - 'scripts/readiness-fixtures.mjs'
       - 'scripts/fixture-storage.mjs'
       - '.github/workflows/rules-screening.yml'
+      - '.github/workflows/production-runtime-verify.yml'
+      - '.github/workflows/deploy-pages.yml'
+      - 'scripts/open-beta-production-verify.mjs'
+      - 'scripts/cloudflare-release-gate.mjs'
+      - 'scripts/live-site-release.mjs'
+      - 'tests/open-beta-release.test.js'
+      - 'docs/open-beta-production-deployment.json'
 permissions:
   contents: read
 jobs:
