@@ -1,0 +1,69 @@
+{
+  "scope": "Local synthetic CPU benchmark, five alternating samples; excludes upload, parsing document formats, database, HTTP, UI and AI. Compares uncached compilation/parsing with bounded warm-worker reuse. Not production latency.",
+  "node": "v24.22.1",
+  "samples": 5,
+  "results": [
+    {
+      "name": "500 unique resumes in five pages",
+      "baseline_ms": [
+        329.52,
+        284.56,
+        269.22,
+        272.97,
+        279.54
+      ],
+      "cached_ms": [
+        285.89,
+        257.01,
+        296.61,
+        239.71,
+        254.55
+      ],
+      "baseline_median_ms": 279.54,
+      "cached_median_ms": 257.01,
+      "speedup": 1.09,
+      "exact_results_equal": true,
+      "metrics": {
+        "jobBuilds": 1,
+        "jobHits": 4,
+        "resumeParses": 500,
+        "resumeHits": 0,
+        "jobs": 1,
+        "resumes": 100,
+        "evidenceWeight": 1100160
+      },
+      "ai_calls": 0
+    },
+    {
+      "name": "20 resumes rescored across ten pages",
+      "baseline_ms": [
+        172.5,
+        171.57,
+        165.84,
+        175.42,
+        160.94
+      ],
+      "cached_ms": [
+        54.52,
+        58.48,
+        58.9,
+        63.52,
+        50.01
+      ],
+      "baseline_median_ms": 171.57,
+      "cached_median_ms": 58.48,
+      "speedup": 2.93,
+      "exact_results_equal": true,
+      "metrics": {
+        "jobBuilds": 1,
+        "jobHits": 9,
+        "resumeParses": 20,
+        "resumeHits": 180,
+        "jobs": 1,
+        "resumes": 20,
+        "evidenceWeight": 219552
+      },
+      "ai_calls": 0
+    }
+  ]
+}

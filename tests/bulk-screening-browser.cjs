@@ -6,7 +6,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
  const {processBulkScreeningBatch,summarizeBulkScreening}=await import('../supabase/functions/_shared/bulk-screening.ts');
  const {qualificationPools,qualificationJob}=await import('./fixtures/screening-qualification-pools.mjs');
  const pool=qualificationPools.find(p=>p.id==='qa'),source={...qualificationJob(pool,'workspace','job-a'),workspaceId:'workspace',feedback:[],assessments:[],lessons:[],sourceVersion:'source'};
- const batches=new Map();
+ const batches=new Map(),successfulUploads=new Map();let activeUploads=0,peakUploads=0;
  let batch=null,docs=new Map(),candidates=new Map(),failedOnce=false,deepCalls=0,legacyCalls=0,approvals=0,delayCreate=false,releaseCreate,createCalls=0,startCalls=0,loseStartResponse=true,rulesOnlyRead=false,rulesOnlyReads=0;
  const assessment=c=>({status:'ready',revision:'current',result:{name:'Candidate',role:'QA Engineer',primary_signal:'Verified synthetic testing evidence.',tags:['QA'],score:c.result.score/10,manager_score:c.result.score/10,jd_reason:'Verified synthetic testing evidence.',manager_reason:'No additional manager preferences supplied.',resume_evidence:[{claim:'Testing work',quote:c.text.split('\n').find(t=>/Performed|Owned/.test(t))||c.text}],concerns:['Verify scope on a phone screen.'],screening_questions:['What testing did you personally own?']}});
  async function operation(op,args){
@@ -27,7 +27,14 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   if(op==='analysis'){const c=candidates.get(args[0]),gap=rulesOnlyRead&&c.result&&c.assessment;if(gap){rulesOnlyRead=false;rulesOnlyReads++;}return {batchId:batch.id,started:!!batch.analysis_requested_at,stored:docs.has(c.candidateId),fileName:c.name,rules:c.result||null,assessment:gap?null:c.assessment||null};}
   if(op==='prepare'){const [,ordinal,text]=args,{id}=await require('../assets/resume-intake.js').identity('workspace',batch.job_id,text),item=batch.items[ordinal];item.candidate_id=id;
    if(!candidates.has(id))candidates.set(id,{candidateId:id,jobId:batch.job_id,name:item.file_name,text});return {candidate_id:id,hash:id.padEnd(64,'0'),stored:docs.has(id)};}
-  if(op==='upload'){const [c,text,fileName]=args;if(fileName==='retry.txt'&&!failedOnce){failedOnce=true;throw Error('Simulated upload interruption');}docs.set(c.id,text);return 'stored';}
+  if(op==='upload'){
+   const [c,text,fileName]=args;activeUploads++;peakUploads=Math.max(peakUploads,activeUploads);
+   try{
+    await new Promise(resolve=>setTimeout(resolve,30));
+    if(fileName==='retry.txt'&&!failedOnce){failedOnce=true;throw Error('Simulated upload interruption');}
+    successfulUploads.set(c.id,(successfulUploads.get(c.id)||0)+1);docs.set(c.id,text);return 'stored';
+   }finally{activeUploads--;}
+  }
   if(op==='mark'){batch.items[args[1]].status=args[2];return null;}
   if(op==='seal'){if(batch.items.some(i=>['pending','failed'].includes(i.status)))throw Error('Unfinished files');batch.sealed=true;return null;}
   if(op==='refresh'){
@@ -71,6 +78,7 @@ const Zip=require('../assets/vendor/jszip-3.10.1.min.js'),dir=path.resolve(__dir
   await page.locator('[data-bulk-message]').filter({hasText:/Preparing|Reading|Saving/}).waitFor();const ack=performance.now()-started;
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Some files need attention'),{},{timeout:45000});
   assert.equal(pdfWorkers.size,0,'PDF parsing workers leaked after successful or failed documents');assert.equal(batch.budget_usd,5);assert.equal(docs.size,22,'Duplicate or readable document handling failed');assert.equal(deepCalls,0,'Upload invoked full AI');assert.equal(await page.locator('#candidateCards [data-candidate-id="earlier-0"]').isVisible(),true,'Current upload hid an earlier saved candidate');assert.equal(await page.locator('#candidateCards [data-candidate-id]').count(),23,'New saved resumes did not join the job list without a reload');assert.equal(batch.sealed,false);assert.match(await page.locator('#bulkScreening').textContent(),/Your upload list/);assert.equal([...candidates.values()].filter(c=>c.result).length,0,'Upload started analysis before the button');
+  assert.equal(peakUploads,2,'Network saves did not overlap, or exceeded the two-file bound');assert.equal(activeUploads,0);assert.ok([...successfulUploads.values()].every(n=>n===1),'Duplicate resume caused duplicate persistence');
   assert.ok([...docs.values()].some(t=>t.includes('Documented regression coverage')),'DOCX text box lost');assert.ok([...docs.values()].some(t=>t.includes('Used SQL to validate billing data')),'PDF extraction lost');
   await page.locator('[data-bulk-resume-files]').setInputFiles({name:'retry.txt',mimeType:'text/plain',buffer:Buffer.from(text(99))});
   await page.waitForFunction(()=>document.querySelector('[data-bulk-message]')?.textContent.includes('Files saved'),{},{timeout:15000});

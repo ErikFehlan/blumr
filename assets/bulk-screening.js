@@ -58,22 +58,24 @@
      if(jobId===job.id){if(!draft)list.unshift({id,created_at:new Date().toISOString()});batchId=id;snapshot=null;}
     }
     Object.assign(run,{id,work});let lastRefresh=0;
-    for(const item of work){
-     if(!current(g))break;
-     try{
+    const saveCandidate=global.BlumrUploadPool.keyedGate(),stored=new Set();
+    await global.BlumrUploadPool.run(work,{isCurrent:()=>current(g),read:async item=>{
       item.state='reading';if(batchId===id)status('Reading '+item.entry.name);
       const file=await item.entry.load(),extracted=await api.extract(file,text=>{if(current(g)&&batchId===id)status(text);});
-      const text=typeof extracted==='string'?extracted:extracted?.text;if(!current(g))break;
+      return {file,text:typeof extracted==='string'?extracted:extracted?.text};
+     },save:async(item,{file,text})=>{
       item.state='saving';if(batchId===id)status('Saving '+item.entry.name);
-      const prepared=await service.prepareScreeningUpload(id,item.ordinal,text);if(!current(g))break;
-      if(!prepared.stored)await service.uploadResume({id:prepared.candidate_id,jobId:job.id,resumeIntake:{hash:prepared.hash}},file,text);
-      if(!current(g))break;
+      const prepared=await service.prepareScreeningUpload(id,item.ordinal,text);if(!current(g))return;
+      await saveCandidate(prepared.candidate_id,async()=>{
+       if(!current(g))return;
+       if(!prepared.stored&&!stored.has(prepared.candidate_id))await service.uploadResume({id:prepared.candidate_id,jobId:job.id,resumeIntake:{hash:prepared.hash}},file,text);
+       stored.add(prepared.candidate_id);
+      });
+      if(!current(g))return;
       await service.updateScreeningItem(id,item.ordinal,'saved');if(current(g))api.savedResume?.({id:prepared.candidate_id,jobId:job.id,name:item.entry.name});item.state='saved';item.entry=null;
-     }catch(e){item.state='failed';item.error=e.message||'Document needs attention';if(current(g))try{await service.updateScreeningItem(id,item.ordinal,'failed');}catch{}}
-     if(!current(g))break;
-     if(batchId===id&&Date.now()-lastRefresh>2000){lastRefresh=Date.now();await refresh();}
-     await new Promise(resolve=>setTimeout(resolve,250));
-    }
+     },onError:async(item,e)=>{item.state='failed';item.error=e.message||'Document needs attention';try{await service.updateScreeningItem(id,item.ordinal,'failed');}catch{}},
+     onSettled:async()=>{if(batchId===id&&Date.now()-lastRefresh>2000){lastRefresh=Date.now();await refresh();}}
+    });
     run.running=false;
     if(current(g)&&batchId===id){await refresh();status(work.some(i=>i.state==='failed')?'Some files need attention. Retry their originals or remove them before analyzing.':'Files saved. Add more resumes or click Analyze when you’re ready.');}
    }catch(e){if(current(g)&&jobId===job.id)status(e.message||'Upload could not start.');}finally{run.running=false;if(current(g))render();}
