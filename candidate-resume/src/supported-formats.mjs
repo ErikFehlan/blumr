@@ -1,0 +1,27 @@
+export const formats = [
+  "pdf",
+  "docx",
+  "doc",
+  "odt",
+  "rtf",
+  "txt",
+  "md",
+  "html",
+  "htm",
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "bmp",
+  "tif",
+  "tiff",
+];
+export const imageFormats = [
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "bmp",
+  "tif",
+  "tiff",
+];

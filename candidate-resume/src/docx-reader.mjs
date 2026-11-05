@@ -114,34 +114,48 @@ export function readDocx(bytes) {
       inText = false,
       listId = null,
       listLevel = "0",
-      href = null;
+      href = null,
+      skipped = 0,
+      hiddenRun = false,
+      runText = "";
+    const parents = [],
+      runs = [];
     readXML(
       files.get(name),
       (n) => {
         if (n.uri !== word) return;
-        if (
-          [
-            "altChunk",
-            "object",
-            "drawing",
-            "pict",
-            "txbxContent",
-            "del",
-            "ins",
-            "moveFrom",
-            "moveTo",
-            "vanish",
-            "footnoteReference",
-            "endnoteReference",
-            "fldSimple",
-            "instrText",
-            "sym",
-          ].includes(n.local)
-        )
-          throw Error(
-            "This Word file contains fields, images, tracked changes, or embedded content. Paste the visible resume text to preserve it accurately.",
+        if (["del", "moveFrom"].includes(n.local)) {
+          skipped++;
+          warnings.add(
+            "Tracked changes are shown with insertions kept and deletions removed. Review the final text.",
           );
+        }
+        if (skipped) return;
+        if (["drawing", "pict", "object", "altChunk"].includes(n.local))
+          warnings.add(
+            "Check information in pictures or embedded objects against the original; only document text is extracted.",
+          );
+        if (["fldSimple", "instrText"].includes(n.local))
+          warnings.add(
+            "Saved field values are included; check dates and contact details.",
+          );
+        if (["footnoteReference", "endnoteReference", "sym"].includes(n.local))
+          warnings.add(
+            "Check footnotes, endnotes, and special symbols against the original.",
+          );
+        if (n.local === "vanish")
+          hiddenRun = attr(n, "val") !== "0" && attr(n, "val") !== "false";
+        if (n.local === "r") {
+          runs.push({ hiddenRun, runText });
+          hiddenRun = false;
+          runText = "";
+        }
         if (n.local === "p") {
+          if (parents.length && runText) {
+            value += runText;
+            runText = "";
+          }
+          parents.push({ value, listId, listLevel });
           value = "";
           listId = null;
           listLevel = "0";
@@ -168,10 +182,10 @@ export function readDocx(bytes) {
             "Check the reading order, especially tables or columns.",
           );
         if (n.local === "t") inText = true;
-        if (n.local === "noBreakHyphen") value += "‑";
-        if (n.local === "softHyphen") value += "\u00ad";
-        if (n.local === "tab") value += " ";
-        if (n.local === "br" || n.local === "cr") value += "\n";
+        if (n.local === "noBreakHyphen") runText += "‑";
+        if (n.local === "softHyphen") runText += "\u00ad";
+        if (n.local === "tab") runText += " ";
+        if (n.local === "br" || n.local === "cr") runText += "\n";
         if (n.local === "hyperlink") {
           const id = Object.values(n.attributes).find(
             (a) => a.uri === relationships && a.local === "id",
@@ -181,6 +195,18 @@ export function readDocx(bytes) {
       },
       (n) => {
         if (n.uri !== word) return;
+        if (["del", "moveFrom"].includes(n.local)) {
+          skipped--;
+          return;
+        }
+        if (skipped) return;
+        if (n.local === "r") {
+          if (!hiddenRun) value += runText;
+          ({ hiddenRun, runText } = runs.pop() || {
+            hiddenRun: false,
+            runText: "",
+          });
+        }
         if (n.local === "t") inText = false;
         if (n.local === "hyperlink" && href) {
           if (
@@ -196,23 +222,28 @@ export function readDocx(bytes) {
             list &&
             levels.get(lists.get(listId) + "/" + listLevel) !== "bullet"
           )
-            throw Error(
-              "This Word document uses numbered or custom lists. Paste the visible text to preserve their numbering.",
+            warnings.add(
+              "List items are imported as bullets. Check any meaningful numbering.",
             );
-          lines.push((list ? "• " : "") + value.trim());
+          const text = (list ? "• " : "") + value.trim();
+          if (parents.length > 1)
+            parents[parents.length - 1].value += "\n" + text + "\n";
+          else lines.push(text);
         }
+        if (n.local === "p")
+          ({ value, listId, listLevel } = parents.pop() || {
+            value: "",
+            listId: null,
+            listLevel: "0",
+          });
       },
       (s) => {
-        if (inText) value += s;
+        if (inText && !skipped) runText += s;
       },
     );
     return lines;
   }
   const main = paragraphs("word/document.xml");
-  if (sectionParts.header.size > 1 || sectionParts.footer.size > 1)
-    throw Error(
-      "This Word file uses different headers or footers across sections. Paste the complete visible text in reading order.",
-    );
   const outer = (kind) =>
     [...sectionParts[kind]].flatMap((name) => paragraphs(name));
   const head = outer("header"),

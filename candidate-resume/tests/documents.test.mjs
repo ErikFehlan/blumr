@@ -85,7 +85,7 @@ test("Word header contact detail, true link target, and document order survive",
   ]);
   assert.ok(r.warnings.length);
 });
-test("macro, field and DTD inputs are rejected", () => {
+test("macro and DTD inputs are rejected", () => {
   const file = (xml) => ({
     "[Content_Types].xml": strToU8("<Types/>"),
     "word/document.xml": strToU8(xml),
@@ -93,9 +93,6 @@ test("macro, field and DTD inputs are rejected", () => {
   for (const doc of [
     { ...file("x"), "word/vbaProject.bin": new Uint8Array(1) },
     file("<!DOCTYPE x><x/>"),
-    file(
-      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:fldSimple/></w:document>',
-    ),
   ])
     assert.throws(() => readDocx(zipSync(doc)));
 });

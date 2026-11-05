@@ -245,7 +245,7 @@ export function profileHub({
       const parsed = await readResume(file);
       draftFile = file;
       $("base-text").value = parsed.text;
-      $("base-text").readOnly = true;
+      $("base-text").readOnly = false;
       $("base-warning").textContent = parsed.warnings.join(" ");
       $("base-confirm").checked = false;
       $("base-clear-draft").hidden = false;

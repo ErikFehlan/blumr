@@ -76,7 +76,7 @@ test("paste, review, block unsupported facts, approve, download and import both 
     await page.locator("#next-job").click();
     await page.locator("#file").setInputFiles(files[format]);
     await expect(page.locator("#source")).toHaveValue(/volunteer project/);
-    await expect(page.locator("#source")).toHaveAttribute("readonly", "");
+    await expect(page.locator("#source")).toBeEditable();
     await expect(page.locator("#source-ok")).not.toBeChecked();
   }
   expect(

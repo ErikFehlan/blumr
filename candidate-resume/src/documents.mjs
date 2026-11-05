@@ -6,7 +6,7 @@ import "../../assets/pdf-text.js";
 import "../../assets/upload-validation.js";
 
 const maxPages = 80;
-export async function readPdf(bytes, pdfjs, resources) {
+export async function readPdf(bytes, pdfjs, resources, recognize) {
   globalThis.AncalagonUploadGuard.inspect(bytes, "pdf");
   const task = pdfjs.getDocument({
     data: new Uint8Array(bytes),
@@ -15,18 +15,66 @@ export async function readPdf(bytes, pdfjs, resources) {
     isOffscreenCanvasSupported: false,
     useWasm: false,
     stopAtErrors: true,
+    ...(recognize
+      ? {
+          CanvasFactory: class {
+            create(width, height) {
+              const canvas = new OffscreenCanvas(width, height);
+              return { canvas, context: canvas.getContext("2d") };
+            }
+            getNoAlphaContext(canvas) {
+              return canvas.getContext("2d", { alpha: false });
+            }
+            reset(target, width, height) {
+              target.canvas.width = width;
+              target.canvas.height = height;
+            }
+            destroy(target) {
+              target.canvas.width = 0;
+              target.canvas.height = 0;
+              target.canvas = null;
+              target.context = null;
+            }
+          },
+        }
+      : {}),
     ...resources,
   });
   try {
     const pdf = await task.promise;
     if (pdf.numPages > maxPages)
       throw Error("Use a resume with 80 pages or fewer.");
-    const pages = [];
+    const pages = [],
+      warnings = [];
     let total = 0;
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const items = (await page.getTextContent()).items;
-      const text = globalThis.AncalagonPdfText.pageText(items);
+      let text = globalThis.AncalagonPdfText.pageText(items);
+      if (recognize && text.trim().length < 40) {
+        const viewport = page.getViewport({ scale: 2 });
+        if (viewport.width * viewport.height > 16000000)
+          throw Error("This PDF page is too large to scan safely.");
+        const canvas = new OffscreenCanvas(
+          Math.ceil(viewport.width),
+          Math.ceil(viewport.height),
+        );
+        await page.render({ canvasContext: canvas.getContext("2d"), viewport })
+          .promise;
+        const scanned = await recognize(
+          new Uint8Array(await (await canvas.convertToBlob()).arrayBuffer()),
+        );
+        text = scanned.trim() || text;
+      }
+      if (!text.trim() && recognize) {
+        warnings.push(
+          "No readable text was found on page " +
+            i +
+            ". Check that page against your original.",
+        );
+        page.cleanup();
+        continue;
+      }
       if (!text.trim())
         throw Error(
           "A page has no extractable text. Paste the complete resume or use a text-based PDF.",
@@ -48,6 +96,7 @@ export async function readPdf(bytes, pdfjs, resources) {
     return {
       text: pages.join("\n"),
       warnings: [
+        ...warnings,
         "Compare the text with your PDF. Check columns, links and any information shown in images.",
       ],
     };
