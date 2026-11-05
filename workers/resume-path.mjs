@@ -1,5 +1,5 @@
-// The same Access application protects this path and the candidate Pages origin.
-// Forward only its application cookie; never forward recruiter cookies/tokens.
+// Public candidate frontend. Saved data stays behind candidate Supabase Auth.
+// Never forward recruiter cookies or authorization to the static Pages origin.
 const ORIGIN = 'https://blumr-resume.pages.dev';
 export async function handle(request, fetcher = fetch) {
   const url = new URL(request.url);
@@ -11,12 +11,10 @@ export async function handle(request, fetcher = fetch) {
     url.pathname = '/resume/';
     return Response.redirect(url, 308);
   }
-  const token = request.headers.get('Cf-Access-Jwt-Assertion');
-  if (!token) return new Response('Private pilot access required', { status: 403 });
   const target = new URL(ORIGIN);
   target.pathname = url.pathname.slice('/resume'.length);
   target.search = url.search;
-  const headers = new Headers({ Cookie: `CF_Authorization=${token}` });
+  const headers = new Headers();
   for (const name of ['accept', 'accept-encoding', 'range', 'if-none-match']) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
@@ -29,7 +27,7 @@ export async function handle(request, fetcher = fetch) {
   if (location) {
     const redirect = new URL(location, target);
     if (redirect.origin !== ORIGIN)
-      return new Response('Please reopen the private pilot and sign in again.', { status: 403 });
+      return new Response('The resume tool could not load. Please try again.', { status: 403 });
     redirect.hostname = url.hostname;
     redirect.pathname = '/resume' + redirect.pathname;
     result.headers.set('location', redirect.href);
