@@ -64,7 +64,7 @@ const root=path.resolve(__dirname,'..');
   await page.getByRole('link',{name:'See how blumr works',exact:true}).click();await page.waitForURL('**/how-it-works.html');
   assert.equal(await page.title(),'How it works | blumr');assert.equal(await page.locator('video[data-demo-tracking]').isVisible(),true,'Homepage demo CTA opens the playable How it works page');
   await page.goto(url);await page.locator('body.rf-auth-guest').waitFor();
-  assert.match(await page.locator('.an-hero .an-button-primary').textContent(),/Try blumr free/);
+  assert.match(await page.locator('.an-hero .an-button-primary').textContent(),/Recruiter workspace/);
   await page.locator('#an-tab-context').click();assert.equal(await page.locator('#an-panel-context').isVisible(),true);
   await page.locator('#an-tab-context').press('ArrowRight');assert.equal(await page.locator('#an-tab-brief').getAttribute('aria-selected'),'true');
   await page.locator('#an-tab-brief').press('End');assert.equal(await page.locator('#an-panel-feedback').isVisible(),true);
