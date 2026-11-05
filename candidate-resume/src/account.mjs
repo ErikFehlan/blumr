@@ -73,6 +73,16 @@ export function accountClient(url, key, sessionStore) {
       );
     return data;
   }
+  async function checkedAuth(result) {
+    const { data, error } = await result;
+    if (error) {
+      const failure = new Error("Authentication request failed.");
+      failure.code = error.code;
+      failure.status = error.status;
+      throw failure;
+    }
+    return data;
+  }
   return {
     session: async () => (await checked(client.auth.getSession())).session,
     profile: () =>
@@ -184,9 +194,11 @@ export function accountClient(url, key, sessionStore) {
     deleteJob: (id) =>
       checked(client.from("candidate_saved_jobs").delete().eq("id", id)),
     login: async (email, password) =>
-      checked(client.auth.signInWithPassword({ email, password })),
+      checkedAuth(client.auth.signInWithPassword({ email, password })),
     register: async (email, password) =>
-      checked(client.auth.signUp({ email, password })),
+      checkedAuth(client.auth.signUp({ email, password })),
+    resendConfirmation: (email) =>
+      checkedAuth(client.auth.resend({ type: "signup", email })),
     logout: async () => checked(client.auth.signOut({ scope: "local" })),
     list: async () =>
       checked(
