@@ -1,20 +1,20 @@
-/* blumr Mint, the default recruiter workspace palette in assets/themes.css. */
+/* Public blumr website palette, shared with assets/landing.css. */
 :root {
-  color-scheme: dark;
-  --bg: #0d2120;
-  --rail: #122927;
-  --panel: #193331;
-  --soft: #2a4744;
-  --control: #517975;
-  --line: #355552;
-  --ink: #edf8f6;
-  --muted: #b0cbc8;
-  --mint: #bce0df;
-  --on-mint: #173a36;
-  --good: #b4e6ca;
-  --good-bg: #254f40;
-  --warn: #ebc16f;
-  --warn-bg: #352c1c;
+  color-scheme: light;
+  --bg: #bce0df;
+  --rail: #d7eeea;
+  --panel: #f0f9f7;
+  --soft: #d7eeea;
+  --control: #668f85;
+  --line: #83aca3;
+  --ink: #183c36;
+  --muted: #355b53;
+  --mint: #245e50;
+  --on-mint: #fff;
+  --good: #245e50;
+  --good-bg: #d7eeea;
+  --warn: #795419;
+  --warn-bg: #fff3d9;
   font:
     16px/1.5 Inter,
     ui-sans-serif,
@@ -147,7 +147,7 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 .step:disabled {
-  color: #92aca9;
+  color: #526f68;
 }
 .step:disabled b {
   border-color: var(--line);
@@ -184,7 +184,7 @@ button:disabled {
   background: currentColor;
 }
 .rail-foot .dot {
-  color: #86c7b3;
+  color: var(--mint);
 }
 .studio,
 #workspace,
@@ -247,7 +247,7 @@ aside {
   border: 1px solid #a4ceca;
   border-radius: 15px;
   background:
-    radial-gradient(ellipse at 80% 40%, #d7eeea 0, transparent 60%), var(--mint);
+    radial-gradient(ellipse at 80% 40%, #d7eeea 0, transparent 60%), var(--bg);
   color: #183c36;
 }
 .intro-copy {
@@ -320,7 +320,7 @@ aside {
   font-size: 14px;
 }
 .sidebox.green {
-  background: linear-gradient(125deg, #21443d, var(--panel));
+  background: linear-gradient(125deg, #e3f1ed, var(--panel));
 }
 .shield {
   width: 32px;
@@ -424,7 +424,7 @@ textarea {
   line-height: 1.55;
 }
 ::placeholder {
-  color: #9ab5b1;
+  color: #526f68;
   opacity: 1;
 }
 .primary,
@@ -442,8 +442,9 @@ textarea {
   color: var(--on-mint);
   background: var(--mint);
 }
-.primary:enabled:hover {
-  background: #d7eeea;
+.primary:enabled:hover,
+a.primary:hover {
+  background: #1b4e42;
 }
 .secondary {
   border: 1px solid var(--control);
@@ -520,7 +521,7 @@ input::file-selector-button {
   padding: 12px;
   margin: 0 0 16px;
   font-size: 14px;
-  color: #f6dfb0;
+  color: var(--warn);
   background: var(--warn-bg);
 }
 details,
@@ -601,7 +602,7 @@ summary {
 }
 .pair .revised {
   border-color: #4b7865;
-  background: #204034;
+  background: var(--good-bg);
 }
 .pair p,
 .inline-text,
@@ -820,7 +821,7 @@ dialog::backdrop {
 .access-page {
   display: block;
   background:
-    radial-gradient(ellipse at 55% 0%, #284c45, transparent 68%), var(--bg);
+    radial-gradient(ellipse at 55% 0%, #effaf570, transparent 68%), var(--bg);
 }
 .access-shell {
   width: min(500px, calc(100% - 36px));
@@ -922,3 +923,21 @@ dialog::backdrop {
 .hub-row > .tag {
   margin-left: 8px;
 }
+
+/* Preserve the supplied logo artwork; tint its white letters for light surfaces. */
+.identity .blumr-logo { border-radius: 2px; }
+.identity .blumr-logo > img { clip-path: inset(0 0 0 78%); }
+.identity .blumr-logo::after {
+  content: "";
+  position: absolute;
+  width: 114.798206%;
+  aspect-ratio: 2048 / 682;
+  left: -8.464126%;
+  top: -18.823529%;
+  background: var(--ink);
+  -webkit-mask: url("vendor/blumr-logo.png") center / 100% 100% no-repeat;
+  mask: url("vendor/blumr-logo.png") center / 100% 100% no-repeat;
+  clip-path: inset(0 22% 0 0);
+  pointer-events: none;
+}
+.access-card { box-shadow: 0 24px 64px #24483c18; }
