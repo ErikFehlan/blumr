@@ -126,7 +126,7 @@ test("candidate setup, one original for two jobs, fit coverage, independent vers
   await credentials();
   await role("Sign in").click();
   await expect(page.locator("#login-status")).toContainText(
-    "Could not complete",
+    "The email or password is incorrect.",
   );
   await expect(page.locator("#saved-jobs")).toHaveCount(0);
 });

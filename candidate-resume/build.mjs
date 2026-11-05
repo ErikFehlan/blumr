@@ -11,6 +11,11 @@ if ((url || key) && !validBackend(url, key))
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist/vendor", { recursive: true });
 const assets = {
+  "node_modules/tesseract.js/dist/worker.min.js": "vendor/ocr/worker.min.js",
+  "node_modules/tesseract.js-core": "vendor/ocr/core",
+  "node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz": "vendor/ocr/lang/eng.traineddata.gz",
+  "node_modules/tesseract.js/LICENSE.md": "vendor/ocr/LICENSE",
+
   "index.html": "index.html",
   "login.html": "login.html",
   "style.css": "style.css",
@@ -53,7 +58,7 @@ await build({
 });
 const origin = url ? " " + new URL(url).origin : "";
 const policy =
-  "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'" +
+  "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'" +
   origin +
   "; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'";
 await writeFile(

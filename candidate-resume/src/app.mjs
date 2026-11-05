@@ -1,3 +1,4 @@
+import { formats } from "./supported-formats.mjs";
 import { candidateId } from "./id.mjs";
 import {
   limits,
@@ -190,13 +191,17 @@ function worker(path, payload, transfer = []) {
         finish(
           "Processing took too long. Try a shorter document or paste the text.",
         ),
-      45000,
+      payload.operation === "read" ? 240000 : 45000,
     );
     w.onerror = () =>
       finish(
         "The private processing worker failed. Refresh or try pasting the text.",
       );
     w.onmessage = ({ data }) => {
+      if (data?.channel === "blumr-resume-progress") {
+        info(data.message);
+        return;
+      }
       // PDF.js also sends transport control messages on the worker port.
       if (data?.channel !== "blumr-resume-result") return;
       if (data.ok !== true)
@@ -308,12 +313,8 @@ $("replace-source").onclick = async () => {
 };
 async function readResume(selected) {
   const format = selected.name.split(".").pop().toLowerCase();
-  if (
-    !["pdf", "docx"].includes(format) ||
-    !selected.size ||
-    selected.size > 10485760
-  )
-    throw Error("Choose a PDF or DOCX file up to 10 MB.");
+  if (!formats.includes(format) || !selected.size || selected.size > 10485760)
+    throw Error("Choose a supported document or image up to 10 MB.");
   const bytes = await selected.arrayBuffer();
   const parsed = await worker(
     "document-worker.js",
@@ -341,7 +342,7 @@ $("file").onchange = async () => {
     baseRevision = null;
     file = selected;
     $("source").value = parsed.text;
-    $("source").readOnly = true;
+    $("source").readOnly = false;
     $("file").disabled = true;
     $("source-ok").checked = false;
     $("replace-source").hidden = false;
