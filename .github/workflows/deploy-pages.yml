@@ -60,6 +60,7 @@ jobs:
           node --check assets/auth.js
           node --check assets/landing.js
           node --check assets/company.js
+          node --check assets/product-demos.js
           node --check assets/data.js
           node --check assets/scoring.js
           node --check assets/decision-workspace.js
@@ -93,7 +94,9 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.13.0 linkedom@0.18.12 pdfjs-dist@4.10.38
       - name: Test public website browser journey
-        run: node tests/landing-browser.cjs
+        run: |
+          node tests/landing-browser.cjs
+          node tests/product-demos-browser.cjs
       - name: Test recruiter browser journey
         run: |
           node tests/home-browser.cjs
