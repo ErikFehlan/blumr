@@ -1,5 +1,6 @@
 import {cp,mkdir,readFile,writeFile,rm} from 'node:fs/promises';
 import {enforceRelease} from './cloudflare-release-gate.mjs';
+import {publicPages} from './public-pages.mjs';
 export function stagingCredentials(url,key){
  if(url!=='https://momfzjmycveqginxmqib.supabase.co')throw Error('Unexpected staging project');
  if(/^sb_publishable_[A-Za-z0-9_-]+$/.test(key||''))return {url,key};
@@ -10,7 +11,7 @@ export async function buildPublic({branch,sha,url,key,gate=enforceRelease,direct
  if(branch==='main')await gate({sha,token:process.env.GITHUB_TOKEN});
  else stagingCredentials(url,key);
  await rm(directory,{recursive:true,force:true});await mkdir(directory,{recursive:true});
- for(const file of ['index.html','about.html','how-it-works.html','why-blumr-works.html','pricing.html','_headers'])await cp(file,directory+'/'+file);
+ for(const file of [...publicPages,'_headers'])await cp(file,directory+'/'+file);
  await cp('assets',directory+'/assets',{recursive:true});
  if(branch!=='main'){
   const path=directory+'/assets/auth.js';let auth=await readFile(path,'utf8');

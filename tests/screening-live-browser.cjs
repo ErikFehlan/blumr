@@ -25,7 +25,7 @@ const {chromium}=require('playwright');
  const browser=await chromium.launch({headless:true});
  try{
   const page=await browser.newPage();page.setDefaultTimeout(30000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(fixture.app,{waitUntil:'domcontentloaded'});await page.locator('.an-header [data-auth-mode="signin"]').click();
+  await page.goto(fixture.app,{waitUntil:'domcontentloaded'});await page.locator('.bm-signin > summary').click();await page.locator('.bm-header [data-auth-mode="signin"]').click();
   await page.locator('#authEmail').fill(owner.email);await page.locator('#authPassword').fill(owner.password);await page.locator('#authSubmit').click();await page.locator('#page-home.active').waitFor({timeout:60000});
   const nav=async name=>{const group=page.locator('.rf-nav details').filter({has:page.locator(`[data-page="${name}"]`)});if(await group.count()&&await group.getAttribute('open')===null)await group.locator('summary').click();await page.locator(`.rf-nav [data-page="${name}"]`).click();await page.locator(`#page-${name}.active`).waitFor();};
   await nav('jobs');await page.locator(`[data-activate-job="${rollout.job}"]`).click();await nav('candidates');

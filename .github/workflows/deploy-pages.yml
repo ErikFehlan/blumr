@@ -59,6 +59,7 @@ jobs:
           node --check assets/select.js
           node --check assets/auth.js
           node --check assets/landing.js
+          node --check assets/company.js
           node --check assets/data.js
           node --check assets/scoring.js
           node --check assets/decision-workspace.js
@@ -91,6 +92,8 @@ jobs:
         timeout-minutes: 4
         run: |
           npm install --no-save --package-lock=false playwright@1.58.2 mammoth@1.13.0 linkedom@0.18.12 pdfjs-dist@4.10.38
+      - name: Test public website browser journey
+        run: node tests/landing-browser.cjs
       - name: Test recruiter browser journey
         run: |
           node tests/home-browser.cjs
@@ -104,7 +107,6 @@ jobs:
           CAPTURE_UI=test-results/presentation node tests/presentation-browser.cjs
           node tests/security-browser.cjs
           node tests/word-reader-browser.cjs
-          node tests/landing-browser.cjs
           node tests/demo-analytics-browser.cjs
           node tests/settings-browser.cjs
           CAPTURE_UI=test-results/subscriptions node tests/subscription-browser.cjs
@@ -249,7 +251,7 @@ jobs:
       - name: Stage only public application files
         run: |
           mkdir -p _site
-          cp index.html about.html how-it-works.html why-blumr-works.html pricing.html _site/
+          node --input-type=module -e "import {publicPages} from './scripts/public-pages.mjs'; import {cp} from 'node:fs/promises'; for (const page of publicPages) await cp(page, '_site/' + page);"
           cp -R assets _site/assets
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
