@@ -59,6 +59,7 @@ jobs:
           node --check assets/select.js
           node --check assets/auth.js
           node --check assets/landing.js
+          node --check assets/company.js
           node --check assets/data.js
           node --check assets/scoring.js
           node --check assets/decision-workspace.js
@@ -249,7 +250,7 @@ jobs:
       - name: Stage only public application files
         run: |
           mkdir -p _site
-          cp index.html about.html how-it-works.html why-blumr-works.html pricing.html _site/
+          node --input-type=module -e "import {publicPages} from './scripts/public-pages.mjs'; import {cp} from 'node:fs/promises'; for (const page of publicPages) await cp(page, '_site/' + page);"
           cp -R assets _site/assets
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3

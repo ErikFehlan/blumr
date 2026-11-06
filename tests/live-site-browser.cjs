@@ -25,7 +25,7 @@ let browser,page,stage='setup';
  page=await context.newPage();page.setDefaultTimeout(20000);page.on('pageerror',()=>errors.push('Unhandled application error'));
  const login=async(user)=>{
   const response=await page.goto(fixture.app,{waitUntil:'domcontentloaded',timeout:45000});assert.equal(response.status(),200);
-  await page.locator('.an-header [data-auth-mode="signin"]').click();
+  await page.locator('.bm-signin > summary').click();await page.locator('.bm-header [data-auth-mode="signin"]').click();
   await page.locator('#authEmail').fill(user.email);await page.locator('#authPassword').fill(user.password);await page.locator('#authSubmit').click();
   await page.locator('#page-home.active').waitFor({timeout:60000});
  };

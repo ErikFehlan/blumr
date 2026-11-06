@@ -89,7 +89,7 @@ async function open(t, options = {}) {
       flush: async value => { window.auditSaved = copy(value); }
     }) };
   }, { defaults, options });
-  await page.goto(url);
+  await page.goto(url + (options.guest ? '#authAccess' : ''));
   if (!options.missing && !options.guest && !options.holdLoad) {
     await page.locator('body.rf-authenticated:not(.rf-data-loading)').waitFor();
     await page.locator('#page-home.active').waitFor();
@@ -199,7 +199,7 @@ test('missing application scripts show a recovery control instead of an unrespon
 
 test('interrupted sign-in, signup and recovery restore their buttons and explain the problem', async t => {
   const { page, errors } = await open(t, { guest: true });
-  await page.getByRole('link', { name: 'Log in', exact: true }).first().click();
+  await page.locator('.bm-signin > summary').click();await page.locator('[data-auth-mode="signin"]').click();
   await page.locator('#authEmail').fill('synthetic@example.test');
   await page.locator('#authPassword').fill('Synthetic-password-only');
   await page.evaluate(() => { window.auditAuthThrows = true; });
@@ -242,7 +242,7 @@ test('sign-in stays on the form until workspace data is ready, without duplicate
     const { page, errors } = await open(t, { guest: true, signInSuccess: true, holdSignIn: true, holdLoad: true });
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ reducedMotion: width === 390 ? 'reduce' : 'no-preference' });
-    await page.getByRole('link', { name: 'Log in', exact: true }).first().click();
+    await page.locator('.bm-signin > summary').click();await page.locator('[data-auth-mode="signin"]').click();
     await page.locator('#authEmail').fill('synthetic@example.test');
     await page.locator('#authPassword').fill('Synthetic-password-only');
     await page.locator('#authSubmit').click();
