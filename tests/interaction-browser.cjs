@@ -242,6 +242,7 @@ test('sign-in stays on the form until workspace data is ready, without duplicate
     const { page, errors } = await open(t, { guest: true, signInSuccess: true, holdSignIn: true, holdLoad: true });
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ reducedMotion: width === 390 ? 'reduce' : 'no-preference' });
+    if (width < 700) await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await page.locator('.bm-signin > summary').click();await page.locator('[data-auth-mode="signin"]').click();
     await page.locator('#authEmail').fill('synthetic@example.test');
     await page.locator('#authPassword').fill('Synthetic-password-only');

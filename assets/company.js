@@ -47,5 +47,14 @@
   }, true);
   addEventListener('hashchange', syncAuthSurface);
   addEventListener('popstate', syncAuthSurface);
+  // showGuest emits this before removing the previous workspace state. A
+  // signed-out or expired session should reveal sign-in, even on a clean URL.
+  addEventListener('ancalagon:auth-cleared', () => {
+    if (!document.body.matches('.rf-authenticated, .rf-data-loading')) return;
+    const url = new URL(location.href);
+    url.hash = 'authAccess';
+    history.replaceState(null, '', url);
+    syncAuthSurface();
+  });
   syncAuthSurface();
 })();
