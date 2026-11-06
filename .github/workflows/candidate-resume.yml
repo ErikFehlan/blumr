@@ -1,0 +1,63 @@
+name: Candidate Resume verification
+on:
+  pull_request:
+    paths: ['candidate-resume/**', 'supabase/functions/_shared/**', 'assets/upload-validation.js', 'assets/pdf-text.js', '.github/workflows/candidate-resume.yml']
+permissions:
+  contents: read
+jobs:
+  studio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: candidate-resume
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test && npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-resume-private-review
+          path: candidate-resume/dist/
+          retention-days: 7
+  private-accounts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: candidate-resume
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.119.0
+      - run: npm ci
+      - name: Test candidate accounts in a disposable local project
+        env:
+          CANDIDATE_TEST_STACK: ${{ runner.temp }}/candidate-supabase
+        run: |
+          mkdir -p "$CANDIDATE_TEST_STACK"
+          supabase init --workdir "$CANDIDATE_TEST_STACK"
+          supabase start --workdir "$CANDIDATE_TEST_STACK" --exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          for script in backend/schema.sql backend/supabase/migrations/*.sql backend/retention.sql; do
+            psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f "$script"
+          done
+          node tests/local-auth.mjs
+      - name: Exercise saved accounts through the candidate UI
+        env:
+          CANDIDATE_TEST_STACK: ${{ runner.temp }}/candidate-supabase
+        run: |
+          export CANDIDATE_SUPABASE_URL=http://127.0.0.1:54321
+          CANDIDATE_PUBLISHABLE_KEY="$(supabase status --workdir "$CANDIDATE_TEST_STACK" -o json | jq -er .PUBLISHABLE_KEY)"
+          export CANDIDATE_PUBLISHABLE_KEY
+          npm run build
+          npx playwright install --with-deps chromium
+          npx playwright test --config playwright.accounts.config.mjs
